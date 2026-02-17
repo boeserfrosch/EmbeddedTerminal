@@ -1,0 +1,44 @@
+#ifndef BUILTIN_COMMAND_FLAGS_H
+#define BUILTIN_COMMAND_FLAGS_H
+
+#include <cstdint>
+
+namespace EmbeddedTerminal
+{
+    // Built-in command name constants
+    static const char *CMD_NAME_CAT = "cat";
+    static const char *CMD_NAME_CD = "cd";
+    static const char *CMD_NAME_DOWNLOAD = "download";
+    static const char *CMD_NAME_LS = "ls";
+    static const char *CMD_NAME_MKDIR = "mkdir";
+    static const char *CMD_NAME_RM = "rm";
+    static const char *CMD_NAME_RMDIR = "rmdir";
+    static const char *CMD_NAME_TAIL = "tail";
+    static const char *CMD_NAME_DF = "df";
+    static const char *CMD_NAME_IP = "ip";
+    static const char *CMD_NAME_HELP = "help";
+
+    // Built-in command flags for selective registration
+    typedef uint32_t BuiltinCommand;
+
+    const BuiltinCommand CMD_NONE = 0;
+    const BuiltinCommand CMD_CAT = 1 << 0;
+    const BuiltinCommand CMD_CD = 1 << 1;
+    const BuiltinCommand CMD_DOWNLOAD = 1 << 2;
+    const BuiltinCommand CMD_LS = 1 << 3;
+    const BuiltinCommand CMD_MKDIR = 1 << 4;
+    const BuiltinCommand CMD_RM = 1 << 5;
+    const BuiltinCommand CMD_RMDIR = 1 << 6;
+    const BuiltinCommand CMD_TAIL = 1 << 7;
+    const BuiltinCommand CMD_DF = 1 << 8;
+    const BuiltinCommand CMD_IP = 1 << 9;
+    const BuiltinCommand CMD_HELP = 1 << 10;
+
+    // Convenience flags
+    const BuiltinCommand CMD_FILESYSTEM_ALL = CMD_CAT | CMD_CD | CMD_DOWNLOAD | CMD_LS | CMD_MKDIR | CMD_RM | CMD_RMDIR | CMD_TAIL;
+    const BuiltinCommand CMD_DISK_ALL = CMD_DF;
+    const BuiltinCommand CMD_NETWORK_ALL = CMD_IP;
+    const BuiltinCommand CMD_ALL = CMD_FILESYSTEM_ALL | CMD_DISK_ALL | CMD_NETWORK_ALL | CMD_HELP;
+}
+
+#endif // BUILTIN_COMMAND_FLAGS_H

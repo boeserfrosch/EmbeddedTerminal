@@ -49,6 +49,43 @@ lib_deps =
 
 ```cpp
 #include <Terminal.h>
+#include <DirectoryNavigator.h>
+
+using namespace EmbeddedTerminal;
+
+// Create terminal instance (accepts Serial directly on Arduino platforms)
+Terminal term(Serial);
+DirectoryNavigator nav(&fileSystem);
+
+void setup() {
+    Serial.begin(115200);
+    
+    // NEW: Register all built-in commands with one call!
+    term.registerAllCommands(nav, fileSystem, networkInterface);
+    
+    // Alternative: Register only specific command categories
+    // term.registerFilesystemCommands(nav);  // cat, cd, download, ls, mkdir, rm, rmdir, tail
+    // term.registerDiskCommands(fileSystem); // df
+    // term.registerNetworkCommands(net);     // ip
+    // term.registerHelpCommand();            // help
+    
+    // Alternative: Register selected commands using flags
+    // term.registerFilesystemCommands(nav, CMD_LS | CMD_CD | CMD_CAT);
+    
+    Serial.println("Terminal ready! Type 'help' for available commands.");
+}
+
+void loop() {
+    term.loop();  // Process terminal input
+}
+```
+
+### Legacy Terminal Setup (Still Supported)
+
+For backward compatibility or custom commands, the original registration method still works:
+
+```cpp
+#include <Terminal.h>
 #include <commands/help.h>
 #include <commands/ls.h>
 
@@ -60,7 +97,7 @@ Terminal term(Serial);
 void setup() {
     Serial.begin(115200);
     
-    // Register built-in commands
+    // Register built-in commands manually (legacy approach)
     static cmd::help helpCmd(term);
     static cmd::ls lsCmd(fileSystem);
     
@@ -153,19 +190,76 @@ namespace EmbeddedTerminal {
         // Advanced constructor for custom stream implementations
         Terminal(ITerminalStream &input);
         
+        // Basic operations
         void loop();
-        void registerCommand(ETString keyword, ICommand *observer);
-        void call(ETString keyword, ETString additional);
         const ETMap<ETString, ICommand *> getCommands();
+        
+        // Legacy command registration (for custom commands)
+        void registerCommand(ETString keyword, ICommand *observer);
+        
+        // Built-in command registration by category
+        void registerFilesystemCommands(DirectoryNavigator &nav, uint32_t flags = CMD_FILESYSTEM_ALL);
+        void registerDiskCommands(IFileSystem &fs, uint32_t flags = CMD_DISK_ALL);
+        void registerNetworkCommands(INetworkInterface &net, uint32_t flags = CMD_NETWORK_ALL);
+        void registerHelpCommand();
+        void registerAllCommands(DirectoryNavigator &nav, IFileSystem &fs, INetworkInterface &net);
+        
+        // Command deregistration
+        void deregisterCommand(ETString keyword);
+        void deregisterFilesystemCommands(uint32_t flags = CMD_FILESYSTEM_ALL);
+        void deregisterDiskCommands(uint32_t flags = CMD_DISK_ALL);
+        void deregisterNetworkCommands(uint32_t flags = CMD_NETWORK_ALL);
+        void deregisterHelpCommand();
+        void deregisterAllCommands();
     };
 }
+```
+
+**Built-in Command Flags:**
+
+Use these flags to selectively register commands:
+
+```cpp
+// Individual command flags
+CMD_CAT, CMD_CD, CMD_DOWNLOAD, CMD_LS, CMD_MKDIR, CMD_RM, CMD_RMDIR, CMD_TAIL
+CMD_DF, CMD_IP, CMD_HELP
+
+// Convenience flags
+CMD_FILESYSTEM_ALL  // All filesystem commands (cat, cd, download, ls, mkdir, rm, rmdir, tail)
+CMD_DISK_ALL        // All disk commands (df)
+CMD_NETWORK_ALL     // All network commands (ip)
+CMD_ALL             // All built-in commands
+```
+
+**Registration Examples:**
+
+```cpp
+// Register all built-in commands
+term.registerAllCommands(nav, fileSystem, networkInterface);
+
+// Register all filesystem commands
+term.registerFilesystemCommands(nav);
+
+// Register only specific commands using flags
+term.registerFilesystemCommands(nav, CMD_LS | CMD_CD | CMD_CAT);
+
+// Deregister specific commands
+term.deregisterFilesystemCommands(CMD_LS | CMD_CD);
+
+// Deregister all commands
+term.deregisterAllCommands();
+
+// Custom command registration (still supported)
+term.registerCommand("mycmd", &myCustomCommand);
 ```
 
 **Usage Notes:**
 
 - On Arduino/ESP32 platforms, you can pass `Serial` or any `Stream` object directly
 - For custom stream implementations, create a class implementing `ITerminalStream` interface
-- The Stream is managed internally; no manual cleanup required
+- The Terminal class now owns and manages built-in command objects automatically
+- Custom commands registered via `registerCommand()` must be managed by the caller
+- Command objects are automatically cleaned up in the Terminal destructor
 
 ### ICommand Interface
 

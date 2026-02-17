@@ -1,7 +1,7 @@
 #include "ip.h"
 
 using namespace EmbeddedTerminal::cmd;
-ETString ip::trigger(ETString &keyword, ETString &additional)
+ETString ip::trigger(const ETString &keyword, const ETString &additional)
 {
     ETString result;
     auto interfaces = _net.getInterfaces();
@@ -10,10 +10,10 @@ ETString ip::trigger(ETString &keyword, ETString &additional)
         return "No interface available\n";
     }
 
-    additional = additional.trim();
-    if (!additional.empty())
+    ETString params = additional.trim();
+    if (!params.empty())
     {
-        auto iface = _net.getInterface(additional);
+        auto iface = _net.getInterface(params);
         if (iface.name.empty())
         {
             return "Unknown interface\n";
@@ -42,7 +42,7 @@ ETString ip::trigger(ETString &keyword, ETString &additional)
     return result;
 }
 
-ETString ip::usage(ETString &keyword)
+ETString ip::usage(const ETString &keyword)
 {
     return keyword + " - Returns info for all network interfaces\n";
 }

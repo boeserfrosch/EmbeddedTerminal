@@ -16,9 +16,9 @@ namespace EmbeddedTerminal
             cd(DirectoryNavigator &dir) : _dir(dir)
             {
             }
-            ETString usage(ETString &keyword);
+            ETString usage(const ETString &keyword);
 
-            ETString trigger(ETString &keyword, ETString &additional) override;
+            ETString trigger(const ETString &keyword, const ETString &additional) override;
 
         private:
             DirectoryNavigator &_dir;

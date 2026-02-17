@@ -3,15 +3,21 @@
  *
  * This example demonstrates basic usage of the EmbeddedTerminal library
  * on ESP32 or Arduino platforms. It creates a terminal with several
- * built-in commands accessible via Serial.
+ * built-in commands accessible via Serial using the new simplified
+ * command registration API.
  *
  * Commands available:
- * - help : List all available commands
- * - ls   : List files in current directory
- * - cd   : Change directory
- * - cat  : Display file contents
- * - mkdir: Create a directory
- * - rm   : Remove a file
+ * - help    : List all available commands
+ * - ls      : List files in current directory
+ * - cd      : Change directory
+ * - cat     : Display file contents
+ * - mkdir   : Create a directory
+ * - rm      : Remove a file
+ * - rmdir   : Remove a directory
+ * - tail    : Show end of file
+ * - download: Download file via network
+ * - df      : Show disk usage
+ * - ip      : Show network interfaces
  *
  * Usage:
  * 1. Upload this sketch to your ESP32/Arduino board
@@ -23,27 +29,24 @@
  *   > ls
  *   > mkdir test
  *   > cd test
- *   > pwd
+ *   > df
  */
 
 #include <Arduino.h>
 #include <Terminal.h>
-#include <commands/help.h>
-#include <commands/ls.h>
-#include <commands/cd.h>
-#include <commands/cat.h>
-#include <commands/mkdir.h>
-#include <commands/rm.h>
-#include <commands/df.h>
+#include <BuiltinCommandFactory.h>
 #include <DirectoryNavigator.h>
 
 // Platform-specific file system
 #if defined(ESP32)
 #include <hal/SDMMCFileSystem.h>
+#include <hal/ESPNetworkInterface.h>
 SDMMCFileSystem fileSystem;
+ESPNetworkInterface networkInterface;
 #elif defined(ARDUINO)
 #include <hal/ArduinoFileSystem.h>
 ArduinoFileSystem fileSystem;
+// Note: Network interface not available on basic Arduino
 #else
 #include <hal/NativeFileSystem.h>
 NativeFileSystem fileSystem;
@@ -54,17 +57,11 @@ using namespace EmbeddedTerminal;
 // Create terminal instance (Terminal accepts Stream directly on Arduino)
 Terminal term(Serial);
 
+// Create factory instance (owns built-in commands)
+EmbeddedTerminal::BuiltinCommandFactory factory;
+
 // Directory navigator for file commands
 DirectoryNavigator nav(&fileSystem);
-
-// Command instances (must be static to persist)
-static cmd::help helpCmd(term);
-static cmd::ls lsCmd(nav);
-static cmd::cd cdCmd(nav);
-static cmd::cat catCmd(nav);
-static cmd::mkdir mkdirCmd(nav);
-static cmd::rm rmCmd(nav);
-static cmd::df dfCmd(fileSystem);
 
 void setup()
 {
@@ -92,14 +89,22 @@ void setup()
     }
 #endif
 
-    // Register commands with terminal
-    term.registerCommand("help", &helpCmd);
-    term.registerCommand("ls", &lsCmd);
-    term.registerCommand("cd", &cdCmd);
-    term.registerCommand("cat", &catCmd);
-    term.registerCommand("mkdir", &mkdirCmd);
-    term.registerCommand("rm", &rmCmd);
-    term.registerCommand("df", &dfCmd);
+    // Register all built-in commands using BuiltinCommandFactory
+    // This is the simplest approach - all commands registered automatically
+#if defined(ESP32)
+    factory.registerAllCommands(term, nav, networkInterface);
+#else
+    // On platforms without network support, register commands individually by category
+    factory.registerFilesystemCommands(term, nav); // cat, cd, download, ls, mkdir, rm, rmdir, tail
+    factory.registerDiskCommands(term, nav);       // df
+    factory.registerHelpCommand(term);             // help
+#endif
+
+    // Alternative: Selective registration with flags
+    // Uncomment to register only specific commands:
+    // factory.registerFilesystemCommands(term, nav, CMD_LS | CMD_CD | CMD_CAT);
+    // factory.registerDiskCommands(term, nav, CMD_DF);
+    // factory.registerHelpCommand(term);
 
     // Show available commands
     Serial.println();

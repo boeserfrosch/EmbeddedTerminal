@@ -15,9 +15,9 @@ namespace EmbeddedTerminal
             help(Terminal &terminal) : _terminal(terminal)
             {
             }
-            ETString usage(ETString &keyword);
+            ETString usage(const ETString &keyword);
 
-            ETString trigger(ETString &keyword, ETString &additional) override;
+            ETString trigger(const ETString &keyword, const ETString &additional) override;
 
         private:
             Terminal &_terminal;

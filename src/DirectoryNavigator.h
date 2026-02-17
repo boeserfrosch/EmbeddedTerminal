@@ -158,6 +158,12 @@ namespace EmbeddedTerminal
             return isDirectory(path.c_str());
         }
 
+        // Get underlying file system
+        IFileSystem* getFileSystem() const
+        {
+            return fs_;
+        }
+
     private:
         IFileSystem *fs_;
         ETString currentDir_;

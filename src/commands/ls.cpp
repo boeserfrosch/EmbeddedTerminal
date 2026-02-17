@@ -2,7 +2,7 @@
 #include <sstream>
 
 using namespace EmbeddedTerminal::cmd;
-ETString ls::trigger(ETString &keyword, ETString &additional)
+ETString ls::trigger(const ETString &keyword, const ETString &additional)
 {
     additional.trim();
     auto param = split(additional, " ");
@@ -40,7 +40,7 @@ ETString ls::trigger(ETString &keyword, ETString &additional)
     return result;
 }
 
-ETString ls::usage(ETString &keyword)
+ETString ls::usage(const ETString &keyword)
 {
     return "List the conntent of directories\n\n" +
            keyword + " - List the content of the current directory\n" +

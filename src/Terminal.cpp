@@ -1,21 +1,23 @@
 #include "Terminal.h"
 #include <string>
 #include <algorithm>
+
 namespace EmbeddedTerminal
 {
 
     Terminal::Terminal(ITerminalStream &input) : _input(input)
 #if defined(ARDUINO) || defined(ESP_PLATFORM)
-        , _ownedStream(nullptr)
+                                                 ,
+                                                 _ownedStream(nullptr)
 #endif
     {
-        buffer.reserve(256);
+        buffer.reserve(BUFFER_RESERVE_SIZE);
     }
 
 #if defined(ARDUINO) || defined(ESP_PLATFORM)
     Terminal::Terminal(Stream &stream) : _ownedStream(new ArduinoStream(stream)), _input(*_ownedStream)
     {
-        buffer.reserve(256);
+        buffer.reserve(BUFFER_RESERVE_SIZE);
     }
 #endif
 
@@ -27,6 +29,7 @@ namespace EmbeddedTerminal
             delete _ownedStream;
         }
 #endif
+        // Terminal does NOT own commands - caller is responsible for cleanup
     }
 
     void Terminal::loop()
@@ -66,31 +69,57 @@ namespace EmbeddedTerminal
         }
     }
 
-    void Terminal::registerCommand(ETString keyword, ICommand *observer)
+    void Terminal::registerCommand(const ETString &keyword, ICommand *observer)
     {
-        keyword.trim();
-        _observer.insert({keyword, observer});
+        if (observer == nullptr)
+        {
+            return; // Ignore null command pointers
+        }
+
+        ETString trimmedKeyword = keyword;
+        trimmedKeyword.trim();
+
+        if (trimmedKeyword.empty())
+        {
+            return; // Ignore empty keywords
+        }
+
+        // Store command pointer - Terminal does NOT take ownership
+        _observer[trimmedKeyword] = observer;
     }
 
-    const ETMap<ETString, ICommand *> Terminal::getCommands()
+    const ETMap<ETString, ICommand *> &Terminal::getCommands() const
     {
         return _observer;
     }
 
-    void Terminal::call(ETString keyword, ETString additional)
+    void Terminal::deregisterCommand(const ETString &keyword)
     {
-        keyword.trim();
+        ETString trimmedKeyword = keyword;
+        trimmedKeyword.trim();
+        auto it = _observer.find(trimmedKeyword);
+        if (it != _observer.end())
+        {
+            // Just remove from map - Terminal does NOT own commands
+            _observer.erase(it);
+        }
+    }
 
-        if (keyword.empty())
+    void Terminal::call(const ETString &keyword, const ETString &additional)
+    {
+        ETString trimmedKeyword = keyword;
+        trimmedKeyword.trim();
+
+        if (trimmedKeyword.empty())
             return;
-        auto search = _observer.find(keyword);
+        auto search = _observer.find(trimmedKeyword);
         if (search != _observer.end())
         {
-            _input.print(search->second->trigger(keyword, additional));
+            _input.print(search->second->trigger(trimmedKeyword, additional));
         }
         else
         {
-            _input.printf("%s is unknown!\n", keyword.c_str());
+            _input.printf("%s is unknown!\n", trimmedKeyword.c_str());
         }
     }
 }

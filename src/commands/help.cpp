@@ -1,15 +1,15 @@
 #include "help.h"
 
 using namespace EmbeddedTerminal;
-ETString cmd::help::trigger(ETString &keyword, ETString &additional)
+ETString cmd::help::trigger(const ETString &keyword, const ETString &additional)
 {
-    additional = additional.trim();
-    auto parts = split(additional, " ");
+    ETString params = additional.trim();
+    auto parts = split(params, " ");
 
     ETString result = "Available commands\n";
     auto commands = _terminal.getCommands();
 
-    if (additional.empty())
+    if (params.empty())
     {
         for (const auto &command : commands)
         {
@@ -28,7 +28,7 @@ ETString cmd::help::trigger(ETString &keyword, ETString &additional)
     return cmd->second->usage(cmdKey);
 }
 
-ETString cmd::help::usage(ETString &keyword)
+ETString cmd::help::usage(const ETString &keyword)
 {
     return keyword + " - Returns all available commands\n" +
            keyword + " [command] - Returns the usage for the specific command\n";

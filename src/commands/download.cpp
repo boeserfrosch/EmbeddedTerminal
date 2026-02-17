@@ -89,7 +89,7 @@ ETString sendFile(ETFile &file)
     return result;
 }
 
-ETString cmd::download::trigger(ETString &keyword, ETString &additional)
+ETString cmd::download::trigger(const ETString &keyword, const ETString &additional)
 {
 
     additional.trim();
@@ -105,7 +105,7 @@ ETString cmd::download::trigger(ETString &keyword, ETString &additional)
     return sendFile(file);
 }
 
-ETString cmd::download::usage(ETString &keyword)
+ETString cmd::download::usage(const ETString &keyword)
 {
     return "Download a specific file\n\n" +
            keyword + "[path] - Download the file under the given path\n If the file did not exists than just a filesize of zero will be returned";

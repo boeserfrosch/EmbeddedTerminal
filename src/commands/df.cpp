@@ -1,7 +1,7 @@
 #include "commands/df.h"
 
 using namespace EmbeddedTerminal::cmd;
-ETString df::trigger(ETString &keyword, ETString &additional)
+ETString df::trigger(const ETString &keyword, const ETString &additional)
 {
     char sizeStr[256];
     auto dim = 1024 * 1024.0;
@@ -15,7 +15,7 @@ ETString df::trigger(ETString &keyword, ETString &additional)
     return sizeStr;
 }
 
-ETString df::usage(ETString &keyword)
+ETString df::usage(const ETString &keyword)
 {
     return keyword + " - Show disk usage \n";
 }

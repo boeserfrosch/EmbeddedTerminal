@@ -1,18 +1,18 @@
 #include "tail.h"
 using namespace EmbeddedTerminal::cmd;
-ETString tail::trigger(ETString &keyword, ETString &additional)
+ETString tail::trigger(const ETString &keyword, const ETString &additional)
 {
     bool truncated = false;
-    additional = additional.trim();
-    if (additional.empty())
+    ETString fileName = additional.trim();
+    if (fileName.empty())
     {
         return "Expected parameter\n" + usage(keyword);
     }
-    if (!_dir.exists(additional.c_str()) || _dir.isDirectory(additional.c_str()))
+    if (!_dir.exists(fileName.c_str()) || _dir.isDirectory(fileName.c_str()))
     {
-        return "file " + additional + " did not exist!\n";
+        return "file " + fileName + " did not exist!\n";
     }
-    auto file = _dir.open(additional.trim().c_str(), "r", false);
+    auto file = _dir.open(fileName.c_str(), "r", false);
     if (file.size() > 512)
     {
         truncated = true;
@@ -27,7 +27,7 @@ ETString tail::trigger(ETString &keyword, ETString &additional)
     return ETString(content.c_str()) + "\n";
 }
 
-ETString tail::usage(ETString &keyword)
+ETString tail::usage(const ETString &keyword)
 {
     return keyword + " [file] - Returns the last lines of the specified file. At max 512 bytes.\n";
 }

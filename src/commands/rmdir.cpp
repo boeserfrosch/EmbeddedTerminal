@@ -1,31 +1,31 @@
 #include "rmdir.h"
 
 using namespace EmbeddedTerminal::cmd;
-ETString rmdir::trigger(ETString &keyword, ETString &additional)
+ETString rmdir::trigger(const ETString &keyword, const ETString &additional)
 {
-    additional = additional.trim();
-    if (additional.empty())
+    ETString folderName = additional.trim();
+    if (folderName.empty())
         return "Can not remove folder with no name\n";
-    if (!_dir.exists(additional))
+    if (!_dir.exists(folderName))
     {
-        return additional + " did not exists\n";
+        return folderName + " did not exists\n";
     }
-    if (!_dir.isDirectory(additional))
+    if (!_dir.isDirectory(folderName))
     {
-        return additional + " is not a directory\n";
+        return folderName + " is not a directory\n";
     }
-    if (!_dir.isEmpty(additional.c_str()))
+    if (!_dir.isEmpty(folderName.c_str()))
     {
-        return additional + " is not empty\n";
+        return folderName + " is not empty\n";
     }
-    if (!_dir.rmdir(additional))
+    if (!_dir.rmdir(folderName))
     {
-        return "Could not remove " + additional + "\n";
+        return "Could not remove " + folderName + "\n";
     }
-    return additional + " removed\n";
+    return folderName + " removed\n";
 }
 
-ETString rmdir::usage(ETString &keyword)
+ETString rmdir::usage(const ETString &keyword)
 {
     return keyword + " [folder] - Remove the specfied folder\n";
 }

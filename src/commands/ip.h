@@ -14,8 +14,8 @@ namespace EmbeddedTerminal
             ip(INetworkInterface &network) : _net(network)
             {
             }
-            ETString usage(ETString &keyword);
-            ETString trigger(ETString &keyword, ETString &additional) override;
+            ETString usage(const ETString &keyword);
+            ETString trigger(const ETString &keyword, const ETString &additional) override;
 
         private:
             INetworkInterface &_net;

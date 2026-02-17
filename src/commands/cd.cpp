@@ -1,22 +1,22 @@
 #include "commands/cd.h"
 
 using namespace EmbeddedTerminal::cmd;
-ETString cd::trigger(ETString &keyword, ETString &relPath)
+ETString cd::trigger(const ETString &keyword, const ETString &relPath)
 {
-    relPath = relPath.trim();
-    if (relPath.empty())
+    ETString path = relPath.trim();
+    if (path.empty())
     {
         return "Expected parameter\n" + usage(keyword);
     }
-    if (!_dir.exists(relPath.c_str()))
+    if (!_dir.exists(path.c_str()))
     {
-        return relPath + " did not exist \n";
+        return path + " did not exist \n";
     }
-    if (!_dir.isDirectory(relPath.c_str()))
+    if (!_dir.isDirectory(path.c_str()))
     {
-        return relPath + " is not a directory \n";
+        return path + " is not a directory \n";
     }
-    if (_dir.cd(relPath.c_str()))
+    if (_dir.cd(path.c_str()))
     {
         return "> " + _dir.pwd() + "\n";
     }
@@ -26,7 +26,7 @@ ETString cd::trigger(ETString &keyword, ETString &relPath)
     }
 }
 
-ETString cd::usage(ETString &keyword)
+ETString cd::usage(const ETString &keyword)
 {
     return keyword + " [path] - Change the current directory relative to path\n";
 }

@@ -19,11 +19,11 @@ void tearDown(void) {}
 class DummyCommand : public ICommand
 {
 public:
-    ETString trigger(ETString &keyword, ETString &additional) override
+    ETString trigger(const ETString &keyword, const ETString &additional) override
     {
         return "Dummy command triggered";
     }
-    ETString usage(ETString &keyword) override
+    ETString usage(const ETString &keyword) override
     {
         return "Dummy usage";
     }

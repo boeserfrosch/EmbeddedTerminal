@@ -1,30 +1,30 @@
 #include "rm.h"
 
 using namespace EmbeddedTerminal::cmd;
-ETString rm::trigger(ETString &keyword, ETString &additional)
+ETString rm::trigger(const ETString &keyword, const ETString &additional)
 {
-    additional = additional.trim();
-    if (additional.empty())
+    ETString fileName = additional.trim();
+    if (fileName.empty())
     {
         return "Can not remove unspecified file!\n";
     }
-    if (!_dir.exists(additional.c_str()))
+    if (!_dir.exists(fileName.c_str()))
     {
-        return additional + " did not exist!\n";
+        return fileName + " did not exist!\n";
     }
-    if (_dir.isDirectory(additional))
+    if (_dir.isDirectory(fileName))
     {
-        return additional + "is not a file\n";
+        return fileName + "is not a file\n";
     }
-    auto result = _dir.remove(additional.trim().c_str());
+    auto result = _dir.remove(fileName.c_str());
     if (result)
     {
-        return additional + " removed\n";
+        return fileName + " removed\n";
     }
     return "Error on deleting\n";
 }
 
-ETString rm::usage(ETString &keyword)
+ETString rm::usage(const ETString &keyword)
 {
     return keyword + " [file] - Remove the specified file\n";
 }

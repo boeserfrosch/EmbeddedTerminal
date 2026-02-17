@@ -8,10 +8,10 @@ namespace EmbeddedTerminal
     class ICommand
     {
     public:
-        virtual ETString usage(ETString &keyword) = 0;
+        virtual ETString usage(const ETString &keyword) = 0;
 
     protected:
-        virtual ETString trigger(ETString &keyword, ETString &additional) = 0;
+        virtual ETString trigger(const ETString &keyword, const ETString &additional) = 0;
         friend class Terminal;
     };
 } // namespace EmbeddedTerminal

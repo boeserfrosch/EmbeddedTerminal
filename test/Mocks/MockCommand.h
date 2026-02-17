@@ -9,14 +9,14 @@ class MockCommand : public EmbeddedTerminal::ICommand
 public:
     ETString lastKeyword;
     ETString lastAdditional;
-    ETString usage(ETString &keyword) override
+    ETString usage(const ETString &keyword) override
     {
         lastKeyword = keyword;
         return "Usage: " + keyword;
     }
 
 protected:
-    ETString trigger(ETString &keyword, ETString &additional) override
+    ETString trigger(const ETString &keyword, const ETString &additional) override
     {
         lastKeyword = keyword;
         lastAdditional = additional;
