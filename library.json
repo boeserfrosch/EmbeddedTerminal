@@ -1,0 +1,33 @@
+{
+    "name": "EmbeddedTerminal",
+    "version": "0.1.0",
+    "description": "Platform-independent terminal library for embedded systems with command parsing, file system abstraction, and network interfaces.",
+    "keywords": [
+        "terminal",
+        "embedded",
+        "platform-independent",
+        "command-line",
+        "cli",
+        "shell",
+        "filesystem",
+        "esp32",
+        "arduino"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/boeserfrosch/EmbeddedTerminal"
+    },
+    "authors": [
+        {
+            "name": "Guido Lehne",
+            "email": "guido.lehne@example.com",
+            "maintainer": true
+        }
+    ],
+    "license": "GPL-3.0",
+    "frameworks": "*",
+    "platforms": "*",
+    "dependencies": {
+        "hideakitai/ArxContainer": "^0.7.0"
+    }
+}

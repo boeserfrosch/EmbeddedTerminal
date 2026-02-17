@@ -1,0 +1,82 @@
+#######################################
+# Syntax Coloring Map For EmbeddedTerminal
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+Terminal				KEYWORD1
+ETString				KEYWORD1
+ETVector				KEYWORD1
+ETMap					KEYWORD1
+ETFile					KEYWORD1
+DirectoryNavigator		KEYWORD1
+ICommand				KEYWORD1
+IFile					KEYWORD1
+IFileSystem				KEYWORD1
+ITerminalStream			KEYWORD1
+INetworkInterface		KEYWORD1
+NativeFileSystem		KEYWORD1
+ArduinoFileSystem		KEYWORD1
+SDMMCFileSystem			KEYWORD1
+NetworkInfo				KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+loop					KEYWORD2
+registerCommand			KEYWORD2
+call					KEYWORD2
+getCommands				KEYWORD2
+trigger					KEYWORD2
+usage					KEYWORD2
+exists					KEYWORD2
+mkdir					KEYWORD2
+rmdir					KEYWORD2
+remove					KEYWORD2
+list					KEYWORD2
+open					KEYWORD2
+isDirectory				KEYWORD2
+isEmpty					KEYWORD2
+capacity				KEYWORD2
+totalBytes				KEYWORD2
+usedBytes				KEYWORD2
+trim					KEYWORD2
+cleanupString			KEYWORD2
+split					KEYWORD2
+join					KEYWORD2
+toLower					KEYWORD2
+toETString				KEYWORD2
+cd						KEYWORD2
+pwd						KEYWORD2
+ls						KEYWORD2
+navigate				KEYWORD2
+getAll					KEYWORD2
+length					KEYWORD2
+empty					KEYWORD2
+substr					KEYWORD2
+find					KEYWORD2
+c_str					KEYWORD2
+read					KEYWORD2
+write					KEYWORD2
+available				KEYWORD2
+printf					KEYWORD2
+println					KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+FILE_MODE_READ			LITERAL1
+FILE_MODE_WRITE			LITERAL1
+FILE_MODE_APPEND		LITERAL1
+npos					LITERAL1
+
+#######################################
+# Namespaces
+#######################################
+
+EmbeddedTerminal		KEYWORD3
+cmd						KEYWORD3
