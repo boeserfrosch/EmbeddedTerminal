@@ -1,12 +1,14 @@
 #if defined(ARDUINO)
 #include <Arduino.h>
+#include <SD.h>
 #endif
 #include <unity.h>
 
 #include "../src/hal/ArduinoFile.h"
-#include <SD.h>
 
 using namespace EmbeddedTerminal;
+
+#if defined(ARDUINO)
 
 static const char *TEST_FILE = "/file.txt";
 
@@ -129,9 +131,23 @@ void test_isDirectory(void)
     SD.rmdir("/dir");
 }
 
+#else // !ARDUINO (ESP-IDF)
+
+// SD library is not available in ESP-IDF, provide stub implementations
+void setUp(void) {}
+void tearDown(void) {}
+
+void test_arduinofile_not_available_in_espidf(void)
+{
+    TEST_IGNORE_MESSAGE("ArduinoFile tests only available on Arduino framework");
+}
+
+#endif // ARDUINO
+
 int process_tests_arduino_file()
 {
     UNITY_BEGIN();
+#if defined(ARDUINO)
     RUN_TEST(test_write_and_read_single_byte);
     RUN_TEST(test_write_and_read_buffer);
     RUN_TEST(test_readAll_and_writeAll);
@@ -140,6 +156,10 @@ int process_tests_arduino_file()
     RUN_TEST(test_isOpen_and_close);
     RUN_TEST(test_name_and_path);
     RUN_TEST(test_isDirectory);
+#else
+    // ESP-IDF: SD library not available
+    RUN_TEST(test_arduinofile_not_available_in_espidf);
+#endif
     return UNITY_END();
 }
 
