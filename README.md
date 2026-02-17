@@ -26,7 +26,7 @@ Add to your `platformio.ini`:
 ```ini
 [env]
 lib_deps = 
-    boeserfrosch/EmbeddedTerminal@^0.2.0
+    boeserfrosch/EmbeddedTerminal@^0.2.1
 ```
 
 ### Arduino Library Manager
