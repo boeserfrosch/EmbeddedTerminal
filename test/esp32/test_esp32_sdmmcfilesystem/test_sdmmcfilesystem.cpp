@@ -7,9 +7,9 @@
 
 #include "../src/hal/SDMMCFileSystem.h"
 
-using namespace EmbeddedTerminal;
-
 #if defined(ARDUINO)
+
+using namespace EmbeddedTerminal;
 
 static SDMMCFileSystem *fileSystem;
 

@@ -6,9 +6,9 @@
 
 #include "../src/hal/ArduinoFile.h"
 
-using namespace EmbeddedTerminal;
-
 #if defined(ARDUINO)
+
+using namespace EmbeddedTerminal;
 
 static const char *TEST_FILE = "/file.txt";
 
