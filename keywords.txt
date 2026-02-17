@@ -52,6 +52,7 @@ toETString				KEYWORD2
 cd						KEYWORD2
 pwd						KEYWORD2
 ls						KEYWORD2
+ping					KEYWORD2
 navigate				KEYWORD2
 getAll					KEYWORD2
 length					KEYWORD2

@@ -193,6 +193,23 @@ namespace EmbeddedTerminal
                 terminal.registerCommand(CMD_NAME_IP, _builtinCommands[CMD_NAME_IP]);
             }
         }
+
+        if (flags & CMD_PING)
+        {
+            auto it = _builtinCommands.find(CMD_NAME_PING);
+            if (it == _builtinCommands.end())
+            {
+                cmd::ping *pingCmd = new cmd::ping(net);
+                if (pingCmd != nullptr)
+                {
+                    _builtinCommands[CMD_NAME_PING] = pingCmd;
+                }
+            }
+            if (_builtinCommands.find(CMD_NAME_PING) != _builtinCommands.end())
+            {
+                terminal.registerCommand(CMD_NAME_PING, _builtinCommands[CMD_NAME_PING]);
+            }
+        }
     }
 
     void BuiltinCommandFactory::registerHelpCommand(Terminal &terminal)
@@ -251,6 +268,8 @@ namespace EmbeddedTerminal
     {
         if (flags & CMD_IP)
             terminal.deregisterCommand(CMD_NAME_IP);
+        if (flags & CMD_PING)
+            terminal.deregisterCommand(CMD_NAME_PING);
     }
 
     void BuiltinCommandFactory::deregisterHelpCommand(Terminal &terminal)

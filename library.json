@@ -28,6 +28,7 @@
     "frameworks": "*",
     "platforms": "*",
     "dependencies": {
-        "hideakitai/ArxContainer": "^0.7.0"
+        "hideakitai/ArxContainer": "^0.7.0",
+        "mobizt/ESP32 Ping": "^1.0.1"
     }
 }
