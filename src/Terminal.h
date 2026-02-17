@@ -9,7 +9,7 @@
 #include <string>
 #include <sstream>
 
-#if defined(ARDUINO) || defined(ESP_PLATFORM)
+#if defined(ARDUINO)
 #include <Arduino.h>
 #include "hal/ArduinoStream.h"
 #endif
@@ -25,7 +25,7 @@ namespace EmbeddedTerminal
     {
     public:
         Terminal(ITerminalStream &input);
-#if defined(ARDUINO) || defined(ESP_PLATFORM)
+#if defined(ARDUINO)
         Terminal(Stream &stream);
 #endif
         ~Terminal();
@@ -51,7 +51,7 @@ namespace EmbeddedTerminal
     private:
         ETMap<ETString, ICommand *> _observer;
         ITerminalStream &_input;
-#if defined(ARDUINO) || defined(ESP_PLATFORM)
+#if defined(ARDUINO)
         ArduinoStream *_ownedStream;
 #endif
 

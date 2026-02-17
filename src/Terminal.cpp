@@ -6,7 +6,7 @@ namespace EmbeddedTerminal
 {
 
     Terminal::Terminal(ITerminalStream &input) : _input(input)
-#if defined(ARDUINO) || defined(ESP_PLATFORM)
+#if defined(ARDUINO)
                                                  ,
                                                  _ownedStream(nullptr)
 #endif
@@ -14,7 +14,7 @@ namespace EmbeddedTerminal
         buffer.reserve(BUFFER_RESERVE_SIZE);
     }
 
-#if defined(ARDUINO) || defined(ESP_PLATFORM)
+#if defined(ARDUINO)
     Terminal::Terminal(Stream &stream) : _ownedStream(new ArduinoStream(stream)), _input(*_ownedStream)
     {
         buffer.reserve(BUFFER_RESERVE_SIZE);
@@ -23,7 +23,7 @@ namespace EmbeddedTerminal
 
     Terminal::~Terminal()
     {
-#if defined(ARDUINO) || defined(ESP_PLATFORM)
+#if defined(ARDUINO)
         if (_ownedStream != nullptr)
         {
             delete _ownedStream;

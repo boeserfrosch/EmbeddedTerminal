@@ -9,7 +9,7 @@
 
 using namespace EmbeddedTerminal;
 
-static SDMMCFileSystem *fs;
+static SDMMCFileSystem *fileSystem;
 
 void setUp(void)
 {
@@ -17,30 +17,30 @@ void setUp(void)
     {
         TEST_FAIL_MESSAGE("SD init failed, cannot run FileSystem tests!");
     }
-    fs = new SDMMCFileSystem();
+    fileSystem = new SDMMCFileSystem();
 
     // Aufräumen vor jedem Test
-    if (fs->exists("/test.txt"))
-        fs->remove("/test.txt");
-    if (fs->exists("/dir"))
-        fs->rmdir("/dir");
+    if (fileSystem->exists("/test.txt"))
+        fileSystem->remove("/test.txt");
+    if (fileSystem->exists("/dir"))
+        fileSystem->rmdir("/dir");
 }
 
 void tearDown(void)
 {
-    delete fs;
+    delete fileSystem;
 }
 
 // ---- Tests mit gültigem Mount ----
 
 void test_open_and_write_read_file(void)
 {
-    ETFile file = fs->open("/test.txt", FILE_MODE_WRITE, true);
+    ETFile file = fileSystem->open("/test.txt", FILE_MODE_WRITE, true);
     TEST_ASSERT_TRUE(file.isOpen());
     TEST_ASSERT_TRUE(file.writeAll("Hello World!"));
     file.close();
 
-    ETFile file2 = fs->open("/test.txt", FILE_MODE_READ);
+    ETFile file2 = fileSystem->open("/test.txt", FILE_MODE_READ);
     TEST_ASSERT_TRUE(file2.isOpen());
     ETString content = file2.readAll();
     TEST_ASSERT_EQUAL_STRING("Hello World!", content.c_str());
@@ -49,38 +49,38 @@ void test_open_and_write_read_file(void)
 
 void test_exists_and_remove(void)
 {
-    ETFile file = fs->open("/test.txt", FILE_MODE_WRITE, true);
+    ETFile file = fileSystem->open("/test.txt", FILE_MODE_WRITE, true);
     file.writeAll("abc");
     file.close();
 
-    TEST_ASSERT_TRUE(fs->exists("/test.txt"));
-    TEST_ASSERT_TRUE(fs->remove("/test.txt"));
-    TEST_ASSERT_FALSE(fs->exists("/test.txt"));
+    TEST_ASSERT_TRUE(fileSystem->exists("/test.txt"));
+    TEST_ASSERT_TRUE(fileSystem->remove("/test.txt"));
+    TEST_ASSERT_FALSE(fileSystem->exists("/test.txt"));
 }
 
 void test_isEmpty(void)
 {
-    ETFile file = fs->open("/test.txt", FILE_MODE_WRITE, true);
+    ETFile file = fileSystem->open("/test.txt", FILE_MODE_WRITE, true);
     file.writeAll("");
     file.close();
 
-    TEST_ASSERT_TRUE(fs->isEmpty("/test.txt"));
+    TEST_ASSERT_TRUE(fileSystem->isEmpty("/test.txt"));
 
-    ETFile file2 = fs->open("/test.txt", FILE_MODE_WRITE);
+    ETFile file2 = fileSystem->open("/test.txt", FILE_MODE_WRITE);
     file2.writeAll("data");
     file2.close();
 
-    TEST_ASSERT_FALSE(fs->isEmpty("/test.txt"));
+    TEST_ASSERT_FALSE(fileSystem->isEmpty("/test.txt"));
 }
 
 void test_mkdir_and_rmdir(void)
 {
-    TEST_ASSERT_FALSE(fs->exists("/dir"));
-    TEST_ASSERT_TRUE(fs->mkdir("/dir"));
-    TEST_ASSERT_TRUE(fs->exists("/dir"));
-    TEST_ASSERT_TRUE(fs->isDirectory("/dir"));
-    TEST_ASSERT_TRUE(fs->rmdir("/dir"));
-    TEST_ASSERT_FALSE(fs->exists("/dir"));
+    TEST_ASSERT_FALSE(fileSystem->exists("/dir"));
+    TEST_ASSERT_TRUE(fileSystem->mkdir("/dir"));
+    TEST_ASSERT_TRUE(fileSystem->exists("/dir"));
+    TEST_ASSERT_TRUE(fileSystem->isDirectory("/dir"));
+    TEST_ASSERT_TRUE(fileSystem->rmdir("/dir"));
+    TEST_ASSERT_FALSE(fileSystem->exists("/dir"));
 }
 
 // ---- Fehlerfall Tests ----
