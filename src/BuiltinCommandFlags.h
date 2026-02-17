@@ -6,17 +6,17 @@
 namespace EmbeddedTerminal
 {
     // Built-in command name constants
-    static const char *CMD_NAME_CAT = "cat";
-    static const char *CMD_NAME_CD = "cd";
-    static const char *CMD_NAME_DOWNLOAD = "download";
-    static const char *CMD_NAME_LS = "ls";
-    static const char *CMD_NAME_MKDIR = "mkdir";
-    static const char *CMD_NAME_RM = "rm";
-    static const char *CMD_NAME_RMDIR = "rmdir";
-    static const char *CMD_NAME_TAIL = "tail";
-    static const char *CMD_NAME_DF = "df";
-    static const char *CMD_NAME_IP = "ip";
-    static const char *CMD_NAME_HELP = "help";
+    constexpr const char *CMD_NAME_CAT = "cat";
+    constexpr const char *CMD_NAME_CD = "cd";
+    constexpr const char *CMD_NAME_DOWNLOAD = "download";
+    constexpr const char *CMD_NAME_LS = "ls";
+    constexpr const char *CMD_NAME_MKDIR = "mkdir";
+    constexpr const char *CMD_NAME_RM = "rm";
+    constexpr const char *CMD_NAME_RMDIR = "rmdir";
+    constexpr const char *CMD_NAME_TAIL = "tail";
+    constexpr const char *CMD_NAME_DF = "df";
+    constexpr const char *CMD_NAME_IP = "ip";
+    constexpr const char *CMD_NAME_HELP = "help";
 
     // Built-in command flags for selective registration
     typedef uint32_t BuiltinCommand;

@@ -1,13 +1,15 @@
 // Platform conditional includes
 #if defined(ARDUINO)
 #include <Arduino.h>
+#include "SD_MMC.h"
 #endif
 #include <unity.h>
 
 #include "../src/hal/SDMMCFileSystem.h"
-#include "SD_MMC.h"
 
 using namespace EmbeddedTerminal;
+
+#if defined(ARDUINO)
 
 static SDMMCFileSystem *fileSystem;
 
@@ -128,9 +130,23 @@ void test_isEmpty_with_null_mount_returns_true(void)
     TEST_ASSERT_TRUE(nullFs.isEmpty("/someFile")); // Da Datei nicht existiert
 }
 
+#else // !ARDUINO (ESP-IDF)
+
+// SD_MMC is not available in ESP-IDF, provide stub implementations
+void setUp(void) {}
+void tearDown(void) {}
+
+void test_sdmmc_not_available_in_espidf(void)
+{
+    TEST_IGNORE_MESSAGE("SD_MMC tests only available on Arduino framework");
+}
+
+#endif // ARDUINO
+
 int process_tests_filesystem()
 {
     UNITY_BEGIN();
+#if defined(ARDUINO)
     // Normal cases
     RUN_TEST(test_open_and_write_read_file);
     RUN_TEST(test_exists_and_remove);
@@ -145,6 +161,10 @@ int process_tests_filesystem()
     RUN_TEST(test_rmdir_with_null_mount_returns_false);
     RUN_TEST(test_isDirectory_with_null_mount_returns_false);
     RUN_TEST(test_isEmpty_with_null_mount_returns_true);
+#else
+    // ESP-IDF: SD_MMC not available
+    RUN_TEST(test_sdmmc_not_available_in_espidf);
+#endif
 
     return UNITY_END();
 }

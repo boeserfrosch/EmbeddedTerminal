@@ -8,6 +8,7 @@ namespace EmbeddedTerminal
     class ICommand
     {
     public:
+        virtual ~ICommand() = default;
         virtual ETString usage(const ETString &keyword) = 0;
 
     protected:
