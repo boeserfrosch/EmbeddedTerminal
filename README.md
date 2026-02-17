@@ -26,7 +26,7 @@ Add to your `platformio.ini`:
 ```ini
 [env]
 lib_deps = 
-    boeserfrosch/EmbeddedTerminal@^0.1.0
+    boeserfrosch/EmbeddedTerminal@^0.2.0
 ```
 
 ### Arduino Library Manager
@@ -45,109 +45,149 @@ lib_deps =
 
 ## Quick Start
 
-### Basic Terminal Setup
+### Basic Terminal Setup (Recommended)
+
+> **Full example:** [examples/BasicTerminal/BasicTerminal.ino](examples/BasicTerminal/BasicTerminal.ino)
 
 ```cpp
 #include <Terminal.h>
+#include <BuiltinCommandFactory.h>
+#include <hal/ArduinoFileSystem.h>
+
+ArduinoFileSystem fs;
+DirectoryNavigator nav(&fs);
+Terminal term(Serial);
+BuiltinCommandFactory factory;
+
+void setup() {
+    Serial.begin(115200);
+    
+    // Register all built-in commands using factory
+    factory.registerAllCommands(term, nav, nullptr);
+    
+    Serial.println("Terminal ready! Type 'help' for available commands.");
+    Serial.print("> ");
+}
+
+void loop() {
+    term.loop();
+}
+```
+
+### Selective Command Registration
+
+Register only specific command categories using flags:
+
+> **Full example:** [examples/SelectiveRegistration/SelectiveRegistration.ino](examples/SelectiveRegistration/SelectiveRegistration.ino)
+
+```cpp
+#include <BuiltinCommandFlags.h>
+
+BuiltinCommandFactory factory;
+
+void setup() {
+    Serial.begin(115200);
+    
+    // Register only filesystem navigation commands
+    factory.registerFilesystemCommands(term, nav, CMD_LS | CMD_CD | CMD_CAT);
+    
+    // Register disk usage command
+    factory.registerDiskCommands(term, nav);
+    
+    // Register network commands (requires INetworkInterface)
+    // factory.registerNetworkCommands(term, networkInterface);
+    
+    // Register help command
+    factory.registerHelpCommand(term);
+    
+    Serial.println("Terminal ready! Type 'help' for available commands.");
+    Serial.print("> ");
+}
+```
+
+### With Network Interface (ESP32)
+
+> **Full example:** [examples/NetworkTerminal/NetworkTerminal.ino](examples/NetworkTerminal/NetworkTerminal.ino)
+
+```cpp
+#include <Terminal.h>
+#include <BuiltinCommandFactory.h>
+#include <hal/ESPNetworkInterface.h>
+
+ArduinoFileSystem fs;
+DirectoryNavigator nav(&fs);
+ESPNetworkInterface netInterface;
+Terminal term(Serial);
+BuiltinCommandFactory factory;
+
+void setup() {
+    Serial.begin(115200);
+    WiFi.begin("SSID", "password");
+    
+    // Register all commands including network
+    factory.registerAllCommands(term, nav, &netInterface);
+    
+    Serial.println("Terminal ready! Type 'help' for available commands.");
+    Serial.print("> ");
+}
+
+void loop() {
+    term.loop();
+}
+```
+
+### Custom Commands
+
+> **Full example:** [examples/SimpleCustomCommand/SimpleCustomCommand.ino](examples/SimpleCustomCommand/SimpleCustomCommand.ino)
+
+```cpp
+#include <Terminal.h>
+#include <interfaces/ICommand.h>
 #include <DirectoryNavigator.h>
 
-using namespace EmbeddedTerminal;
-
-// Create terminal instance (accepts Serial directly on Arduino platforms)
-Terminal term(Serial);
-DirectoryNavigator nav(&fileSystem);
-
-void setup() {
-    Serial.begin(115200);
-    
-    // NEW: Register all built-in commands with one call!
-    term.registerAllCommands(nav, fileSystem, networkInterface);
-    
-    // Alternative: Register only specific command categories
-    // term.registerFilesystemCommands(nav);  // cat, cd, download, ls, mkdir, rm, rmdir, tail
-    // term.registerDiskCommands(fileSystem); // df
-    // term.registerNetworkCommands(net);     // ip
-    // term.registerHelpCommand();            // help
-    
-    // Alternative: Register selected commands using flags
-    // term.registerFilesystemCommands(nav, CMD_LS | CMD_CD | CMD_CAT);
-    
-    Serial.println("Terminal ready! Type 'help' for available commands.");
-}
-
-void loop() {
-    term.loop();  // Process terminal input
-}
-```
-
-### Legacy Terminal Setup (Still Supported)
-
-For backward compatibility or custom commands, the original registration method still works:
-
-```cpp
-#include <Terminal.h>
-#include <commands/help.h>
-#include <commands/ls.h>
-
-using namespace EmbeddedTerminal;
-
-// Create terminal instance (accepts Serial directly on Arduino platforms)
-Terminal term(Serial);
-
-void setup() {
-    Serial.begin(115200);
-    
-    // Register built-in commands manually (legacy approach)
-    static cmd::help helpCmd(term);
-    static cmd::ls lsCmd(fileSystem);
-    
-    term.registerCommand("help", &helpCmd);
-    term.registerCommand("ls", &lsCmd);
-    
-    Serial.println("Terminal ready! Type 'help' for available commands.");
-}
-
-void loop() {
-    term.loop();  // Process terminal input
-}
-```
-
-### Custom Command Example
-
-```cpp
-#include <interfaces/ICommand.h>
+// Platform-specific file system
+#if defined(ESP32)
+#include <hal/SDMMCFileSystem.h>
+SDMMCFileSystem fs;
+#elif defined(ARDUINO)
+#include <hal/ArduinoFileSystem.h>
+ArduinoFileSystem fs;
+#else
+#include <hal/NativeFileSystem.h>
+NativeFileSystem fs;
+#endif
 
 class MyCommand : public ICommand {
 public:
-    ETString trigger(ETString &keyword, ETString &additional) override {
-        return "Hello from " + keyword + "! Args: " + additional;
+    ETString trigger(const ETString &keyword, const ETString &additional) override {
+        return "Hello from custom command!";
     }
     
-    ETString usage(ETString &keyword) override {
-        return "Usage: " + keyword + " [args]";
+    ETString usage(const ETString &keyword) override {
+        return "mycmd - Custom command example";
     }
 };
 
-// In setup():
-static MyCommand myCmd;
-term.registerCommand("mycmd", &myCmd);
-```
-
-### File System Integration
-
-```cpp
-#include <hal/NativeFileSystem.h>  // Or ArduinoFileSystem, SDMMCFileSystem
-#include <DirectoryNavigator.h>
-
-NativeFileSystem fs;
 DirectoryNavigator nav(&fs);
+MyCommand myCmd;
+Terminal term(Serial);
 
-// Use with commands
-static cmd::cd cdCmd(nav);
-static cmd::ls lsCmd(nav);
-term.registerCommand("cd", &cdCmd);
-term.registerCommand("ls", &lsCmd);
+void setup() {
+    Serial.begin(115200);
+    
+    // Register custom command
+    term.registerCommand("mycmd", &myCmd);
+    
+    Serial.println("Terminal ready! Type 'help' for available commands.");
+    Serial.print("> ");
+}
+
+void loop() {
+    term.loop();
+}
 ```
+
+> **See also:** [examples/CustomCommand/CustomCommand.ino](examples/CustomCommand/CustomCommand.ino) for more advanced custom command examples (echo, uptime, LED control)
 
 ## Supported Platforms
 
@@ -178,96 +218,108 @@ term.registerCommand("ls", &lsCmd);
 
 ## API Reference
 
-### Terminal Class
+### BuiltinCommandFactory
+
+Factory class for creating and managing built-in commands.
 
 ```cpp
-namespace EmbeddedTerminal {
-    class Terminal {
-    public:
-        // Simple constructor for Arduino/ESP32 (accepts Stream directly)
-        Terminal(Stream &stream);  // Arduino/ESP32 only
-        
-        // Advanced constructor for custom stream implementations
-        Terminal(ITerminalStream &input);
-        
-        // Basic operations
-        void loop();
-        const ETMap<ETString, ICommand *> getCommands();
-        
-        // Legacy command registration (for custom commands)
-        void registerCommand(ETString keyword, ICommand *observer);
-        
-        // Built-in command registration by category
-        void registerFilesystemCommands(DirectoryNavigator &nav, uint32_t flags = CMD_FILESYSTEM_ALL);
-        void registerDiskCommands(IFileSystem &fs, uint32_t flags = CMD_DISK_ALL);
-        void registerNetworkCommands(INetworkInterface &net, uint32_t flags = CMD_NETWORK_ALL);
-        void registerHelpCommand();
-        void registerAllCommands(DirectoryNavigator &nav, IFileSystem &fs, INetworkInterface &net);
-        
-        // Command deregistration
-        void deregisterCommand(ETString keyword);
-        void deregisterFilesystemCommands(uint32_t flags = CMD_FILESYSTEM_ALL);
-        void deregisterDiskCommands(uint32_t flags = CMD_DISK_ALL);
-        void deregisterNetworkCommands(uint32_t flags = CMD_NETWORK_ALL);
-        void deregisterHelpCommand();
-        void deregisterAllCommands();
-    };
-}
+class BuiltinCommandFactory {
+public:
+    // Register all built-in commands
+    void registerAllCommands(Terminal &term, DirectoryNavigator &nav, INetworkInterface *net);
+    
+    // Register command categories
+    void registerFilesystemCommands(Terminal &term, DirectoryNavigator &nav);
+    void registerFilesystemCommands(Terminal &term, DirectoryNavigator &nav, uint16_t flags);
+    void registerDiskCommands(Terminal &term, DirectoryNavigator &nav);
+    void registerNetworkCommands(Terminal &term, INetworkInterface &net);
+    void registerHelpCommand(Terminal &term);
+    
+    // Deregister all commands
+    void deregisterAllCommands(Terminal &term);
+    
+    // Destructor automatically cleans up all owned commands
+    ~BuiltinCommandFactory();
+};
 ```
 
-**Built-in Command Flags:**
+**Available Command Flags:**
 
-Use these flags to selectively register commands:
+- `CMD_CAT` - Display file contents
+- `CMD_CD` - Change directory
+- `CMD_DOWNLOAD` - Download file via terminal
+- `CMD_LS` - List directory contents
+- `CMD_MKDIR` - Create directory
+- `CMD_RM` - Remove file
+- `CMD_RMDIR` - Remove directory
+- `CMD_TAIL` - Display end of file
+- `CMD_DF` - Show disk usage
+- `CMD_IP` - Show network interfaces
+- `CMD_HELP` - Display help
+
+### Terminal
+
+Main terminal execution engine for processing commands.
 
 ```cpp
-// Individual command flags
-CMD_CAT, CMD_CD, CMD_DOWNLOAD, CMD_LS, CMD_MKDIR, CMD_RM, CMD_RMDIR, CMD_TAIL
-CMD_DF, CMD_IP, CMD_HELP
-
-// Convenience flags
-CMD_FILESYSTEM_ALL  // All filesystem commands (cat, cd, download, ls, mkdir, rm, rmdir, tail)
-CMD_DISK_ALL        // All disk commands (df)
-CMD_NETWORK_ALL     // All network commands (ip)
-CMD_ALL             // All built-in commands
-```
-
-**Registration Examples:**
-
-```cpp
-// Register all built-in commands
-term.registerAllCommands(nav, fileSystem, networkInterface);
-
-// Register all filesystem commands
-term.registerFilesystemCommands(nav);
-
-// Register only specific commands using flags
-term.registerFilesystemCommands(nav, CMD_LS | CMD_CD | CMD_CAT);
-
-// Deregister specific commands
-term.deregisterFilesystemCommands(CMD_LS | CMD_CD);
-
-// Deregister all commands
-term.deregisterAllCommands();
-
-// Custom command registration (still supported)
-term.registerCommand("mycmd", &myCustomCommand);
+class Terminal {
+public:
+    // Constructors
+    Terminal(ITerminalStream &input);
+    Terminal(Stream &stream);  // Arduino/ESP32 platforms
+    
+    // Main execution loop
+    void loop();
+    
+    // Command registration (for custom commands)
+    void registerCommand(const ETString &keyword, ICommand *command);
+    void deregisterCommand(const ETString &keyword);
+    
+    // Get registered commands
+    const ETMap<ETString, ICommand *>& getCommands() const;
+};
 ```
 
 **Usage Notes:**
 
-- On Arduino/ESP32 platforms, you can pass `Serial` or any `Stream` object directly
-- For custom stream implementations, create a class implementing `ITerminalStream` interface
-- The Terminal class now owns and manages built-in command objects automatically
-- Custom commands registered via `registerCommand()` must be managed by the caller
-- Command objects are automatically cleaned up in the Terminal destructor
+- Terminal does NOT own built-in commands - use BuiltinCommandFactory for those
+- Custom commands registered via `registerCommand()` must be owned by caller
+- Call `loop()` in your main loop to process terminal input
+- On Arduino/ESP32, you can pass `Serial` or any `Stream` directly
+
+> **See also:** [examples/OwnershipExample/OwnershipExample.ino](examples/OwnershipExample/OwnershipExample.ino) for a clear demonstration of the ownership model
+
+### File System Integration
+
+```cpp
+#include <hal/NativeFileSystem.h>  // Or ArduinoFileSystem, SDMMCFileSystem
+#include <DirectoryNavigator.h>
+
+NativeFileSystem fs;
+DirectoryNavigator nav(&fs);
+
+// Access filesystem from navigator
+IFileSystem* fsPtr = nav.getFileSystem();
+```
+
+### Network Interface
+
+```cpp
+#include <hal/ESPNetworkInterface.h>  // ESP32 WiFi/Ethernet
+
+ESPNetworkInterface netInterface;
+
+// Use with network commands
+factory.registerNetworkCommands(term, netInterface);
+```
 
 ### ICommand Interface
 
 ```cpp
 class ICommand {
 public:
-    virtual ETString trigger(ETString &keyword, ETString &additional) = 0;
-    virtual ETString usage(ETString &keyword) = 0;
+    virtual ETString trigger(const ETString &keyword, const ETString &additional) = 0;
+    virtual ETString usage(const ETString &keyword) const = 0;
 };
 ```
 
@@ -312,7 +364,7 @@ public:
 
 ## Project Structure
 
-```
+```text
 EmbeddedTerminal/
 ├── src/
 │   ├── Terminal.h/cpp           # Main terminal engine
@@ -373,6 +425,8 @@ public:
 
 ### Network Interface Integration
 
+> **Full example:** [examples/DualNetworkTerminal/DualNetworkTerminal.ino](examples/DualNetworkTerminal/DualNetworkTerminal.ino)
+
 ```cpp
 #include <interfaces/INetworkInterface.h>
 
@@ -420,7 +474,7 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 
 ## Author
 
-**Guido Lehne**
+Guido Lehne
 
 ## Support
 
