@@ -80,9 +80,49 @@ pio test
 - Use `ETString` instead of `std::string` or `String`
 - Use `ETVector` and `ETMap` instead of direct STL usage
 - Test on multiple platforms before submitting
-- Use platform-specific code only in HAL layer
+- **Use abstraction layers (interfaces) for platform-specific functionality** - See `INetworkInterface` pattern
+- Keep platform-specific code only in HAL implementations, never in command layer
 
-### Example
+### Abstraction Pattern
+
+The preferred approach is to define abstract interfaces (`INetworkInterface`, `IFileSystem`, etc.) with platform-specific implementations. This keeps your business logic clean and testable.
+
+**Example: INetworkInterface Pattern**
+
+```cpp
+// In interfaces/INetworkInterface.h
+class INetworkInterface {
+public:
+    virtual ETString ping(const ETString &target) = 0;  // Pure interface
+};
+
+// In hal/ESPNetworkInterface.h - Arduino implementation
+class ESPNetworkInterface : public INetworkInterface {
+    ETString ping(const ETString &target) override {
+        IPAddress ip;
+        if (!ip.fromString(target.c_str())) {
+            WiFi.hostByName(target.c_str(), ip);
+        }
+        return WiFi.ping(ip) > 0 ? "reachable" : "unreachable";
+    }
+};
+
+// In test/Mocks/MockNetworkInterface.h - Test implementation
+class MockNetworkInterface : public INetworkInterface {
+    ETString ping(const ETString &target) override {
+        return target == "10.255.255.255" ? "unreachable" : "reachable (mock)";
+    }
+};
+
+// In commands/ping.cpp - Clean, platform-agnostic
+ETString ping::trigger(const ETString &keyword, const ETString &additional) {
+    return _net.ping(target);  // Delegate to interface
+}
+```
+
+See the actual implementation in `src/commands/ping.cpp` and `src/interfaces/INetworkInterface.h` for a production example.
+
+### String Handling Example
 
 ```cpp
 // Good: Platform-independent
@@ -91,7 +131,7 @@ ETString processInput(const ETString &input) {
     return result;
 }
 
-// Avoid: Platform-specific
+// Avoid: Direct platform-specific strings
 #if defined(ARDUINO)
 String processInput(const String &input) {
     String result = input;
