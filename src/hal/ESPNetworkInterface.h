@@ -3,6 +3,10 @@
 
 #if defined(ESP32) || defined(ESP_PLATFORM)
 
+#if defined(ESP32)
+#include <ESP32Ping.h>
+#endif
+
 #include "interfaces/INetworkInterface.h"
 #include "ETTypes.h"
 #include <WiFi.h>
@@ -81,6 +85,41 @@ namespace EmbeddedTerminal
 #endif
 
             return info;
+        }
+
+        ETString ping(const ETString &target) override
+        {
+#if defined(ESP32)
+            // ESP32-specific implementation using ESP32Ping library
+            const int pingCount = 3;
+            bool pingable = Ping.ping(target.c_str(), pingCount);
+
+            if (!pingable)
+            {
+                return "Host " + target + " is not reachable\n";
+            }
+
+            ETString result = target + " pinged " + ETString(pingCount) + " times:\n";
+            result += "  Average time: " + ETString((int)Ping.averageTime()) + " ms\n";
+            result += "  Min time: " + ETString((int)Ping.minTime()) + " ms\n";
+            result += "  Max time: " + ETString((int)Ping.maxTime()) + " ms\n";
+
+            return result;
+#else
+            // ESP8266 or other ESP platform with WiFi.ping()
+            const int pingCount = 3;
+            int avgTime = WiFi.ping(target.c_str());
+
+            if (avgTime == 0)
+            {
+                return "Host " + target + " is not reachable\n";
+            }
+
+            ETString result = target + " pinged " + ETString(pingCount) + " times:\n";
+            result += "  Average time: " + ETString(avgTime) + " ms\n";
+
+            return result;
+#endif
         }
     };
 
