@@ -26,6 +26,10 @@ namespace EmbeddedTerminal
 
         // Get info for a specific interface by name
         virtual NetworkInfo getInterface(const ETString &name) const = 0;
+
+        // Ping a host (IP address or hostname)
+        // Returns result string with status and optional statistics
+        virtual ETString ping(const ETString &target) = 0;
     };
 
 } // namespace EmbeddedTerminal
