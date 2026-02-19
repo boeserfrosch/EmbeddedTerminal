@@ -42,6 +42,9 @@ void test_terminal_call_unknown(void)
     stream.inputBuffer = "foo\n";
     term.loop();
     TEST_ASSERT_TRUE(stream.outputBuffer.find("foo is unknown") != ETString::npos);
+    TEST_ASSERT_TRUE(stream.stderrBuffer.find("foo is unknown") != ETString::npos);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("foo is unknown") == ETString::npos);
+    TEST_ASSERT_EQUAL(127, term.getLastExitCode());
 }
 
 void test_terminal_getCommands(void)

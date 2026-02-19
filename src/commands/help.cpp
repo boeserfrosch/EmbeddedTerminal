@@ -1,7 +1,8 @@
 #include "help.h"
 
 using namespace EmbeddedTerminal;
-ETString cmd::help::trigger(const ETString &keyword, const ETString &additional)
+
+ETString cmd::help::buildHelpOutput(const ETString &additional)
 {
     ETString params = additional.trim();
     auto parts = split(params, " ");
@@ -26,6 +27,23 @@ ETString cmd::help::trigger(const ETString &keyword, const ETString &additional)
     }
     ETString cmdKey = cmd->first;
     return cmd->second->usage(cmdKey);
+}
+
+CommandResult cmd::help::execute(CommandInvocation &invocation)
+{
+    ETString output = buildHelpOutput(invocation.arguments);
+    if (!output.empty())
+    {
+        invocation.stdoutChannel.print(output);
+    }
+
+    return CommandResult::completed(0);
+}
+
+ETString cmd::help::trigger(const ETString &keyword, const ETString &additional)
+{
+    (void)keyword;
+    return buildHelpOutput(additional);
 }
 
 ETString cmd::help::usage(const ETString &keyword)

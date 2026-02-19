@@ -93,6 +93,41 @@ void test_help_auto_completion_command_suggestions(void)
     TEST_ASSERT_TRUE(suggestions[0].contains("dummy"));
 }
 
+void test_help_execute_writes_stdout(void)
+{
+    TestHelp help;
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+
+    ETString keyword = "help";
+    ETString arg = "dummy";
+
+    class EmptyInputChannel : public IInputChannel
+    {
+    public:
+        bool available() override { return false; }
+        ETString readAll() override { return ""; }
+    } stdinChannel;
+
+    class StreamBackedOutputChannel : public IOutputChannel
+    {
+    public:
+        explicit StreamBackedOutputChannel(MockStream &stream, TerminalChannel channel) : _stream(stream), _channel(channel) {}
+        void print(const ETString &s) override { _stream.printTo(_channel, s); }
+
+    private:
+        MockStream &_stream;
+        TerminalChannel _channel;
+    } stdoutChannel(stream, TerminalChannel::StdOut), stderrChannel(stream, TerminalChannel::StdErr);
+
+    CommandInvocation invocation{keyword, arg, context, stdinChannel, stdoutChannel, stderrChannel};
+    CommandResult result = help.execute(invocation);
+
+    TEST_ASSERT_EQUAL(0, result.exitCode);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("Dummy usage") != ETString::npos);
+    TEST_ASSERT_TRUE(stream.stderrBuffer.find("Dummy usage") == ETString::npos);
+}
+
 void process_tests()
 {
     UNITY_BEGIN();
@@ -102,6 +137,7 @@ void process_tests()
     RUN_TEST(test_help_edge_cases);
     RUN_TEST(test_help_output_format);
     RUN_TEST(test_help_auto_completion_command_suggestions);
+    RUN_TEST(test_help_execute_writes_stdout);
     UNITY_END();
 }
 #if (defined(ESP_PLATFORM) || defined(ESP32)) && not defined(ARDUINO)

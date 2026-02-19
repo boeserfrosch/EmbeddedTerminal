@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Command runtime v2 scaffolding**
+  - Added `ICommandRuntime` abstractions for stream-based command execution (`stdin`, `stdout`, `stderr`)
+  - Added `CommandInvocation`, `CommandContext`, and `CommandResult` types
+  - Added default `ICommand::execute()` implementation that adapts legacy `trigger()` commands
+  - Added channel-aware `ITerminalStream::printTo()` / `printfTo()` extension points
+
+### Changed
+
+- **Terminal execution path**
+  - `Terminal::call()` now executes commands through `ICommand::execute()`
+  - Added terminal-level last exit code tracking via `Terminal::getLastExitCode()`
+  - Unknown commands now set exit code `127` and are emitted via the stderr channel abstraction
+
 ## [0.2.0] - 2026-02-17
 
 ### Added

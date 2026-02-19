@@ -15,9 +15,11 @@ class MockStream : public ITerminalStream
 public:
     ETString inputBuffer;
     ETString outputBuffer;
+    ETString stdoutBuffer;
+    ETString stderrBuffer;
     size_t inputPos = 0;
 
-    MockStream() : inputBuffer(), outputBuffer(), inputPos(0) {}
+    MockStream() : inputBuffer(), outputBuffer(), stdoutBuffer(), stderrBuffer(), inputPos(0) {}
 
     bool available() override
     {
@@ -35,6 +37,7 @@ public:
 
     void print(const ETString &str) override
     {
+        stdoutBuffer += str;
         outputBuffer += str;
     }
 
@@ -45,7 +48,34 @@ public:
         va_start(args, fmt);
         vsnprintf(buf, sizeof(buf), fmt, args);
         va_end(args);
-        outputBuffer += buf;
+        ETString text(buf);
+        stdoutBuffer += text;
+        outputBuffer += text;
+    }
+
+    void printTo(TerminalChannel channel, const ETString &str) override
+    {
+        if (channel == TerminalChannel::StdErr)
+        {
+            stderrBuffer += str;
+        }
+        else
+        {
+            stdoutBuffer += str;
+        }
+
+        outputBuffer += str;
+    }
+
+    void printfTo(TerminalChannel channel, const char *fmt, ...) override
+    {
+        char buf[256];
+        va_list args;
+        va_start(args, fmt);
+        vsnprintf(buf, sizeof(buf), fmt, args);
+        va_end(args);
+
+        printTo(channel, ETString(buf));
     }
 };
 

@@ -4,6 +4,48 @@
 
 namespace EmbeddedTerminal
 {
+    namespace
+    {
+        class StreamInputChannel : public IInputChannel
+        {
+        public:
+            explicit StreamInputChannel(ITerminalStream &stream) : _stream(stream)
+            {
+            }
+
+            bool available() override
+            {
+                return _stream.available();
+            }
+
+            ETString readAll() override
+            {
+                return _stream.readAll();
+            }
+
+        private:
+            ITerminalStream &_stream;
+        };
+
+        class StreamOutputChannel : public IOutputChannel
+        {
+        public:
+            StreamOutputChannel(ITerminalStream &stream, TerminalChannel channel)
+                : _stream(stream), _channel(channel)
+            {
+            }
+
+            void print(const ETString &s) override
+            {
+                _stream.printTo(_channel, s);
+            }
+
+        private:
+            ITerminalStream &_stream;
+            TerminalChannel _channel;
+        };
+    }
+
 
     Terminal::Terminal(ITerminalStream &input) : _input(input)
 #if defined(ARDUINO)
@@ -135,12 +177,26 @@ namespace EmbeddedTerminal
         auto search = _observer.find(trimmedKeyword);
         if (search != _observer.end())
         {
-            _input.print(search->second->trigger(trimmedKeyword, additional));
+            StreamInputChannel stdinChannel(_input);
+            StreamOutputChannel stdoutChannel(_input, TerminalChannel::StdOut);
+            StreamOutputChannel stderrChannel(_input, TerminalChannel::StdErr);
+
+            CommandContext context{_sessionVariables, _lastExitCode, true};
+            CommandInvocation invocation{trimmedKeyword, additional, context, stdinChannel, stdoutChannel, stderrChannel};
+            CommandResult result = search->second->execute(invocation);
+
+            _lastExitCode = result.exitCode;
         }
         else
         {
-            _input.printf("%s is unknown!\n", trimmedKeyword.c_str());
+            _lastExitCode = 127;
+            _input.printfTo(TerminalChannel::StdErr, "%s is unknown!\n", trimmedKeyword.c_str());
         }
+    }
+
+    int Terminal::getLastExitCode() const
+    {
+        return _lastExitCode;
     }
 
     const ETString &Terminal::getBuffer() const

@@ -19,12 +19,15 @@ namespace EmbeddedTerminal
             }
             ETString usage(const ETString &keyword);
 
+            CommandResult execute(CommandInvocation &invocation) override;
+
             ETString trigger(const ETString &keyword, const ETString &additional) override;
 
             // Auto completion - suggest command names
             ETVector<ETString> getSuggestions(const ETString &partial) override;
 
         private:
+            ETString buildHelpOutput(const ETString &additional);
             Terminal &_terminal;
         };
     };

@@ -3,6 +3,7 @@
 
 #include "ETTypes.h"
 #include "IAutoCompleter.h"
+#include "ICommandRuntime.h"
 
 namespace EmbeddedTerminal
 {
@@ -11,6 +12,17 @@ namespace EmbeddedTerminal
     public:
         virtual ~ICommand() = default;
         virtual ETString usage(const ETString &keyword) = 0;
+
+        virtual CommandResult execute(CommandInvocation &invocation)
+        {
+            ETString response = trigger(invocation.keyword, invocation.arguments);
+            if (!response.empty())
+            {
+                invocation.stdoutChannel.print(response);
+            }
+
+            return CommandResult::completed(0);
+        }
 
         /// @brief Default implementation returns no suggestions
         /// Commands can override this to provide auto completion

@@ -10,6 +10,7 @@ The Readme is partially generated using AI but was proven to be inaccurate in so
 
 - ✅ **Platform Independent**: Works on Arduino, ESP32 (ESP-IDF & Arduino), and native environments
 - ✅ **Command System**: Register and execute custom commands with keyword-based parsing
+- ✅ **Command Runtime v2 (Preview)**: Stream-oriented command execution path with exit-code support
 - ✅ **File System Abstraction**: Unified interface for different file systems (SPIFFS, SD, LittleFS, Native)
 - ✅ **Built-in Commands**: cat, cd, ls, mkdir, rm, rmdir, df, tail, help, ip, download
 - ✅ **Network Interface**: Abstract network interface for displaying connection information
@@ -188,6 +189,16 @@ void loop() {
 ```
 
 > **See also:** [examples/CustomCommand/CustomCommand.ino](examples/CustomCommand/CustomCommand.ino) for more advanced custom command examples (echo, uptime, LED control)
+
+### Command Runtime v2 (Preview)
+
+EmbeddedTerminal now includes a new `execute()` command path designed for streaming and scripting use-cases:
+
+- `ICommand::execute(CommandInvocation&)` receives `stdin`, `stdout`, `stderr`, and command context
+- `CommandResult` carries command `exitCode` and execution state
+- Existing `trigger(keyword, additional)` commands continue to work via the default adapter implementation
+
+This allows incremental migration of commands from string-return APIs to stream-first execution without breaking existing command implementations.
 
 ### Auto Completion
 
