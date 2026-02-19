@@ -33,3 +33,9 @@ ETString cmd::help::usage(const ETString &keyword)
     return keyword + " - Returns all available commands\n" +
            keyword + " [command] - Returns the usage for the specific command\n";
 }
+
+ETVector<ETString> cmd::help::getSuggestions(const ETString &partial)
+{
+    CommandCompleter completer(_terminal.getCommands());
+    return completer.getSuggestions(partial);
+}

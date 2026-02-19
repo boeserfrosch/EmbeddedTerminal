@@ -4,6 +4,7 @@
 #include "ETTypes.h"
 #include "interfaces/ITerminalStream.h"
 #include "interfaces/ICommand.h"
+#include "interfaces/IAutoCompleter.h"
 #include "BuiltinCommandFlags.h"
 #include <map>
 #include <string>
@@ -45,6 +46,10 @@ namespace EmbeddedTerminal
         void loop();
         const ETMap<ETString, ICommand *> &getCommands() const;
 
+        // Auto completion support
+        const ETString &getBuffer() const;
+        ETString getLastWord() const;
+
     protected:
         void call(const ETString &keyword, const ETString &additional);
 
@@ -60,6 +65,9 @@ namespace EmbeddedTerminal
 
         ETString buffer;
         ETString lineDelimiter = "\n";
+
+        // Auto completion helper
+        void _handleAutoCompletion();
     };
 }
 #endif // TERMINAL_H

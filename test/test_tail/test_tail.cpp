@@ -73,6 +73,22 @@ void test_tail_trigger_edge_cases(void)
     TEST_ASSERT_TRUE(result.find("Expected parameter") != ETString::npos);
 }
 
+void test_tail_auto_completion_file_suggestions(void)
+{
+    TestTail tail;
+    ETVector<ETString> suggestions = tail.getSuggestions("fi");
+    TEST_ASSERT_TRUE(suggestions.size() > 0);
+    TEST_ASSERT_TRUE(suggestions[0].contains("file"));
+}
+
+void test_tail_auto_completion_another_file(void)
+{
+    TestTail tail;
+    ETVector<ETString> suggestions = tail.getSuggestions("bi");
+    TEST_ASSERT_TRUE(suggestions.size() > 0);
+    TEST_ASSERT_TRUE(suggestions[0].contains("big"));
+}
+
 void process_tests()
 {
     UNITY_BEGIN();
@@ -81,6 +97,8 @@ void process_tests()
     RUN_TEST(test_tail_trigger_file_not_exists);
     RUN_TEST(test_tail_usage);
     RUN_TEST(test_tail_trigger_edge_cases);
+    RUN_TEST(test_tail_auto_completion_file_suggestions);
+    RUN_TEST(test_tail_auto_completion_another_file);
     UNITY_END();
 }
 

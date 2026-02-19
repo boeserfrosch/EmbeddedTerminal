@@ -30,3 +30,8 @@ ETString cd::usage(const ETString &keyword)
 {
     return keyword + " [path] - Change the current directory relative to path\n";
 }
+ETVector<ETString> cd::getSuggestions(const ETString &partial)
+{
+    // Delegate to DirectoryCompleter
+    return _completer.getSuggestions(partial);
+}

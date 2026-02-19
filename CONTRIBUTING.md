@@ -87,7 +87,7 @@ pio test
 
 The preferred approach is to define abstract interfaces (`INetworkInterface`, `IFileSystem`, etc.) with platform-specific implementations. This keeps your business logic clean and testable.
 
-**Example: INetworkInterface Pattern**
+#### Example: INetworkInterface Pattern
 
 ```cpp
 // In interfaces/INetworkInterface.h
@@ -144,6 +144,56 @@ std::string processInput(const std::string &input) {
 }
 #endif
 ```
+
+### Adding Auto Completion to Custom Commands
+
+EmbeddedTerminal supports TAB-based auto completion. To add auto completion to your custom command:
+
+1. **Inherit from both `ICommand` and `IAutoCompleter`**:
+
+   ```cpp
+   class MyCommand : public ICommand, public IAutoCompleter {
+       // ...
+   };
+   ```
+
+2. **Implement the `getSuggestions()` method**:
+
+   ```cpp
+   ETVector<ETString> getSuggestions(const ETString &partial) override {
+       ETVector<ETString> suggestions;
+       
+       // Get your data (files, options, etc.)
+       ETVector<ETString> allItems = getAvailableItems();
+       
+       // Filter items that start with the partial input
+       for (const auto &item : allItems) {
+           if (item.startsWith(partial)) {
+               suggestions.push_back(item);
+           }
+       }
+       
+       return suggestions;
+   }
+   ```
+
+3. **Use built-in completers if applicable** (from [src/DefaultAutoCompleters.h](src/DefaultAutoCompleters.h)):
+
+   ```cpp
+   // For path-based completions
+   DirectoryCompleter dirCompleter(navigator);
+   return dirCompleter.getSuggestions(partial);
+   
+   // For file path completions (files and directories)
+   FilePathCompleter fileCompleter(navigator);
+   return fileCompleter.getSuggestions(partial);
+   
+   // For command name completions
+   CommandCompleter cmdCompleter(terminal.getCommands());
+   return cmdCompleter.getSuggestions(partial);
+   ```
+
+**See also**: The built-in commands implement auto completion - check [src/commands/cd.h](src/commands/cd.h), [src/commands/cat.h](src/commands/cat.h), and [src/commands/ls.h](src/commands/ls.h) for examples.
 
 ## Testing
 
@@ -215,7 +265,7 @@ When adding new features:
 
 Write clear, concise commit messages:
 
-```
+```txt
 Add support for command history
 
 - Implement history buffer with configurable size
@@ -225,7 +275,7 @@ Add support for command history
 
 ### Format
 
-```
+```txt
 <type>: <short summary>
 
 <optional detailed description>

@@ -28,3 +28,8 @@ ETString rm::usage(const ETString &keyword)
 {
     return keyword + " [file] - Remove the specified file\n";
 }
+
+ETVector<ETString> rm::getSuggestions(const ETString &partial)
+{
+    return _completer.getSuggestions(partial);
+}

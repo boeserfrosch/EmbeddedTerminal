@@ -3,6 +3,8 @@
 
 #include "DirectoryNavigator.h"
 #include "Terminal.h"
+#include "interfaces/IAutoCompleter.h"
+#include "DefaultAutoCompleters.h"
 
 namespace EmbeddedTerminal
 {
@@ -12,12 +14,15 @@ namespace EmbeddedTerminal
         {
 
         public:
-            ls(DirectoryNavigator &dir) : _dir(dir)
+            ls(DirectoryNavigator &dir) : _dir(dir), _completer(dir)
             {
             }
             ETString usage(const ETString &keyword);
 
             ETString trigger(const ETString &keyword, const ETString &additional) override;
+
+            // Auto completion - suggest directories only
+            ETVector<ETString> getSuggestions(const ETString &partial) override;
 
         private:
             struct
@@ -28,6 +33,7 @@ namespace EmbeddedTerminal
 
         private:
             DirectoryNavigator &_dir;
+            DirectoryCompleter _completer;
         };
     };
 };

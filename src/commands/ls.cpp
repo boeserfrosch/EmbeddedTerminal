@@ -1,4 +1,4 @@
-#include "ls.h"
+﻿#include "ls.h"
 #include <sstream>
 
 using namespace EmbeddedTerminal::cmd;
@@ -64,4 +64,10 @@ void ls::parseConf(std::vector<ETString> params)
     }
 
     // return lsConf();
+}
+
+ETVector<ETString> ls::getSuggestions(const ETString &partial)
+{
+    // Delegate to DirectoryCompleter
+    return _completer.getSuggestions(partial);
 }
