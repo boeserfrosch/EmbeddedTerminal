@@ -17,5 +17,6 @@
 #include "rm.h"
 #include "rmdir.h"
 #include "tail.h"
+#include "xxd.h"
 
 #endif // BUILTIN_COMMANDS_H
