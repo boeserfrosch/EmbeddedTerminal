@@ -17,6 +17,7 @@ namespace EmbeddedTerminal
     constexpr const char *CMD_NAME_DF = "df";
     constexpr const char *CMD_NAME_IP = "ip";
     constexpr const char *CMD_NAME_PING = "ping";
+    constexpr const char *CMD_NAME_PWD = "pwd";
     constexpr const char *CMD_NAME_HELP = "help";
 
     // Built-in command flags for selective registration
@@ -34,10 +35,11 @@ namespace EmbeddedTerminal
     const BuiltinCommand CMD_DF = 1 << 8;
     const BuiltinCommand CMD_IP = 1 << 9;
     const BuiltinCommand CMD_PING = 1 << 10;
-    const BuiltinCommand CMD_HELP = 1 << 11;
+    const BuiltinCommand CMD_PWD = 1 << 11;
+    const BuiltinCommand CMD_HELP = 1 << 12;
 
     // Convenience flags
-    const BuiltinCommand CMD_FILESYSTEM_ALL = CMD_CAT | CMD_CD | CMD_DOWNLOAD | CMD_LS | CMD_MKDIR | CMD_RM | CMD_RMDIR | CMD_TAIL;
+    const BuiltinCommand CMD_FILESYSTEM_ALL = CMD_CAT | CMD_CD | CMD_DOWNLOAD | CMD_LS | CMD_MKDIR | CMD_RM | CMD_RMDIR | CMD_TAIL | CMD_PWD;
     const BuiltinCommand CMD_DISK_ALL = CMD_DF;
     const BuiltinCommand CMD_NETWORK_ALL = CMD_IP | CMD_PING;
     const BuiltinCommand CMD_ALL = CMD_FILESYSTEM_ALL | CMD_DISK_ALL | CMD_NETWORK_ALL | CMD_HELP;

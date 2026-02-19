@@ -137,6 +137,23 @@ namespace EmbeddedTerminal
             }
         }
 
+        if (flags & CMD_PWD)
+        {
+            auto it = _builtinCommands.find(CMD_NAME_PWD);
+            if (it == _builtinCommands.end())
+            {
+                cmd::pwd *pwdCmd = new cmd::pwd(nav);
+                if (pwdCmd != nullptr)
+                {
+                    _builtinCommands[CMD_NAME_PWD] = pwdCmd;
+                }
+            }
+            if (_builtinCommands.find(CMD_NAME_PWD) != _builtinCommands.end())
+            {
+                terminal.registerCommand(CMD_NAME_PWD, _builtinCommands[CMD_NAME_PWD]);
+            }
+        }
+
         if (flags & CMD_TAIL)
         {
             auto it = _builtinCommands.find(CMD_NAME_TAIL);

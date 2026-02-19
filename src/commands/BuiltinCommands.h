@@ -13,6 +13,7 @@
 #include "ls.h"
 #include "mkdir.h"
 #include "ping.h"
+#include "pwd.h"
 #include "rm.h"
 #include "rmdir.h"
 #include "tail.h"
