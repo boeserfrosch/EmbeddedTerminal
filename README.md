@@ -189,6 +189,108 @@ void loop() {
 
 > **See also:** [examples/CustomCommand/CustomCommand.ino](examples/CustomCommand/CustomCommand.ino) for more advanced custom command examples (echo, uptime, LED control)
 
+### Auto Completion
+
+EmbeddedTerminal supports TAB-based auto completion for commands and file paths. When the user presses TAB while typing, the terminal:
+
+1. Looks up the command being typed
+2. Asks that command for completion suggestions
+3. Auto-fills the longest common prefix
+4. Displays remaining options if multiple matches exist
+
+#### Using Auto Completion
+
+No setup required! Auto completion works automatically with built-in commands that support it:
+
+- **`cd <TAB>`**: Suggests available directories
+- **`cat <TAB>`**: Suggests available files and directories
+- **`ls <TAB>`**: Suggests available directories
+- **Any path argument**: Auto-complete works mid-word on any path
+
+#### Example Usage
+
+```txt
+> cd /t[TAB]
+> cd /tmp/
+  data/
+  logs/
+  cache/
+```
+
+If only one match, auto-completes immediately:
+
+```txt
+> cat /data/m[TAB]
+> cat /data/message.txt
+```
+
+#### Adding Auto Completion to Custom Commands
+
+To add auto completion to your custom command, implement the `IAutoCompleter` interface:
+
+```cpp
+#include <Terminal.h>
+#include <interfaces/ICommand.h>
+#include <interfaces/IAutoCompleter.h>
+#include <DefaultAutoCompleters.h>
+
+class MyAutocompleteCommand : public ICommand, public IAutoCompleter {
+public:
+    MyAutocompleteCommand(DirectoryNavigator &nav) : nav_(nav) {}
+    
+    ETString trigger(const ETString &keyword, const ETString &additional) override {
+        return "Command: " + additional;
+    }
+    
+    ETString usage(const ETString &keyword) override {
+        return "myautocmd [argument] - Command with auto completion";
+    }
+    
+    // Provide auto completion suggestions
+    ETVector<ETString> getSuggestions(const ETString &partial) override {
+        ETVector<ETString> suggestions;
+        
+        // Return suggestions that match the partial input
+        // Example: suggest files in current directory
+        ETVector<ETString> files = nav_.ls("/");
+        for (const auto &file : files) {
+            if (file.startsWith(partial)) {
+                suggestions.push_back(file);
+            }
+        }
+        
+        return suggestions;
+    }
+
+private:
+    DirectoryNavigator &nav_;
+};
+
+// Register like any other command
+MyAutocompleteCommand myCmd(nav);
+term.registerCommand("myautocmd", &myCmd);
+```
+
+**Built-in Auto Completers** (available in [src/DefaultAutoCompleters.h](src/DefaultAutoCompleters.h)):
+
+- **`CommandCompleter`**: Suggests available command names from the terminal's command map
+- **`FilePathCompleter`**: Suggests files and directories that match the partial path
+- **`DirectoryCompleter`**: Suggests only directories (useful for `cd`, `ls`, etc.)
+
+You can use these in your own commands:
+
+```cpp
+class MyCommand : public ICommand, public IAutoCompleter {
+    DirectoryNavigator &nav_;
+    
+    ETVector<ETString> getSuggestions(const ETString &partial) override {
+        // Use DirectoryCompleter to suggest directories
+        DirectoryCompleter completer(nav_);
+        return completer.getSuggestions(partial);
+    }
+};
+```
+
 ## Supported Platforms
 
 | Platform | Framework | Status | Notes |

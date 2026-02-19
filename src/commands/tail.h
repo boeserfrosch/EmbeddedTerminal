@@ -2,6 +2,8 @@
 #define TAIL_H
 
 #include "DirectoryNavigator.h"
+#include "interfaces/IAutoCompleter.h"
+#include "DefaultAutoCompleters.h"
 #include "Terminal.h"
 namespace EmbeddedTerminal
 {
@@ -12,14 +14,18 @@ namespace EmbeddedTerminal
         {
 
         public:
-            tail(DirectoryNavigator &dir) : _dir(dir)
+            tail(DirectoryNavigator &dir) : _dir(dir), _completer(dir)
             {
             }
             ETString usage(const ETString &keyword);
             ETString trigger(const ETString &keyword, const ETString &additional) override;
 
+            // Auto completion - suggest file paths to tail
+            ETVector<ETString> getSuggestions(const ETString &partial) override;
+
         private:
             DirectoryNavigator &_dir;
+            FilePathCompleter _completer;
         };
     };
 };

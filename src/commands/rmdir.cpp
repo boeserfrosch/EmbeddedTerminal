@@ -29,3 +29,8 @@ ETString rmdir::usage(const ETString &keyword)
 {
     return keyword + " [folder] - Remove the specfied folder\n";
 }
+
+ETVector<ETString> rmdir::getSuggestions(const ETString &partial)
+{
+    return _completer.getSuggestions(partial);
+}

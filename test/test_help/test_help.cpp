@@ -85,6 +85,14 @@ void test_help_output_format(void)
     TEST_ASSERT_TRUE(result.find("Dummy usage") != ETString::npos);
 }
 
+void test_help_auto_completion_command_suggestions(void)
+{
+    TestHelp help;
+    ETVector<ETString> suggestions = help.getSuggestions("du");
+    TEST_ASSERT_TRUE(suggestions.size() > 0);
+    TEST_ASSERT_TRUE(suggestions[0].contains("dummy"));
+}
+
 void process_tests()
 {
     UNITY_BEGIN();
@@ -93,6 +101,7 @@ void process_tests()
     RUN_TEST(test_help_usage);
     RUN_TEST(test_help_edge_cases);
     RUN_TEST(test_help_output_format);
+    RUN_TEST(test_help_auto_completion_command_suggestions);
     UNITY_END();
 }
 #if (defined(ESP_PLATFORM) || defined(ESP32)) && not defined(ARDUINO)

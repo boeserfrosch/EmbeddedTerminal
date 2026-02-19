@@ -100,6 +100,22 @@ void test_rmdir_notemptydirectory(void)
     TEST_ASSERT_TRUE(rmdir.exists("/foo/bar"));
 }
 
+void test_rmdir_auto_completion_directory_suggestions(void)
+{
+    TestRmdir rmdir;
+    ETVector<ETString> suggestions = rmdir.getSuggestions("di");
+    TEST_ASSERT_TRUE(suggestions.size() > 0);
+    TEST_ASSERT_TRUE(suggestions[0].contains("dir"));
+}
+
+void test_rmdir_auto_completion_no_files(void)
+{
+    TestRmdir rmdir;
+    ETVector<ETString> suggestions = rmdir.getSuggestions("fi");
+    // Should not suggest files, only directories
+    TEST_ASSERT_TRUE(suggestions.size() == 0 || !suggestions[0].contains(".txt"));
+}
+
 void process_tests()
 {
     UNITY_BEGIN();
@@ -110,6 +126,8 @@ void process_tests()
     RUN_TEST(test_rmdir_edge_cases);
     RUN_TEST(test_rmdir_subdirectory);
     RUN_TEST(test_rmdir_notemptydirectory);
+    RUN_TEST(test_rmdir_auto_completion_directory_suggestions);
+    RUN_TEST(test_rmdir_auto_completion_no_files);
     UNITY_END();
 }
 

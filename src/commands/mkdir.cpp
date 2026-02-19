@@ -28,3 +28,8 @@ ETString mkdir::usage(const ETString &keyword)
 {
     return keyword + " [folder] - Create the specified folder in the current directory\n";
 }
+
+ETVector<ETString> mkdir::getSuggestions(const ETString &partial)
+{
+    return _completer.getSuggestions(partial);
+}

@@ -73,6 +73,22 @@ void test_rm_edge_cases(void)
     TEST_ASSERT_TRUE(result.find("Can not remove unspecified file!\n") != ETString::npos);
 }
 
+void test_rm_auto_completion_file_suggestions(void)
+{
+    TestRm rm;
+    ETVector<ETString> suggestions = rm.getSuggestions("fi");
+    TEST_ASSERT_TRUE(suggestions.size() > 0);
+    TEST_ASSERT_TRUE(suggestions[0].contains("file"));
+}
+
+void test_rm_auto_completion_directory_suggestions(void)
+{
+    TestRm rm;
+    ETVector<ETString> suggestions = rm.getSuggestions("di");
+    TEST_ASSERT_TRUE(suggestions.size() > 0);
+    TEST_ASSERT_TRUE(suggestions[0].contains("dir"));
+}
+
 void process_tests()
 {
     UNITY_BEGIN();
@@ -81,6 +97,8 @@ void process_tests()
     RUN_TEST(test_rm_directory_instead_of_file);
     RUN_TEST(test_rm_usage);
     RUN_TEST(test_rm_edge_cases);
+    RUN_TEST(test_rm_auto_completion_file_suggestions);
+    RUN_TEST(test_rm_auto_completion_directory_suggestions);
     UNITY_END();
 }
 

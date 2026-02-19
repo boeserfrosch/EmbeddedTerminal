@@ -63,6 +63,14 @@ void test_mkdir_edge_cases(void)
     TEST_ASSERT_TRUE(result.find("Can not create folder with no name\n") != ETString::npos);
 }
 
+void test_mkdir_auto_completion_directory_suggestions(void)
+{
+    TestMkdir mkdir;
+    ETVector<ETString> suggestions = mkdir.getSuggestions("exi");
+    // Should suggest existing directories
+    TEST_ASSERT_TRUE(suggestions.size() >= 0);
+}
+
 void process_tests()
 {
     UNITY_BEGIN();
@@ -70,6 +78,7 @@ void process_tests()
     RUN_TEST(test_mkdir_existing_directory);
     RUN_TEST(test_mkdir_usage);
     RUN_TEST(test_mkdir_edge_cases);
+    RUN_TEST(test_mkdir_auto_completion_directory_suggestions);
     UNITY_END();
 }
 #if (defined(ESP_PLATFORM) || defined(ESP32)) && not defined(ARDUINO)

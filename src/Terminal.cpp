@@ -39,8 +39,28 @@ namespace EmbeddedTerminal
 
         // Read input and append to buffer
         ETString inputLine = _input.readAll();
+
+        // Check for TAB character (0x09) for auto completion
+        bool hasTab = inputLine.contains('\t');
+        if (hasTab)
+        {
+            // Remove the TAB from the input line (don't echo it)
+            size_t tabPos = inputLine.find('\t');
+            while (tabPos != ETString::npos)
+            {
+                inputLine.erase(tabPos, 1);
+                tabPos = inputLine.find('\t');
+            }
+        }
+
         _input.print(inputLine);
         buffer += inputLine;
+
+        // Handle auto completion after buffer is updated
+        if (hasTab)
+        {
+            _handleAutoCompletion();
+        }
 
         size_t delimPosition;
         while ((delimPosition = buffer.find(lineDelimiter)) != ETString::npos)
@@ -120,6 +140,94 @@ namespace EmbeddedTerminal
         else
         {
             _input.printf("%s is unknown!\n", trimmedKeyword.c_str());
+        }
+    }
+
+    const ETString &Terminal::getBuffer() const
+    {
+        return buffer;
+    }
+
+    ETString Terminal::getLastWord() const
+    {
+        // Extract the last word from the buffer (after the last space)
+        size_t lastSpacePos = buffer.find_last_of(' ');
+        if (lastSpacePos != ETString::npos)
+        {
+            return buffer.substr(lastSpacePos + 1);
+        }
+        return buffer;
+    }
+
+    void Terminal::_handleAutoCompletion()
+    {
+        // Get the keyword (first word in buffer)
+        ETString keywordPart = buffer;
+        size_t spacePos = buffer.find(' ');
+        if (spacePos != ETString::npos)
+        {
+            keywordPart = buffer.substr(0, spacePos);
+        }
+
+        // Get the partial argument being typed
+        ETString partialArg = getLastWord();
+
+        // Lookup the command and check if it has auto completion support
+        auto search = _observer.find(keywordPart);
+        if (search != _observer.end())
+        {
+            ICommand *cmd = search->second;
+            // Call getSuggestions directly - it returns empty vector if not overridden
+            ETVector<ETString> suggestions = cmd->getSuggestions(partialArg);
+
+            if (suggestions.empty())
+            {
+                // No matches, just beep
+                _input.print("\a");
+                return;
+            }
+
+            if (suggestions.size() == 1)
+            {
+                // Single match - auto-complete it
+                ETString match = suggestions[0];
+                if (match.length() > partialArg.length())
+                {
+                    ETString toAppend = match.substr(partialArg.length());
+                    buffer += toAppend;
+                    _input.print(toAppend);
+                }
+            }
+            else
+            {
+                // Multiple matches - find common prefix and display options
+                ETString commonPrefix = suggestions[0];
+                for (size_t i = 1; i < suggestions.size(); i++)
+                {
+                    size_t j = 0;
+                    while (j < commonPrefix.length() && j < suggestions[i].length() &&
+                           commonPrefix[j] == suggestions[i][j])
+                    {
+                        j++;
+                    }
+                    commonPrefix = commonPrefix.substr(0, j);
+                }
+
+                // Auto-complete to common prefix
+                if (commonPrefix.length() > partialArg.length())
+                {
+                    ETString toAppend = commonPrefix.substr(partialArg.length());
+                    buffer += toAppend;
+                    _input.print(toAppend);
+                }
+
+                // Display remaining options
+                _input.print("\n");
+                for (const auto &suggestion : suggestions)
+                {
+                    _input.printf("  %s\n", suggestion.c_str());
+                }
+            }
         }
     }
 }

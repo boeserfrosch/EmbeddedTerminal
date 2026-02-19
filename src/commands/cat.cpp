@@ -1,4 +1,4 @@
-#include "commands/cat.h"
+﻿#include "commands/cat.h"
 ETString EmbeddedTerminal::cmd::cat::trigger(const ETString &keyword, const ETString &additional)
 {
     ETString path = additional.trim();
@@ -26,4 +26,10 @@ ETString EmbeddedTerminal::cmd::cat::trigger(const ETString &keyword, const ETSt
 ETString EmbeddedTerminal::cmd::cat::usage(const ETString &keyword)
 {
     return keyword + " [file] - Returns the content of the defined file (at max the first 512 bytes)\n";
+}
+
+ETVector<ETString> EmbeddedTerminal::cmd::cat::getSuggestions(const ETString &partial)
+{
+    // Delegate to FilePathCompleter
+    return _completer.getSuggestions(partial);
 }

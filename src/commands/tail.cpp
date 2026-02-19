@@ -31,3 +31,8 @@ ETString tail::usage(const ETString &keyword)
 {
     return keyword + " [file] - Returns the last lines of the specified file. At max 512 bytes.\n";
 }
+
+ETVector<ETString> tail::getSuggestions(const ETString &partial)
+{
+    return _completer.getSuggestions(partial);
+}
