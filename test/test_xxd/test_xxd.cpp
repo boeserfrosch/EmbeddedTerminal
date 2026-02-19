@@ -1,0 +1,132 @@
+// Platform conditional includes
+#if defined(ARDUINO) //|| defined(ESP_PLATFORM)
+#include <Arduino.h>
+#endif
+#include <unity.h>
+#if defined(ESP_PLATFORM) || defined(ESP_32)
+#include <freertos/FreeRTOS.h>
+#include <freertos/timers.h>
+#endif
+#include "commands/xxd.h"
+#include "../src/DirectoryNavigator.h"
+#include "../Mocks/MockFileSystem.h"
+
+#include <unity.h>
+
+void setUp(void) {}
+void tearDown(void) {}
+
+void test_xxd_trigger_small_file(void)
+{
+    MockFileSystem fs;
+    EmbeddedTerminal::DirectoryNavigator dir(&fs);
+    fs.createFile("/file.txt", "hello1234", 9); // Small file
+    EmbeddedTerminal::cmd::xxd xxd(dir);
+
+    ETString keyword = "xxd";
+    ETString arg = "file.txt";
+    ETString result = xxd.trigger(keyword, arg);
+    TEST_ASSERT_TRUE(result.find("68 65 6C 6C 6F 31 32 33 34") != ETString::npos); // Hex for "hello123"
+}
+
+void test_xxd_trigger_large_file(void)
+{
+    MockFileSystem fs;
+    EmbeddedTerminal::DirectoryNavigator dir(&fs);
+    fs.createFile("/big.txt", "ABCABC", 2000); // Fake large file
+    EmbeddedTerminal::cmd::xxd xxd(dir);
+    ETString keyword = "xxd";
+    ETString arg = "big.txt";
+    ETString result = xxd.trigger(keyword, arg);
+    TEST_ASSERT_TRUE(result.find("41 42 43") != ETString::npos);             // Hex for "ABC"
+    TEST_ASSERT_TRUE(result.length() > 1000);                                // Should be large since we read 512 bytes and not truncate
+    TEST_ASSERT_TRUE(result.find("00000200:") == ETString::npos);            // Should have at most 512 bytes, so offset 200 should not be present
+    TEST_ASSERT_TRUE(result.find("... output truncated") != ETString::npos); // Should not be truncated since we read 512 bytes
+}
+
+void test_xxd_trigger_file_not_exists(void)
+{
+    MockFileSystem fs;
+    EmbeddedTerminal::DirectoryNavigator dir(&fs);
+    EmbeddedTerminal::cmd::xxd xxd(dir);
+
+    ETString keyword = "xxd";
+    ETString arg = "nofile.txt";
+    ETString result = xxd.trigger(keyword, arg);
+    TEST_ASSERT_TRUE(result.find("did not exist!") != ETString::npos);
+}
+
+void test_xxd_usage(void)
+{
+    MockFileSystem fs;
+    EmbeddedTerminal::DirectoryNavigator dir(&fs);
+    EmbeddedTerminal::cmd::xxd xxd(dir);
+
+    ETString keyword = "xxd";
+    ETString result = xxd.usage(keyword);
+    TEST_ASSERT_TRUE(result.find("Returns the content of the defined file as hex dump") != ETString::npos);
+}
+
+void test_xxd_trigger_edge_cases(void)
+{
+    MockFileSystem fs;
+    EmbeddedTerminal::DirectoryNavigator dir(&fs);
+    EmbeddedTerminal::cmd::xxd xxd(dir);
+
+    // Test empty path
+    ETString result = xxd.trigger("xxd", "   ");
+    TEST_ASSERT_TRUE(result.find("path or name to file expected") != ETString::npos);
+
+    // Test directory instead of file
+    fs.createDirectory("/dir");
+    result = xxd.trigger("xxd", "dir");
+    TEST_ASSERT_TRUE(result.find("did not exist!") != ETString::npos);
+}
+
+void test_xxd_get_suggestions(void)
+{
+    MockFileSystem fs;
+    EmbeddedTerminal::DirectoryNavigator dir(&fs);
+    fs.createFile("/file1.txt", "data", 4);
+    fs.createFile("/file2.txt", "data", 4);
+    fs.createDirectory("/dir");
+    EmbeddedTerminal::cmd::xxd xxd(dir);
+
+    ETVector<ETString> suggestions = xxd.getSuggestions("fi");
+    TEST_ASSERT_EQUAL(2, suggestions.size());
+    TEST_ASSERT_TRUE(suggestions[0] == "/file1.txt" || suggestions[0] == "/file2.txt");
+    TEST_ASSERT_TRUE(suggestions[1] == "/file1.txt" || suggestions[1] == "/file2.txt");
+}
+
+int process_tests()
+{
+    UNITY_BEGIN();
+    RUN_TEST(test_xxd_trigger_small_file);
+    RUN_TEST(test_xxd_trigger_large_file);
+    RUN_TEST(test_xxd_trigger_file_not_exists);
+    RUN_TEST(test_xxd_usage);
+    RUN_TEST(test_xxd_trigger_edge_cases);
+    RUN_TEST(test_xxd_get_suggestions);
+    UNITY_END();
+    return 0;
+}
+
+#if (defined(ESP_PLATFORM) || defined(ESP32)) && not defined(ARDUINO)
+extern "C" void app_main()
+{
+    vTaskDelay(pdMS_TO_TICKS(4000));
+    process_tests();
+}
+#elif defined(ARDUINO)
+void setup()
+{
+    delay(2500);
+    process_tests();
+}
+void loop() {}
+#else
+int main()
+{
+    return process_tests();
+}
+#endif

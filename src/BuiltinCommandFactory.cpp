@@ -170,6 +170,22 @@ namespace EmbeddedTerminal
                 terminal.registerCommand(CMD_NAME_TAIL, _builtinCommands[CMD_NAME_TAIL]);
             }
         }
+        if (flags & CMD_XXD)
+        {
+            auto it = _builtinCommands.find(CMD_NAME_XXD);
+            if (it == _builtinCommands.end())
+            {
+                cmd::xxd *xxdCmd = new cmd::xxd(nav);
+                if (xxdCmd != nullptr)
+                {
+                    _builtinCommands[CMD_NAME_XXD] = xxdCmd;
+                }
+            }
+            if (_builtinCommands.find(CMD_NAME_XXD) != _builtinCommands.end())
+            {
+                terminal.registerCommand(CMD_NAME_XXD, _builtinCommands[CMD_NAME_XXD]);
+            }
+        }
     }
 
     void BuiltinCommandFactory::registerDiskCommands(Terminal &terminal, DirectoryNavigator &nav, uint32_t flags)
@@ -273,6 +289,8 @@ namespace EmbeddedTerminal
             terminal.deregisterCommand(CMD_NAME_RMDIR);
         if (flags & CMD_TAIL)
             terminal.deregisterCommand(CMD_NAME_TAIL);
+        if (flags & CMD_XXD)
+            terminal.deregisterCommand(CMD_NAME_XXD);
     }
 
     void BuiltinCommandFactory::deregisterDiskCommands(Terminal &terminal, uint32_t flags)
