@@ -74,7 +74,7 @@ public:
     {
         if (!open)
             return false;
-        _content = str;
+        _content += str;
         pos = _content.length();
         return true;
     }

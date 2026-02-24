@@ -8,8 +8,9 @@
 #include <freertos/timers.h>
 #endif
 #include "commands/rmdir.h"
-#include <string>
 #include "../Mocks/MockFileSystem.h"
+#include "../Mocks/MockStream.h"
+#include "../Mocks/CommandRuntimeTestUtils.h"
 #include "DirectoryNavigator.h"
 
 void setUp(void) {}
@@ -116,6 +117,25 @@ void test_rmdir_auto_completion_no_files(void)
     TEST_ASSERT_TRUE(suggestions.size() == 0 || !suggestions[0].contains(".txt"));
 }
 
+void test_rmdir_execute_writes_stdout(void)
+{
+    TestRmdir rmdir;
+
+    MockStream stream;
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+    EmptyInputChannel stdinChannel;
+    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+
+    CommandInvocation invocation{"rmdir", "dir1", context, stdinChannel, stdoutChannel, stderrChannel};
+    CommandResult result = rmdir.execute(invocation);
+
+    TEST_ASSERT_EQUAL(0, result.exitCode);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("removed") != ETString::npos);
+    TEST_ASSERT_TRUE(stream.stderrBuffer.empty());
+}
+
 void process_tests()
 {
     UNITY_BEGIN();
@@ -128,6 +148,7 @@ void process_tests()
     RUN_TEST(test_rmdir_notemptydirectory);
     RUN_TEST(test_rmdir_auto_completion_directory_suggestions);
     RUN_TEST(test_rmdir_auto_completion_no_files);
+    RUN_TEST(test_rmdir_execute_writes_stdout);
     UNITY_END();
 }
 

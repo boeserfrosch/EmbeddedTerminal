@@ -465,7 +465,7 @@ public:
     virtual bool mkdir(const char *path) = 0;
     virtual bool rmdir(const char *path) = 0;
     virtual bool remove(const char *path) = 0;
-    virtual ETVector<ETFile> list(const char *path) const = 0;
+    virtual ETVector<ETString> list(const char *path) const = 0;
     virtual ETFile open(const char *path, const char *mode = "r", bool create = false) = 0;
     virtual bool isDirectory(const char *path) = 0;
     virtual bool isEmpty(const char *path) = 0;

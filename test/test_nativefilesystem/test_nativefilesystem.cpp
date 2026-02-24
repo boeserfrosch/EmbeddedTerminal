@@ -118,10 +118,8 @@ void test_filesystem_list(void)
     auto list = fs.list(TEST_DIR);
     TEST_ASSERT_EQUAL(2, list.size());
 
-    ETVector<ETString> names = list;
-
-    bool found1 = std::find(names.begin(), names.end(), ETString("test.txt")) != names.end();
-    bool found2 = std::find(names.begin(), names.end(), ETString("test2.txt")) != names.end();
+    bool found1 = std::find(list.begin(), list.end(), ETString("test.txt")) != list.end();
+    bool found2 = std::find(list.begin(), list.end(), ETString("test2.txt")) != list.end();
     TEST_ASSERT_TRUE(found1 && found2);
 }
 

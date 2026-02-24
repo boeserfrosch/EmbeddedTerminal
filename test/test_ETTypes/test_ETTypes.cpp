@@ -80,8 +80,8 @@ void test_substr()
 void test_assign()
 {
     ETString s = "ABC";
-    std::string a = "foo";
     TEST_ASSERT_EQUAL_STRING("ABC", s.c_str());
+    std::string a = "foo";
     s = a;
     TEST_ASSERT_EQUAL_STRING("foo", s.c_str());
     ETString t(s);

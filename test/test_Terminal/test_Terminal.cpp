@@ -9,8 +9,6 @@
 
 #include "../src/Terminal.h"
 #include "../src/ETTypes.h"
-#include <string>
-#include <map>
 #include "../Mocks/MockStream.h"
 #include "../Mocks/MockCommand.h"
 #include <unity.h>

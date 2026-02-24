@@ -9,6 +9,8 @@
 #endif
 #include "../src/commands/cd.h"
 #include "../Mocks/MockFileSystem.h"
+#include "../Mocks/MockStream.h"
+#include "../Mocks/CommandRuntimeTestUtils.h"
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -74,6 +76,118 @@ void test_cd_pwd_cd_back_to_pwd(void)
     DirectoryNavigator dir(&FS);
 }
 
+void test_cd_auto_completion(void)
+{
+    MockFileSystem fs;
+    fs.createDirectory("/dir1");
+    fs.createDirectory("/dir2");
+    fs.createDirectory("/dir3");
+    DirectoryNavigator dir(&fs);
+    cmd::cd cd(dir);
+
+    ETVector<ETString> suggestions = cd.getSuggestions("");
+    TEST_ASSERT_EQUAL(3, suggestions.size());
+    TEST_ASSERT_TRUE(suggestions[0] == "/dir1/");
+    TEST_ASSERT_TRUE(suggestions[1] == "/dir2/");
+    TEST_ASSERT_TRUE(suggestions[2] == "/dir3/");
+}
+
+void test_cd_auto_completion_partial(void)
+{
+    MockFileSystem fs;
+    fs.createDirectory("/dir1");
+    fs.createDirectory("/dir2");
+    fs.createDirectory("/dir3");
+    DirectoryNavigator dir(&fs);
+    cmd::cd cd(dir);
+
+    ETVector<ETString> suggestions = cd.getSuggestions("dir");
+    TEST_ASSERT_EQUAL(3, suggestions.size());
+    TEST_ASSERT_TRUE(suggestions[0] == "/dir1/");
+    TEST_ASSERT_TRUE(suggestions[1] == "/dir2/");
+    TEST_ASSERT_TRUE(suggestions[2] == "/dir3/");
+}
+
+void test_cd_auto_completion_no_match(void)
+{
+    MockFileSystem fs;
+    fs.createDirectory("/dir1");
+    fs.createDirectory("/dir2");
+    fs.createDirectory("/dir3");
+    DirectoryNavigator dir(&fs);
+    cmd::cd cd(dir);
+
+    ETVector<ETString> suggestions = cd.getSuggestions("xyz");
+    TEST_ASSERT_EQUAL(0, suggestions.size());
+}
+
+void test_cd_stream_output_on_execute(void)
+{
+    MockFileSystem fs;
+    fs.createDirectory("/folder");
+    DirectoryNavigator dir(&fs);
+    cmd::cd cd(dir);
+    MockStream stream;
+
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+    ETString keyword = "cd";
+    ETString arg = "folder";
+
+    EmptyInputChannel stdinChannel;
+    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+    CommandInvocation invocation{keyword, arg, context, stdinChannel, stdoutChannel, stderrChannel};
+    CommandResult result = cd.execute(invocation);
+
+    TEST_ASSERT_EQUAL(0, result.exitCode);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("> /folder") != ETString::npos);
+}
+
+void test_cd_stream_output_on_execute_invalid_path(void)
+{
+    MockFileSystem fs;
+    DirectoryNavigator dir(&fs);
+    cmd::cd cd(dir);
+    MockStream stream;
+
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+    ETString keyword = "cd";
+    ETString arg = "nonexistent";
+
+    EmptyInputChannel stdinChannel;
+    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+    CommandInvocation invocation{keyword, arg, context, stdinChannel, stdoutChannel, stderrChannel};
+    CommandResult result = cd.execute(invocation);
+
+    TEST_ASSERT_EQUAL(1, result.exitCode);
+    TEST_ASSERT_TRUE(stream.stderrBuffer.find("did not exist") != ETString::npos);
+}
+
+void test_cd_stream_output_on_execute_no_parameter(void)
+{
+    MockFileSystem fs;
+    DirectoryNavigator dir(&fs);
+    cmd::cd cd(dir);
+    MockStream stream;
+
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+    ETString keyword = "cd";
+    ETString arg = "   ";
+
+    EmptyInputChannel stdinChannel;
+    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+    CommandInvocation invocation{keyword, arg, context, stdinChannel, stdoutChannel, stderrChannel};
+    CommandResult result = cd.execute(invocation);
+
+    TEST_ASSERT_EQUAL(1, result.exitCode);
+    TEST_ASSERT_TRUE(stream.stderrBuffer.find("Expected parameter") != ETString::npos);
+}
+
 int process_tests_cd()
 {
 
@@ -85,6 +199,13 @@ int process_tests_cd()
     RUN_TEST(test_cd_usage);
     RUN_TEST(test_cd_empty_keyword);
     RUN_TEST(test_cd_pwd_cd_back_to_pwd);
+    RUN_TEST(test_cd_auto_completion);
+    RUN_TEST(test_cd_auto_completion_partial);
+    RUN_TEST(test_cd_auto_completion_no_match);
+    RUN_TEST(test_cd_stream_output_on_execute);
+    RUN_TEST(test_cd_stream_output_on_execute_invalid_path);
+    RUN_TEST(test_cd_stream_output_on_execute_no_parameter);
+
 #ifndef COMBINED_TESTS
     UNITY_END();
 #endif

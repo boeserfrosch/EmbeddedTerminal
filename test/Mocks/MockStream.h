@@ -1,8 +1,6 @@
 #ifndef MOCK_STREAM_H
 #define MOCK_STREAM_H
 
-#include <string>
-#include <vector>
 #include <cstdint>
 #include <cstring>
 #include <cstdarg>

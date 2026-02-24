@@ -8,8 +8,9 @@
 #include <freertos/timers.h>
 #endif
 #include "commands/ls.h"
-#include <string>
 #include "../Mocks/MockFileSystem.h"
+#include "../Mocks/MockStream.h"
+#include "../Mocks/CommandRuntimeTestUtils.h"
 #include "DirectoryNavigator.h"
 
 void setUp(void) {}
@@ -92,6 +93,25 @@ void test_ls_nonexistent_directory(void)
     TEST_ASSERT_TRUE(result.find("is not a directory") != ETString::npos);
 }
 
+void test_ls_execute_writes_stdout(void)
+{
+    TestLs ls;
+
+    MockStream stream;
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+    EmptyInputChannel stdinChannel;
+    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+
+    CommandInvocation invocation{"ls", "dir3", context, stdinChannel, stdoutChannel, stderrChannel};
+    CommandResult result = ls.execute(invocation);
+
+    TEST_ASSERT_EQUAL(0, result.exitCode);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("foo.txt") != ETString::npos);
+    TEST_ASSERT_TRUE(stream.stderrBuffer.empty());
+}
+
 void process_tests()
 {
     UNITY_BEGIN();
@@ -100,6 +120,7 @@ void process_tests()
     RUN_TEST(test_ls_edge_cases);
     RUN_TEST(test_ls_output_format);
     RUN_TEST(test_ls_flag_l);
+    RUN_TEST(test_ls_execute_writes_stdout);
     UNITY_END();
 }
 

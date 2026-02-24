@@ -3,8 +3,6 @@
 
 #include "terminal/Terminal.h"
 #include "../Mocks/MockStream.h"
-#include <string>
-#include <map>
 
 class MockTerminal : public Terminal
 {

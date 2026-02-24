@@ -9,7 +9,8 @@
 #endif
 #include "commands/ping.h"
 #include "../Mocks/MockNetworkInterface.h"
-#include <string>
+#include "../Mocks/MockStream.h"
+#include "../Mocks/CommandRuntimeTestUtils.h"
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -152,6 +153,26 @@ void test_ping_response_includes_statistics(void)
                      result.find("not reachable") != ETString::npos);
 }
 
+void test_ping_execute_writes_stdout(void)
+{
+    MockNetworkInterface net;
+    EmbeddedTerminal::cmd::ping pingCmd(net);
+
+    MockStream stream;
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+    EmptyInputChannel stdinChannel;
+    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+
+    CommandInvocation invocation{"ping", "localhost", context, stdinChannel, stdoutChannel, stderrChannel};
+    CommandResult result = pingCmd.execute(invocation);
+
+    TEST_ASSERT_EQUAL(0, result.exitCode);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("localhost") != ETString::npos);
+    TEST_ASSERT_TRUE(stream.stderrBuffer.empty());
+}
+
 void process_tests()
 {
     UNITY_BEGIN();
@@ -164,6 +185,7 @@ void process_tests()
     RUN_TEST(test_ping_unreachable_host);
     RUN_TEST(test_ping_invalid_host);
     RUN_TEST(test_ping_response_includes_statistics);
+    RUN_TEST(test_ping_execute_writes_stdout);
     UNITY_END();
 }
 

@@ -4,6 +4,7 @@
 #include "ETTypes.h"
 #include "IAutoCompleter.h"
 #include "ICommandRuntime.h"
+#include "OptionParser.h"
 
 namespace EmbeddedTerminal
 {

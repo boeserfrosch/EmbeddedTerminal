@@ -8,8 +8,9 @@
 #include <freertos/timers.h>
 #endif
 #include "commands/df.h"
-#include <string>
 #include "../Mocks/MockFileSystem.h"
+#include "../Mocks/MockStream.h"
+#include "../Mocks/CommandRuntimeTestUtils.h"
 #include "DirectoryNavigator.h"
 
 using namespace EmbeddedTerminal;
@@ -77,6 +78,27 @@ void test_df_trigger_output_format(void)
     TEST_ASSERT_TRUE(result.find("Free") != ETString::npos);
 }
 
+void test_df_execute_writes_stdout(void)
+{
+    MockFileSystem FS;
+    FS._capacity = 1024 * 1024 * 8;
+    cmd::df df(FS);
+
+    MockStream stream;
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+    EmptyInputChannel stdinChannel;
+    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+
+    CommandInvocation invocation{"df", "", context, stdinChannel, stdoutChannel, stderrChannel};
+    CommandResult result = df.execute(invocation);
+
+    TEST_ASSERT_EQUAL(0, result.exitCode);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("Size") != ETString::npos);
+    TEST_ASSERT_TRUE(stream.stderrBuffer.empty());
+}
+
 void process_tests()
 {
 
@@ -86,6 +108,7 @@ void process_tests()
     RUN_TEST(test_df_usage);
     RUN_TEST(test_df_trigger_edge_cases);
     RUN_TEST(test_df_trigger_output_format);
+    RUN_TEST(test_df_execute_writes_stdout);
     UNITY_END();
 }
 

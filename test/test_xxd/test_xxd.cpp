@@ -10,6 +10,8 @@
 #include "commands/xxd.h"
 #include "../src/DirectoryNavigator.h"
 #include "../Mocks/MockFileSystem.h"
+#include "../Mocks/MockStream.h"
+#include "../Mocks/CommandRuntimeTestUtils.h"
 
 #include <unity.h>
 
@@ -98,6 +100,81 @@ void test_xxd_get_suggestions(void)
     TEST_ASSERT_TRUE(suggestions[1] == "/file1.txt" || suggestions[1] == "/file2.txt");
 }
 
+void test_xxd_execute_writes_stdout(void)
+{
+    MockFileSystem fs;
+    EmbeddedTerminal::DirectoryNavigator dir(&fs);
+    fs.createFile("/file.txt", "hello1234", 9);
+    EmbeddedTerminal::cmd::xxd xxd(dir);
+
+    MockStream stream;
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+    EmptyInputChannel stdinChannel;
+    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+
+    CommandInvocation invocation{"xxd", "file.txt", context, stdinChannel, stdoutChannel, stderrChannel};
+    CommandResult result = xxd.execute(invocation);
+
+    TEST_ASSERT_EQUAL(0, result.exitCode);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("00000000") != ETString::npos);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("68 65 6C 6C 6F") != ETString::npos);
+    TEST_ASSERT_TRUE(stream.stderrBuffer.empty());
+}
+
+void test_xxd_execute_missing_file_writes_stderr(void)
+{
+    MockFileSystem fs;
+    EmbeddedTerminal::DirectoryNavigator dir(&fs);
+    EmbeddedTerminal::cmd::xxd xxd(dir);
+
+    MockStream stream;
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+    EmptyInputChannel stdinChannel;
+    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+
+    CommandInvocation invocation{"xxd", "missing.bin", context, stdinChannel, stdoutChannel, stderrChannel};
+    CommandResult result = xxd.execute(invocation);
+
+    TEST_ASSERT_EQUAL(EmbeddedTerminal::cmd::errorCodes::XXD_CMD_ERROR_FILE_NOT_FOUND, result.exitCode);
+    TEST_ASSERT_TRUE(stream.stderrBuffer.find("file not found") != ETString::npos);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.empty());
+}
+
+void test_xxd_execute_navigates_on_next_key(void)
+{
+    MockFileSystem fs;
+    EmbeddedTerminal::DirectoryNavigator dir(&fs);
+    ETString content = "";
+    for (int i = 0; i < 30; i++)
+    {
+        content += "0123456789";
+    }
+    fs.createFile("/big.bin", content, 0);
+
+    EmbeddedTerminal::cmd::xxd xxd(dir);
+    MockStream stream;
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+    BufferedInputChannel stdinChannel;
+    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+
+    CommandInvocation invocation{"xxd", "big.bin", context, stdinChannel, stdoutChannel, stderrChannel};
+    CommandResult first = xxd.execute(invocation);
+    TEST_ASSERT_EQUAL(0, first.exitCode);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("00000000") != ETString::npos);
+
+    stream.stdoutBuffer = "";
+    stdinChannel.buffer = "n";
+    CommandResult second = xxd.execute(invocation);
+    TEST_ASSERT_EQUAL(0, second.exitCode);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("00000010") != ETString::npos);
+}
+
 int process_tests()
 {
     UNITY_BEGIN();
@@ -107,6 +184,9 @@ int process_tests()
     RUN_TEST(test_xxd_usage);
     RUN_TEST(test_xxd_trigger_edge_cases);
     RUN_TEST(test_xxd_get_suggestions);
+    RUN_TEST(test_xxd_execute_writes_stdout);
+    RUN_TEST(test_xxd_execute_missing_file_writes_stderr);
+    RUN_TEST(test_xxd_execute_navigates_on_next_key);
     UNITY_END();
     return 0;
 }

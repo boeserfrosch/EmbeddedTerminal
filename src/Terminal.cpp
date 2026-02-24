@@ -1,5 +1,4 @@
 #include "Terminal.h"
-#include <string>
 #include <algorithm>
 
 namespace EmbeddedTerminal
@@ -45,7 +44,6 @@ namespace EmbeddedTerminal
             TerminalChannel _channel;
         };
     }
-
 
     Terminal::Terminal(ITerminalStream &input) : _input(input)
 #if defined(ARDUINO)

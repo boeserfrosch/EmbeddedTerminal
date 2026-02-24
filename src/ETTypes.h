@@ -24,6 +24,7 @@ class ETString
 public:
     ETString();
     ETString(const char *s);
+    ETString(const unsigned char *s);
     ETString(const std::string &s);
 #if defined(ARDUINO) //|| defined(ESP_PLATFORM)
     ETString(const String &s);
@@ -31,6 +32,8 @@ public:
     ETString(const ETString &other);
     ETString &operator=(const ETString &other);
     ETString &operator=(const char *s);
+    ETString &operator=(char *s);
+    ETString &operator=(unsigned char *s);
     ETString &operator=(const std::string &s);
 #if defined(ARDUINO) //|| defined(ESP_PLATFORM)
     ETString &operator=(const String &s);
@@ -91,6 +94,8 @@ public:
 #else
         std::string::npos;
 #endif
+
+    static size_t toull(const char *str, size_t *idx = nullptr, int base = 10);
 };
 
 inline ETString operator+(const char *lhs, const ETString &rhs)
@@ -117,5 +122,7 @@ ETVector<ETString> split(ETString s, ETString delimiter);
 ETString join(const ETVector<ETString> &elements, const ETString &delimiter);
 
 ETString toETString(size_t src);
+ETString toETString(int src);
+ETString toETString(unsigned long src);
 
 #endif // ET_TYPES_H

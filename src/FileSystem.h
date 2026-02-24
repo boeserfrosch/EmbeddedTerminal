@@ -110,8 +110,6 @@ namespace EmbeddedTerminal
 #else
 #include <cstdio>
 #include <cstring>
-#include <string>
-#include <vector>
 #include <fstream>
 #include <system_error>
 #include <cerrno>
@@ -174,15 +172,15 @@ namespace EmbeddedTerminal
             return std::filesystem::remove_all(path) > 0;
         }
 
-        ETVector<ETFile> list(const char *path) const override
+        ETVector<ETString> list(const char *path) const override
         {
-            ETVector<ETFile> result;
+            ETVector<ETString> result;
             if (!std::filesystem::exists(path) || !std::filesystem::is_directory(path))
                 return result;
 
             for (const auto &entry : std::filesystem::directory_iterator(path))
             {
-                result.push_back(ETFile(std::make_shared<File>(entry.path().string().c_str())));
+                result.push_back(entry.path().filename().string());
             }
             return result;
         }

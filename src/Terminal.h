@@ -7,9 +7,6 @@
 #include "interfaces/ICommandRuntime.h"
 #include "interfaces/IAutoCompleter.h"
 #include "BuiltinCommandFlags.h"
-#include <map>
-#include <string>
-#include <sstream>
 
 #if defined(ARDUINO)
 #include <Arduino.h>

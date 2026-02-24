@@ -9,7 +9,8 @@
 #endif
 #include "commands/ip.h"
 #include "../Mocks/MockNetworkInterface.h"
-#include <string>
+#include "../Mocks/MockStream.h"
+#include "../Mocks/CommandRuntimeTestUtils.h"
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -84,6 +85,27 @@ void test_unknown_iface(void)
     TEST_ASSERT_TRUE(result.find("Unknown interface\n") != ETString::npos);
 }
 
+void test_ip_execute_writes_stdout(void)
+{
+    MockNetworkInterface net;
+    net.addInterface("test", "192.168.1.123", "", "", "", true);
+    EmbeddedTerminal::cmd::ip ip(net);
+
+    MockStream stream;
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+    EmptyInputChannel stdinChannel;
+    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+
+    CommandInvocation invocation{"ip", "", context, stdinChannel, stdoutChannel, stderrChannel};
+    CommandResult result = ip.execute(invocation);
+
+    TEST_ASSERT_EQUAL(0, result.exitCode);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("192.168.1.123") != ETString::npos);
+    TEST_ASSERT_TRUE(stream.stderrBuffer.empty());
+}
+
 void process_tests()
 {
     UNITY_BEGIN();
@@ -93,6 +115,7 @@ void process_tests()
     RUN_TEST(test_ip_single_cases);
     RUN_TEST(test_no_interface);
     RUN_TEST(test_unknown_iface);
+    RUN_TEST(test_ip_execute_writes_stdout);
     UNITY_END();
 }
 

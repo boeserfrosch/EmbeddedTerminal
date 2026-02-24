@@ -8,8 +8,9 @@
 #include <freertos/timers.h>
 #endif
 #include "commands/mkdir.h"
-#include <string>
 #include "../Mocks/MockFileSystem.h"
+#include "../Mocks/MockStream.h"
+#include "../Mocks/CommandRuntimeTestUtils.h"
 #include "DirectoryNavigator.h"
 
 void setUp(void) {}
@@ -71,6 +72,25 @@ void test_mkdir_auto_completion_directory_suggestions(void)
     TEST_ASSERT_TRUE(suggestions.size() >= 0);
 }
 
+void test_mkdir_execute_writes_stdout(void)
+{
+    TestMkdir mkdir;
+
+    MockStream stream;
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+    EmptyInputChannel stdinChannel;
+    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+
+    CommandInvocation invocation{"mkdir", "newdir2", context, stdinChannel, stdoutChannel, stderrChannel};
+    CommandResult result = mkdir.execute(invocation);
+
+    TEST_ASSERT_EQUAL(0, result.exitCode);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("created") != ETString::npos);
+    TEST_ASSERT_TRUE(stream.stderrBuffer.empty());
+}
+
 void process_tests()
 {
     UNITY_BEGIN();
@@ -79,6 +99,7 @@ void process_tests()
     RUN_TEST(test_mkdir_usage);
     RUN_TEST(test_mkdir_edge_cases);
     RUN_TEST(test_mkdir_auto_completion_directory_suggestions);
+    RUN_TEST(test_mkdir_execute_writes_stdout);
     UNITY_END();
 }
 #if (defined(ESP_PLATFORM) || defined(ESP32)) && not defined(ARDUINO)

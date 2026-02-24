@@ -106,7 +106,10 @@ public:
     {
         if (exists(path))
         {
-            return ETFile(files[path]);
+            auto file = files[path];
+            file->open = true; // Ensure open flag is set
+            // DON'T reset position - position is persistent across open/close for same file
+            return ETFile(file);
         }
         return ETFile(std::make_shared<MockFile>(path));
     }

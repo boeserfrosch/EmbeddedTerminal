@@ -8,8 +8,9 @@
 #include <freertos/timers.h>
 #endif
 #include "commands/rm.h"
-#include <string>
 #include "../Mocks/MockFileSystem.h"
+#include "../Mocks/MockStream.h"
+#include "../Mocks/CommandRuntimeTestUtils.h"
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -89,6 +90,25 @@ void test_rm_auto_completion_directory_suggestions(void)
     TEST_ASSERT_TRUE(suggestions[0].contains("dir"));
 }
 
+void test_rm_execute_writes_stdout(void)
+{
+    TestRm rm;
+
+    MockStream stream;
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+    EmptyInputChannel stdinChannel;
+    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+
+    CommandInvocation invocation{"rm", "file.txt", context, stdinChannel, stdoutChannel, stderrChannel};
+    CommandResult result = rm.execute(invocation);
+
+    TEST_ASSERT_EQUAL(0, result.exitCode);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("removed") != ETString::npos);
+    TEST_ASSERT_TRUE(stream.stderrBuffer.empty());
+}
+
 void process_tests()
 {
     UNITY_BEGIN();
@@ -99,6 +119,7 @@ void process_tests()
     RUN_TEST(test_rm_edge_cases);
     RUN_TEST(test_rm_auto_completion_file_suggestions);
     RUN_TEST(test_rm_auto_completion_directory_suggestions);
+    RUN_TEST(test_rm_execute_writes_stdout);
     UNITY_END();
 }
 

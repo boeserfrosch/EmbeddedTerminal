@@ -9,7 +9,7 @@
 #endif
 #include "commands/help.h"
 #include "../Mocks/MockStream.h"
-#include <string>
+#include "../Mocks/CommandRuntimeTestUtils.h"
 
 using namespace EmbeddedTerminal;
 
@@ -102,23 +102,9 @@ void test_help_execute_writes_stdout(void)
     ETString keyword = "help";
     ETString arg = "dummy";
 
-    class EmptyInputChannel : public IInputChannel
-    {
-    public:
-        bool available() override { return false; }
-        ETString readAll() override { return ""; }
-    } stdinChannel;
-
-    class StreamBackedOutputChannel : public IOutputChannel
-    {
-    public:
-        explicit StreamBackedOutputChannel(MockStream &stream, TerminalChannel channel) : _stream(stream), _channel(channel) {}
-        void print(const ETString &s) override { _stream.printTo(_channel, s); }
-
-    private:
-        MockStream &_stream;
-        TerminalChannel _channel;
-    } stdoutChannel(stream, TerminalChannel::StdOut), stderrChannel(stream, TerminalChannel::StdErr);
+    EmptyInputChannel stdinChannel;
+    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
 
     CommandInvocation invocation{keyword, arg, context, stdinChannel, stdoutChannel, stderrChannel};
     CommandResult result = help.execute(invocation);

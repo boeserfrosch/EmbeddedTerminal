@@ -20,12 +20,15 @@ namespace EmbeddedTerminal
             }
             ETString usage(const ETString &keyword);
 
+            CommandResult execute(CommandInvocation &invocation) override;
             ETString trigger(const ETString &keyword, const ETString &additional) override;
 
             // Auto completion - suggest directories only
             ETVector<ETString> getSuggestions(const ETString &partial) override;
 
         private:
+            ETString _checkPath(const ETString &path);
+
             DirectoryNavigator &_dir;
             DirectoryCompleter _completer;
         };

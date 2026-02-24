@@ -99,37 +99,22 @@ namespace EmbeddedTerminal
         bool mkdir(const char *path) override { return _mount && _mount->mkdir(path); }
         bool rmdir(const char *path) override { return _mount && _mount->rmdir(path); }
 
-        ETVector<ETFile> list(const char *path) const override
+        ETVector<ETString> list(const char *path) const override
         {
-            ETVector<ETFile> files;
+            ETVector<ETString> files;
             if (!_mount)
                 return files;
             File dir = _mount->open(path);
             if (!dir || !dir.isDirectory())
                 return files;
 
-            File entry = dir.openNextFile();
-            while (entry)
+            ETString name = dir.getNextFileName();
+            do
             {
-                ETString name;
-                const char *p = entry.name();
-                if (p)
-                    name = ETString(p);
-                // build ArduinoIFile from entry: cannot keep same File object after next call,
-                // so open each file separately by path
-                ETString fullPath = ETString(path);
-                if (!fullPath.endsWith("/"))
-                    fullPath += "/";
-                fullPath += name;
-                File f = _mount->open(fullPath.c_str(), "r");
-                if (f)
-                {
-                    auto filePtr = std::make_shared<ArduinoFile>(f, name, fullPath);
-                    files.push_back(ETFile(filePtr));
-                }
-                entry.close();
-                entry = dir.openNextFile();
-            }
+                files.push_back(name);
+                name = dir.getNextFileName();
+            } while (!name.empty());
+
             dir.close();
             return files;
         }

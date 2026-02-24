@@ -11,12 +11,21 @@ ETString::ETString() : data("")
 }
 
 ETString::ETString(const char *s) : data(s) {}
+ETString::ETString(const unsigned char *s) : data((const char *)s) {}
+
 ETString::ETString(const ETString &other) : data(other.data) {}
 ETString &ETString::operator=(const ETString &other)
 {
     data = other.data;
     return *this;
 }
+
+ETString &ETString::operator=(unsigned char *s)
+{
+    data = (char *)s;
+    return *this;
+}
+
 ETString &ETString::operator=(const char *s)
 {
     data = s;
@@ -360,6 +369,23 @@ bool ETString::contains(const char other) const
     return find(other) != npos;
 }
 
+size_t ETString::toull(const char *str, size_t *idx, int base)
+{
+#if defined(ARDUINO) //|| defined(ESP_PLATFORM)
+    char *endPtr;
+    unsigned long result = strtoul(str, &endPtr, base);
+    if (idx)
+        *idx = endPtr - str;
+    return result;
+#else
+    size_t processedChars = 0;
+    unsigned long result = std::stoul(str, &processedChars, base);
+    if (idx)
+        *idx = processedChars;
+    return result;
+#endif
+}
+
 template <typename... Args>
 ETString string_format(const ETString &format, Args... args)
 {
@@ -397,6 +423,24 @@ ETString join(const ETVector<ETString> &elements, const ETString &delimiter)
 }
 
 ETString toETString(size_t src)
+{
+#if defined(ARDUINO) //|| defined(ESP_PLATFORM)
+    return ETString(String(src));
+#else
+    return ETString(std::to_string(src));
+#endif
+}
+
+ETString toETString(int src)
+{
+#if defined(ARDUINO) //|| defined(ESP_PLATFORM)
+    return ETString(String(src));
+#else
+    return ETString(std::to_string(src));
+#endif
+}
+
+ETString toETString(unsigned long src)
 {
 #if defined(ARDUINO) //|| defined(ESP_PLATFORM)
     return ETString(String(src));
