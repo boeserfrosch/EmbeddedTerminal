@@ -11,7 +11,7 @@ namespace EmbeddedTerminal
 {
     class ArduinoStream : public ITerminalStream
     {
-    private:
+    protected:
         Stream &_stream;
 
     public:
@@ -46,6 +46,22 @@ namespace EmbeddedTerminal
             vsnprintf(buffer, sizeof(buffer), fmt, args);
             va_end(args);
             _stream.print(buffer);
+        }
+
+        void printTo(TerminalChannel channel, const ETString &s) override
+        {
+            (void)channel; // Ignoring channel for Arduino Stream
+            print(s);
+        }
+
+        void printfTo(TerminalChannel channel, const char *fmt, ...) override
+        {
+            char buffer[256];
+            va_list args;
+            va_start(args, fmt);
+            vsnprintf(buffer, sizeof(buffer), fmt, args);
+            va_end(args);
+            printTo(channel, ETString(buffer));
         }
     };
 } // namespace EmbeddedTerminal
