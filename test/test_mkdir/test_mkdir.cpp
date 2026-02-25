@@ -69,7 +69,7 @@ void test_mkdir_auto_completion_directory_suggestions(void)
     TestMkdir mkdir;
     ETVector<ETString> suggestions = mkdir.getSuggestions("exi");
     // Should suggest existing directories
-    TEST_ASSERT_TRUE(suggestions.size() >= 0);
+    TEST_ASSERT_TRUE(suggestions.size() > 0);
 }
 
 void test_mkdir_execute_writes_stdout(void)

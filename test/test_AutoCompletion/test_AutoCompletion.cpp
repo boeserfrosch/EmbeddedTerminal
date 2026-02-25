@@ -180,7 +180,7 @@ void test_auto_completion_common_prefix(void)
 }
 
 // Test runner
-int main(void)
+int process_tests(void)
 {
     UNITY_BEGIN();
     RUN_TEST(test_auto_completion_tab_detection);
@@ -195,3 +195,23 @@ int main(void)
     RUN_TEST(test_auto_completion_common_prefix);
     return UNITY_END();
 }
+
+#if (defined(ESP_PLATFORM) || defined(ESP32)) && not defined(ARDUINO)
+extern "C" void app_main()
+{
+    vTaskDelay(pdMS_TO_TICKS(4000));
+    process_tests();
+}
+#elif defined(ARDUINO)
+void setup()
+{
+    delay(2500);
+    process_tests();
+}
+void loop() {}
+#else
+int main()
+{
+    return process_tests();
+}
+#endif

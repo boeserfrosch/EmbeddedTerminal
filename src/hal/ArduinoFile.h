@@ -80,23 +80,15 @@ namespace EmbeddedTerminal
 
         ETString name() const override
         {
-            ETString ret;
+            ETString path = file_.path();
             // find the last forward‐ or back‐slash
-            size_t pos = path_.find_last_of("/\\");
-            if (pos == std::string::npos)
-            {
-                // no slash found → the whole string is the name
-                ret = path_;
-            }
-            else
-            {
-                // everything after the slash
-                ret = path_.substr(pos + 1);
-            }
-            return ret;
+            size_t pos = max(path.find_last_of("/\\"), path.find_last_of("\\/"));
+
+            pos = (pos == ETString::npos) ? 0 : pos + 1; // if no slash found, start from beginning
+            return path.substr(pos);
         }
 
-        ETString path() const override { return path_; }
+        ETString path() const override { return file_.path(); }
 
         bool isDirectory() const override
         {
@@ -109,13 +101,11 @@ namespace EmbeddedTerminal
         bool isOpen() const override
         {
             auto f = file_;
-
-            return f.peek() >= 0;
+            return f.seek(f.position());
         }
 
     private:
         File file_;
-        ETString path_;
     };
 
 } // namespace EmbeddedTerminal

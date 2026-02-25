@@ -209,7 +209,10 @@ EmbeddedTerminal::cmd::download::downloadState cmd::download::_handleState(Comma
         vars[SESSION_KEY_POS] = "0";
     }
 
-    return {path, filePos};
+    downloadState result;
+    result.path = path;
+    result.position = filePos;
+    return result;
 }
 
 unsigned char cmd::download::_checkState(const downloadState &state, CommandInvocation &invocation)
@@ -241,7 +244,7 @@ EmbeddedTerminal::cmd::download::processChunkResult cmd::download::_processChunk
     {
         invocation.context.variables.erase(SESSION_KEY_PATH);
         invocation.context.variables.erase(SESSION_KEY_POS);
-        return processChunkResult{false, true, errorCodes::DOWNLOAD_CMD_ERROR_FAILED_TO_SEEK};
+        return processChunkResult(false, true, errorCodes::DOWNLOAD_CMD_ERROR_FAILED_TO_SEEK);
     }
 
     size_t fileSize = file.size();
@@ -249,7 +252,7 @@ EmbeddedTerminal::cmd::download::processChunkResult cmd::download::_processChunk
     {
         // EOF
         invocation.stdoutChannel.print("\nEOF\n");
-        return processChunkResult{false, false, 0};
+        return processChunkResult(false, false, errorCodes::DOWNLOAD_CMD_ERROR_NONE);
     }
 
     ETVector<unsigned char> buf(RAW_CHUNK);
@@ -263,7 +266,7 @@ EmbeddedTerminal::cmd::download::processChunkResult cmd::download::_processChunk
     {
         // EOF or read error
         invocation.stdoutChannel.print("\nEOF\n");
-        return processChunkResult{false, true, errorCodes::DOWNLOAD_CMD_ERROR_FAILED_TO_READ};
+        return processChunkResult(false, true, errorCodes::DOWNLOAD_CMD_ERROR_FAILED_TO_READ);
     }
 
     ETString b64 = base64encode(buf.data(), actuallyRead);
@@ -272,7 +275,7 @@ EmbeddedTerminal::cmd::download::processChunkResult cmd::download::_processChunk
     // Update position for potential continuation
     invocation.context.variables[SESSION_KEY_POS] = toETString(filePos + actuallyRead);
 
-    return processChunkResult{true, false, 0}; // Indicate that there is more to read
+    return processChunkResult(true, false, errorCodes::DOWNLOAD_CMD_ERROR_NONE);
 }
 
 CommandResult cmd::download::_error(size_t errorCode, CommandInvocation &invocation)

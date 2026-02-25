@@ -135,6 +135,7 @@ void setup()
     delay(2500);
     process_tests();
 }
+
 void loop() {}
 #else
 int main()

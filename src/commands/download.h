@@ -51,6 +51,8 @@ namespace EmbeddedTerminal
                 bool hasMore = false;
                 bool error = false;
                 size_t errorCode = 0;
+
+                processChunkResult(bool hasMore, bool error = false, size_t errorCode = 0) : hasMore(hasMore), error(error), errorCode(errorCode) {}
             };
 
             downloadState _handleState(CommandInvocation &invocation);

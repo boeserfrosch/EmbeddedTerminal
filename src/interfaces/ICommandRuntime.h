@@ -19,17 +19,26 @@ namespace EmbeddedTerminal
 
         static CommandResult completed(int code = 0)
         {
-            return CommandResult{code, CommandExecutionState::Completed};
+            CommandResult result;
+            result.exitCode = code;
+            result.state = CommandExecutionState::Completed;
+            return result;
         }
 
         static CommandResult running(int code = 0)
         {
-            return CommandResult{code, CommandExecutionState::Running};
+            CommandResult result;
+            result.exitCode = code;
+            result.state = CommandExecutionState::Running;
+            return result;
         }
 
         static CommandResult waitingForInput(int code = 0)
         {
-            return CommandResult{code, CommandExecutionState::WaitingForInput};
+            CommandResult result;
+            result.exitCode = code;
+            result.state = CommandExecutionState::WaitingForInput;
+            return result;
         }
     };
 
@@ -53,6 +62,11 @@ namespace EmbeddedTerminal
         ETMap<ETString, ETString> &variables;
         int lastExitCode = 0;
         bool interactive = false;
+
+        CommandContext(ETMap<ETString, ETString> &vars, int exitCode = 0, bool isInteractive = false)
+            : variables(vars), lastExitCode(exitCode), interactive(isInteractive)
+        {
+        }
     };
 
     struct CommandInvocation

@@ -58,8 +58,8 @@ void test_cleanupLine()
 void test_back_push_pop_back()
 {
     ETString s = "abcd";
-    auto r = s.back();
     TEST_ASSERT_TRUE(s.back() == 'd');
+    // Test that back() does not modify the string
     TEST_ASSERT_TRUE(s.back() == 'd');
     s.pop_back();
     TEST_ASSERT_TRUE(s.back() == 'c');

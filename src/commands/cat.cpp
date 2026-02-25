@@ -95,7 +95,6 @@ namespace EmbeddedTerminal
 
         EmbeddedTerminal::cmd::cat::CatState cat::_handleState(CommandInvocation &invocation)
         {
-            CatState state;
             // Check if this is a continuation of an ongoing stream
             auto &vars = invocation.context.variables;
             auto pathIt = vars.find(SESSION_KEY_PATH);
@@ -124,7 +123,10 @@ namespace EmbeddedTerminal
                 vars[SESSION_KEY_POS] = "0";
             }
 
-            return {path, filePos};
+            CatState state;
+            state.path = path;
+            state.position = filePos;
+            return state;
         }
 
         unsigned char cat::_checkState(const CatState &state, CommandInvocation &invocation)

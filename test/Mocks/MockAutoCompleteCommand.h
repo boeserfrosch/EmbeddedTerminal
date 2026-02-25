@@ -5,7 +5,7 @@
 #include "../../src/interfaces/IAutoCompleter.h"
 #include "../../src/ETTypes.h"
 
-class MockAutoCompleteCommand : public EmbeddedTerminal::ICommand, public EmbeddedTerminal::IAutoCompleter
+class MockAutoCompleteCommand : public EmbeddedTerminal::ICommand
 {
 public:
     ETString lastKeyword;

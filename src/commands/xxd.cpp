@@ -122,7 +122,10 @@ EmbeddedTerminal::cmd::xxd::HandleKeyStrokesResult EmbeddedTerminal::cmd::xxd::_
             {
                 invocation.context.variables[SESSION_KEY_POS] = toETString(currentPos + 16);
             }
-            return HandleKeyStrokesResult{true, false};
+            HandleKeyStrokesResult result;
+            result.hasChanges = true;
+            result.exitCommand = false;
+            return result;
         }
         else if (input == "p")
         {
@@ -135,18 +138,27 @@ EmbeddedTerminal::cmd::xxd::HandleKeyStrokesResult EmbeddedTerminal::cmd::xxd::_
             {
                 invocation.context.variables[SESSION_KEY_POS] = "0";
             }
-            return HandleKeyStrokesResult{true, false};
+            HandleKeyStrokesResult result;
+            result.hasChanges = true;
+            result.exitCommand = false;
+            return result;
         }
         else if (input == "q")
         {
             // Quit
-            return HandleKeyStrokesResult{false, true};
+            HandleKeyStrokesResult result;
+            result.hasChanges = false;
+            result.exitCommand = true;
+            return result;
         }
         else if (input == "g")
         {
             // Go to beginning
             invocation.context.variables[SESSION_KEY_POS] = "0";
-            return HandleKeyStrokesResult{true, false};
+            HandleKeyStrokesResult result;
+            result.hasChanges = true;
+            result.exitCommand = false;
+            return result;
         }
         else if (input == "G")
         {
@@ -163,18 +175,27 @@ EmbeddedTerminal::cmd::xxd::HandleKeyStrokesResult EmbeddedTerminal::cmd::xxd::_
             {
                 invocation.context.variables[SESSION_KEY_POS] = "0";
             }
-            return HandleKeyStrokesResult{true, false};
+            HandleKeyStrokesResult result;
+            result.hasChanges = true;
+            result.exitCommand = false;
+            return result;
         }
         else if (input.startsWith("o"))
         {
             ETString offsetStr = input.substr(1).trim();
             size_t offset = std::stoull(offsetStr.c_str(), nullptr, 16);
             invocation.context.variables[SESSION_KEY_POS] = toETString(offset);
-            return HandleKeyStrokesResult{true, false};
+            HandleKeyStrokesResult result;
+            result.hasChanges = true;
+            result.exitCommand = false;
+            return result;
         }
     }
 
-    return HandleKeyStrokesResult{false, false};
+    HandleKeyStrokesResult result;
+    result.hasChanges = false;
+    result.exitCommand = false;
+    return result;
 }
 
 /* @brief Generates a hex dump string for the given content
