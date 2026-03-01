@@ -8,12 +8,32 @@
 #include <freertos/timers.h>
 #endif
 #include "commands/ping.h"
+#include "../Mocks/MockNetworkSystem.h"
 #include "../Mocks/MockNetworkInterface.h"
 #include "../Mocks/MockStream.h"
 #include "../Mocks/CommandRuntimeTestUtils.h"
 
-void setUp(void) {}
-void tearDown(void) {}
+INetworkSystem *network = nullptr;
+
+void setUp(void)
+{
+    network = new MockNetworkSystem();
+    // Create a mock network interface and add it to the system
+    auto mockInterface = new MockNetworkInterface();
+    network->addInterface(mockInterface->info().name, mockInterface);
+}
+
+void tearDown(void)
+{
+    auto interfaces = network->interfaces();
+    for (auto iface : interfaces)
+    {
+        network->removeInterface(iface->info().name);
+        delete iface;
+    }
+    delete network;
+    network = nullptr;
+}
 
 /**
  * Test: Empty target (no arguments)
@@ -21,8 +41,8 @@ void tearDown(void) {}
  */
 void test_ping_empty_target(void)
 {
-    MockNetworkInterface net;
-    EmbeddedTerminal::cmd::ping pingCmd(net);
+
+    EmbeddedTerminal::cmd::ping pingCmd(*network);
     ETString keyword = "ping";
     ETString additional = "";
     ETString result = pingCmd.trigger(keyword, additional);
@@ -35,8 +55,8 @@ void test_ping_empty_target(void)
  */
 void test_ping_whitespace_only(void)
 {
-    MockNetworkInterface net;
-    EmbeddedTerminal::cmd::ping pingCmd(net);
+
+    EmbeddedTerminal::cmd::ping pingCmd(*network);
     ETString keyword = "ping";
     ETString additional = "   ";
     ETString result = pingCmd.trigger(keyword, additional);
@@ -49,8 +69,8 @@ void test_ping_whitespace_only(void)
  */
 void test_ping_usage(void)
 {
-    MockNetworkInterface net;
-    EmbeddedTerminal::cmd::ping pingCmd(net);
+
+    EmbeddedTerminal::cmd::ping pingCmd(*network);
     ETString keyword = "ping";
     ETString result = pingCmd.usage(keyword);
     TEST_ASSERT_TRUE(result.find("ping") != ETString::npos);
@@ -64,8 +84,8 @@ void test_ping_usage(void)
  */
 void test_ping_target_extraction(void)
 {
-    MockNetworkInterface net;
-    EmbeddedTerminal::cmd::ping pingCmd(net);
+
+    EmbeddedTerminal::cmd::ping pingCmd(*network);
     ETString keyword = "ping";
     ETString additional = "8.8.8.8 extra arguments";
 
@@ -79,13 +99,13 @@ void test_ping_target_extraction(void)
  */
 void test_ping_localhost_success(void)
 {
-    MockNetworkInterface net;
-    EmbeddedTerminal::cmd::ping pingCmd(net);
+
+    EmbeddedTerminal::cmd::ping pingCmd(*network);
     ETString keyword = "ping";
     ETString additional = "localhost";
     ETString result = pingCmd.trigger(keyword, additional);
 
-    // Mock returns success for localhost
+    // Mock return s success for localhost
     TEST_ASSERT_TRUE(result.find("localhost") != ETString::npos);
     TEST_ASSERT_TRUE(result.find("pinged") != ETString::npos);
 }
@@ -96,8 +116,8 @@ void test_ping_localhost_success(void)
  */
 void test_ping_ipv4_address(void)
 {
-    MockNetworkInterface net;
-    EmbeddedTerminal::cmd::ping pingCmd(net);
+
+    EmbeddedTerminal::cmd::ping pingCmd(*network);
     ETString keyword = "ping";
     ETString additional = "192.168.1.1";
     ETString result = pingCmd.trigger(keyword, additional);
@@ -112,10 +132,10 @@ void test_ping_ipv4_address(void)
  */
 void test_ping_unreachable_host(void)
 {
-    MockNetworkInterface net;
-    EmbeddedTerminal::cmd::ping pingCmd(net);
+
+    EmbeddedTerminal::cmd::ping pingCmd(*network);
     ETString keyword = "ping";
-    ETString additional = "10.255.255.255"; // Mock returns unreachable
+    ETString additional = "10.255.255.255"; // Mock return s unreachable
     ETString result = pingCmd.trigger(keyword, additional);
 
     TEST_ASSERT_TRUE(result.find("not reachable") != ETString::npos);
@@ -127,10 +147,10 @@ void test_ping_unreachable_host(void)
  */
 void test_ping_invalid_host(void)
 {
-    MockNetworkInterface net;
-    EmbeddedTerminal::cmd::ping pingCmd(net);
+
+    EmbeddedTerminal::cmd::ping pingCmd(*network);
     ETString keyword = "ping";
-    ETString additional = "invalid"; // Mock returns unreachable
+    ETString additional = "invalid"; // Mock return s unreachable
     ETString result = pingCmd.trigger(keyword, additional);
 
     TEST_ASSERT_TRUE(result.find("not reachable") != ETString::npos);
@@ -142,8 +162,8 @@ void test_ping_invalid_host(void)
  */
 void test_ping_response_includes_statistics(void)
 {
-    MockNetworkInterface net;
-    EmbeddedTerminal::cmd::ping pingCmd(net);
+
+    EmbeddedTerminal::cmd::ping pingCmd(*network);
     ETString keyword = "ping";
     ETString additional = "8.8.8.8";
     ETString result = pingCmd.trigger(keyword, additional);
@@ -155,8 +175,8 @@ void test_ping_response_includes_statistics(void)
 
 void test_ping_execute_writes_stdout(void)
 {
-    MockNetworkInterface net;
-    EmbeddedTerminal::cmd::ping pingCmd(net);
+
+    EmbeddedTerminal::cmd::ping pingCmd(*network);
 
     MockStream stream;
     ETMap<ETString, ETString> vars;

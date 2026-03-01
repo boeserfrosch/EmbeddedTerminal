@@ -11,15 +11,33 @@
 #include "../Mocks/MockFileSystem.h"
 #include "../Mocks/MockStream.h"
 #include "../Mocks/CommandRuntimeTestUtils.h"
+#include "StorageSystem.h"
+#include "../Mocks/MockStorageMedia.h"
 
-void setUp(void) {}
-void tearDown(void) {}
+IStorageSystem *storage = nullptr;
+
+void setUp(void)
+{
+    storage = new StorageSystem();
+    auto media = new MockStorageMedia("mock", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    storage->mountMedia(media, "/");
+}
+void tearDown(void)
+{
+    auto medias = storage->media();
+    for (auto media : medias)
+    {
+        storage->unmountMedia(media->name());
+        delete media;
+    }
+    delete storage;
+    storage = nullptr;
+}
 
 void test_cd_trigger_valid_path(void)
 {
-    MockFileSystem fs;
-    fs.createDirectory("/valid");
-    DirectoryNavigator dir(&fs);
+    storage->mkdir("/valid");
+    DirectoryNavigator dir(storage);
     cmd::cd cd(dir);
     ETString keyword = "cd";
     ETString additional = "/valid";
@@ -29,8 +47,7 @@ void test_cd_trigger_valid_path(void)
 
 void test_cd_trigger_invalid_path(void)
 {
-    MockFileSystem fs;
-    DirectoryNavigator dir(&fs);
+    DirectoryNavigator dir(storage);
     cmd::cd cd(dir);
     ETString keyword = "cd";
     ETString additional = "/invalid";
@@ -38,16 +55,15 @@ void test_cd_trigger_invalid_path(void)
     TEST_ASSERT_TRUE(result.find("did not exist") != ETString::npos);
 
     // Test with a file path that is not a directory
-    fs.createFile("not_a_dir.txt", "content", 7);
-    ETString filePath = "not_a_dir.txt";
+    storage->open("/not_a_dir.txt", "w", true).writeAll("content");
+    ETString filePath = "/not_a_dir.txt";
     ETString result2 = cd.trigger(keyword, filePath);
     TEST_ASSERT_TRUE(result2.find("not a directory") != ETString::npos);
 }
 
 void test_cd_usage(void)
 {
-    MockFileSystem fs;
-    DirectoryNavigator dir(&fs);
+    DirectoryNavigator dir(storage);
     cmd::cd cd(dir);
     ETString keyword = "cd";
     ETString result = cd.usage(keyword);
@@ -56,8 +72,7 @@ void test_cd_usage(void)
 
 void test_cd_empty_keyword(void)
 {
-    MockFileSystem fs;
-    DirectoryNavigator dir(&fs);
+    DirectoryNavigator dir(storage);
     cmd::cd cd(dir);
     ETString keyword = "";
     ETString additional = "";
@@ -67,22 +82,46 @@ void test_cd_empty_keyword(void)
 
 void test_cd_pwd_cd_back_to_pwd(void)
 {
-    MockFileSystem FS;
-    FS.createDirectory("/");
-    FS.createDirectory("/folder");
-    FS.createDirectory("/folder/another");
-    FS.createDirectory("/folder/another/deeper");
-    FS.createDirectory("/folder2");
-    DirectoryNavigator dir(&FS);
+    storage->mkdir("/");
+    storage->mkdir("/folder");
+    storage->mkdir("/folder/another");
+    storage->mkdir("/folder/another/deeper");
+    storage->mkdir("/folder2");
+    DirectoryNavigator dir(storage);
+    cmd::cd cd(dir);
+    // Start at root
+    TEST_ASSERT_TRUE(dir.pwd() == "/");
+    TEST_ASSERT_TRUE(dir.pwd().isRoot());
+    // cd into folder
+    cd.trigger("cd", "folder");
+    TEST_ASSERT_TRUE(dir.pwd() == "/folder");
+    // cd into another
+    cd.trigger("cd", "another");
+    TEST_ASSERT_TRUE(dir.pwd() == "/folder/another");
+    // cd into deeper
+    cd.trigger("cd", "deeper");
+    TEST_ASSERT_TRUE(dir.pwd() == "/folder/another/deeper");
+    // cd back to another
+    cd.trigger("cd", "..");
+    TEST_ASSERT_TRUE(dir.pwd() == "/folder/another");
+    // cd back to folder
+    cd.trigger("cd", "..");
+    TEST_ASSERT_TRUE(dir.pwd() == "/folder");
+    // cd staying in folder
+    cd.trigger("cd", ".");
+    TEST_ASSERT_TRUE(dir.pwd() == "/folder");
+    // cd back to root
+    cd.trigger("cd", "/");
+    TEST_ASSERT_TRUE(dir.pwd() == "/");
+    TEST_ASSERT_TRUE(dir.pwd().isRoot());
 }
 
 void test_cd_auto_completion(void)
 {
-    MockFileSystem fs;
-    fs.createDirectory("/dir1");
-    fs.createDirectory("/dir2");
-    fs.createDirectory("/dir3");
-    DirectoryNavigator dir(&fs);
+    storage->mkdir("/dir1");
+    storage->mkdir("/dir2");
+    storage->mkdir("/dir3");
+    DirectoryNavigator dir(storage);
     cmd::cd cd(dir);
 
     ETVector<ETString> suggestions = cd.getSuggestions("");
@@ -94,11 +133,10 @@ void test_cd_auto_completion(void)
 
 void test_cd_auto_completion_partial(void)
 {
-    MockFileSystem fs;
-    fs.createDirectory("/dir1");
-    fs.createDirectory("/dir2");
-    fs.createDirectory("/dir3");
-    DirectoryNavigator dir(&fs);
+    storage->mkdir("/dir1");
+    storage->mkdir("/dir2");
+    storage->mkdir("/dir3");
+    DirectoryNavigator dir(storage);
     cmd::cd cd(dir);
 
     ETVector<ETString> suggestions = cd.getSuggestions("dir");
@@ -110,11 +148,10 @@ void test_cd_auto_completion_partial(void)
 
 void test_cd_auto_completion_no_match(void)
 {
-    MockFileSystem fs;
-    fs.createDirectory("/dir1");
-    fs.createDirectory("/dir2");
-    fs.createDirectory("/dir3");
-    DirectoryNavigator dir(&fs);
+    storage->mkdir("/dir1");
+    storage->mkdir("/dir2");
+    storage->mkdir("/dir3");
+    DirectoryNavigator dir(storage);
     cmd::cd cd(dir);
 
     ETVector<ETString> suggestions = cd.getSuggestions("xyz");
@@ -123,9 +160,8 @@ void test_cd_auto_completion_no_match(void)
 
 void test_cd_stream_output_on_execute(void)
 {
-    MockFileSystem fs;
-    fs.createDirectory("/folder");
-    DirectoryNavigator dir(&fs);
+    storage->mkdir("/folder");
+    DirectoryNavigator dir(storage);
     cmd::cd cd(dir);
     MockStream stream;
 
@@ -146,8 +182,8 @@ void test_cd_stream_output_on_execute(void)
 
 void test_cd_stream_output_on_execute_invalid_path(void)
 {
-    MockFileSystem fs;
-    DirectoryNavigator dir(&fs);
+    storage->mkdir("/valid");
+    DirectoryNavigator dir(storage);
     cmd::cd cd(dir);
     MockStream stream;
 
@@ -168,8 +204,8 @@ void test_cd_stream_output_on_execute_invalid_path(void)
 
 void test_cd_stream_output_on_execute_no_parameter(void)
 {
-    MockFileSystem fs;
-    DirectoryNavigator dir(&fs);
+    storage->mkdir("/test");
+    DirectoryNavigator dir(storage);
     cmd::cd cd(dir);
     MockStream stream;
 

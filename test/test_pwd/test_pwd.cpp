@@ -11,15 +11,36 @@
 #include "../Mocks/MockFileSystem.h"
 #include "../Mocks/MockStream.h"
 #include "../Mocks/CommandRuntimeTestUtils.h"
+#include "StorageSystem.h"
+#include "../Mocks/MockStorageMedia.h"
 
-void setUp(void) {}
-void tearDown(void) {}
+IStorageSystem *storage = nullptr;
+DirectoryNavigator *dir = nullptr;
+
+void setUp(void)
+{
+    storage = new StorageSystem();
+    auto media = new MockStorageMedia("mock", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    storage->mountMedia(media, "/");
+    dir = new DirectoryNavigator(storage);
+}
+void tearDown(void)
+{
+    auto medias = storage->media();
+    for (auto media : medias)
+    {
+        storage->unmountMedia(media->name());
+        delete media;
+    }
+    delete dir;
+    dir = nullptr;
+    delete storage;
+    storage = nullptr;
+}
 
 void test_pwd_returns_root_directory(void)
 {
-    MockFileSystem fs;
-    DirectoryNavigator dir(&fs);
-    cmd::pwd pwd(dir);
+    cmd::pwd pwd(*dir);
     ETString keyword = "pwd";
     ETString additional = "";
     ETString result = pwd.trigger(keyword, additional);
@@ -28,13 +49,11 @@ void test_pwd_returns_root_directory(void)
 
 void test_pwd_returns_changed_directory(void)
 {
-    MockFileSystem fs;
-    fs.createDirectory("/home");
-    DirectoryNavigator dir(&fs);
-    cmd::pwd pwd(dir);
-    
+    storage->mkdir("/home");
+    cmd::pwd pwd(*dir);
+
     // Change to /home
-    dir.cd("/home");
+    dir->cd("/home");
     ETString keyword = "pwd";
     ETString additional = "";
     ETString result = pwd.trigger(keyword, additional);
@@ -43,12 +62,10 @@ void test_pwd_returns_changed_directory(void)
 
 void test_pwd_ignores_additional_parameters(void)
 {
-    MockFileSystem fs;
-    fs.createDirectory("/test");
-    DirectoryNavigator dir(&fs);
-    cmd::pwd pwd(dir);
-    
-    dir.cd("/test");
+    storage->mkdir("/test");
+    cmd::pwd pwd(*dir);
+
+    dir->cd("/test");
     ETString keyword = "pwd";
     ETString additional = "extra params that should be ignored";
     ETString result = pwd.trigger(keyword, additional);
@@ -57,9 +74,7 @@ void test_pwd_ignores_additional_parameters(void)
 
 void test_pwd_usage(void)
 {
-    MockFileSystem fs;
-    DirectoryNavigator dir(&fs);
-    cmd::pwd pwd(dir);
+    cmd::pwd pwd(*dir);
     ETString keyword = "pwd";
     ETString result = pwd.usage(keyword);
     TEST_ASSERT_TRUE(result.find("Print the current working directory") != ETString::npos);
@@ -67,16 +82,14 @@ void test_pwd_usage(void)
 
 void test_pwd_with_nested_directories(void)
 {
-    MockFileSystem fs;
-    fs.createDirectory("/usr");
-    fs.createDirectory("/usr/local");
-    fs.createDirectory("/usr/local/bin");
-    DirectoryNavigator dir(&fs);
-    cmd::pwd pwd(dir);
-    
-    dir.cd("/usr");
-    dir.cd("local");
-    dir.cd("bin");
+    storage->mkdir("/usr");
+    storage->mkdir("/usr/local");
+    storage->mkdir("/usr/local/bin");
+    cmd::pwd pwd(*dir);
+
+    dir->cd("/usr");
+    dir->cd("local");
+    dir->cd("bin");
     ETString keyword = "pwd";
     ETString additional = "";
     ETString result = pwd.trigger(keyword, additional);
@@ -85,9 +98,7 @@ void test_pwd_with_nested_directories(void)
 
 void test_pwd_returns_string_ending_with_newline(void)
 {
-    MockFileSystem fs;
-    DirectoryNavigator dir(&fs);
-    cmd::pwd pwd(dir);
+    cmd::pwd pwd(*dir);
     ETString keyword = "pwd";
     ETString additional = "";
     ETString result = pwd.trigger(keyword, additional);
@@ -96,9 +107,7 @@ void test_pwd_returns_string_ending_with_newline(void)
 
 void test_pwd_execute_writes_stdout(void)
 {
-    MockFileSystem fs;
-    DirectoryNavigator dir(&fs);
-    cmd::pwd pwd(dir);
+    cmd::pwd pwd(*dir);
 
     MockStream stream;
     ETMap<ETString, ETString> vars;

@@ -12,26 +12,37 @@
 #include "../Mocks/MockStream.h"
 #include "../Mocks/CommandRuntimeTestUtils.h"
 #include "DirectoryNavigator.h"
+#include "StorageSystem.h"
+#include "../Mocks/MockStorageMedia.h"
 
-void setUp(void) {}
-void tearDown(void) {}
-MockFileSystem FS;
-DirectoryNavigator dir(&FS);
+IStorageSystem *storage = nullptr;
+DirectoryNavigator *dir = nullptr;
 
-class TestMkdir : public cmd::mkdir
+void setUp(void)
 {
-
-public:
-    TestMkdir() : cmd::mkdir(dir)
+    storage = new StorageSystem();
+    auto media = new MockStorageMedia("mock", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    storage->mountMedia(media, "/");
+    dir = new DirectoryNavigator(storage);
+    storage->mkdir("existingdir");
+}
+void tearDown(void)
+{
+    auto medias = storage->media();
+    for (auto media : medias)
     {
-        // Setup mock directories
-        FS.createDirectory("existingdir");
+        storage->unmountMedia(media->name());
+        delete media;
     }
-};
+    delete dir;
+    dir = nullptr;
+    delete storage;
+    storage = nullptr;
+}
 
 void test_mkdir_valid_directory(void)
 {
-    TestMkdir mkdir;
+    cmd::mkdir mkdir(*dir);
     ETString keyword = "mkdir";
     ETString arg = "newdir";
     ETString result = mkdir.trigger(keyword, arg);
@@ -40,7 +51,7 @@ void test_mkdir_valid_directory(void)
 
 void test_mkdir_existing_directory(void)
 {
-    TestMkdir mkdir;
+    cmd::mkdir mkdir(*dir);
     ETString keyword = "mkdir";
     ETString arg = "existingdir";
     ETString result = mkdir.trigger(keyword, arg);
@@ -49,7 +60,7 @@ void test_mkdir_existing_directory(void)
 
 void test_mkdir_usage(void)
 {
-    TestMkdir mkdir;
+    cmd::mkdir mkdir(*dir);
     ETString keyword = "mkdir";
     ETString result = mkdir.usage(keyword);
     TEST_ASSERT_TRUE(result.find("Create the specified folder") != ETString::npos);
@@ -57,7 +68,7 @@ void test_mkdir_usage(void)
 
 void test_mkdir_edge_cases(void)
 {
-    TestMkdir mkdir;
+    cmd::mkdir mkdir(*dir);
     ETString keyword = "mkdir";
     ETString arg = "   ";
     ETString result = mkdir.trigger(keyword, arg);
@@ -66,7 +77,7 @@ void test_mkdir_edge_cases(void)
 
 void test_mkdir_auto_completion_directory_suggestions(void)
 {
-    TestMkdir mkdir;
+    cmd::mkdir mkdir(*dir);
     ETVector<ETString> suggestions = mkdir.getSuggestions("exi");
     // Should suggest existing directories
     TEST_ASSERT_TRUE(suggestions.size() > 0);
@@ -74,7 +85,7 @@ void test_mkdir_auto_completion_directory_suggestions(void)
 
 void test_mkdir_execute_writes_stdout(void)
 {
-    TestMkdir mkdir;
+    cmd::mkdir mkdir(*dir);
 
     MockStream stream;
     ETMap<ETString, ETString> vars;

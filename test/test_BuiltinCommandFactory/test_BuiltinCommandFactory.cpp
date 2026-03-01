@@ -14,11 +14,35 @@
 #include "../Mocks/MockStream.h"
 #include "../Mocks/MockFileSystem.h"
 #include "../Mocks/MockNetworkInterface.h"
+#include "../Mocks/MockNetworkSystem.h"
+#include "StorageSystem.h"
+#include "../Mocks/MockStorageMedia.h"
 
 using namespace EmbeddedTerminal;
 
-void setUp(void) {}
-void tearDown(void) {}
+IStorageSystem *storage = nullptr;
+DirectoryNavigator *dir = nullptr;
+
+void setUp(void)
+{
+    storage = new StorageSystem();
+    auto media = new MockStorageMedia("mock", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    storage->mountMedia(media, "/");
+    dir = new DirectoryNavigator(storage);
+}
+void tearDown(void)
+{
+    auto medias = storage->media();
+    for (auto media : medias)
+    {
+        storage->unmountMedia(media->name());
+        delete media;
+    }
+    delete dir;
+    dir = nullptr;
+    delete storage;
+    storage = nullptr;
+}
 
 // Test basic factory construction and destruction
 void test_factory_construction(void)
@@ -33,8 +57,7 @@ void test_register_filesystem_commands_all(void)
 {
     MockStream stream;
     Terminal term(stream);
-    MockFileSystem fs;
-    DirectoryNavigator nav(&fs);
+    DirectoryNavigator nav(*dir);
     BuiltinCommandFactory factory;
 
     factory.registerFilesystemCommands(term, nav, CMD_FILESYSTEM_ALL);
@@ -54,8 +77,7 @@ void test_register_filesystem_commands_selective(void)
 {
     MockStream stream;
     Terminal term(stream);
-    MockFileSystem fs;
-    DirectoryNavigator nav(&fs);
+    DirectoryNavigator nav(*dir);
     BuiltinCommandFactory factory;
 
     factory.registerFilesystemCommands(term, nav, CMD_LS | CMD_CD | CMD_CAT);
@@ -73,8 +95,7 @@ void test_register_disk_commands(void)
 {
     MockStream stream;
     Terminal term(stream);
-    MockFileSystem fs;
-    DirectoryNavigator nav(&fs);
+    DirectoryNavigator nav(*dir);
     BuiltinCommandFactory factory;
 
     factory.registerDiskCommands(term, nav, CMD_DF);
@@ -88,7 +109,7 @@ void test_register_network_commands(void)
 {
     MockStream stream;
     Terminal term(stream);
-    MockNetworkInterface net;
+    MockNetworkSystem net;
     BuiltinCommandFactory factory;
 
     factory.registerNetworkCommands(term, net, CMD_NETWORK_ALL);
@@ -116,9 +137,8 @@ void test_register_all_commands(void)
 {
     MockStream stream;
     Terminal term(stream);
-    MockFileSystem fs;
-    DirectoryNavigator nav(&fs);
-    MockNetworkInterface net;
+    DirectoryNavigator nav(*dir);
+    MockNetworkSystem net;
     BuiltinCommandFactory factory;
 
     factory.registerAllCommands(term, nav, net);
@@ -138,8 +158,7 @@ void test_deregister_filesystem_commands(void)
 {
     MockStream stream;
     Terminal term(stream);
-    MockFileSystem fs;
-    DirectoryNavigator nav(&fs);
+    DirectoryNavigator nav(*dir);
     BuiltinCommandFactory factory;
 
     factory.registerFilesystemCommands(term, nav, CMD_LS | CMD_CD);
@@ -155,9 +174,8 @@ void test_deregister_all_commands(void)
 {
     MockStream stream;
     Terminal term(stream);
-    MockFileSystem fs;
-    DirectoryNavigator nav(&fs);
-    MockNetworkInterface net;
+    DirectoryNavigator nav(*dir);
+    MockNetworkSystem net;
     BuiltinCommandFactory factory;
 
     factory.registerAllCommands(term, nav, net);
@@ -175,8 +193,8 @@ void test_factory_no_duplicate_registration(void)
 {
     MockStream stream;
     Terminal term(stream);
-    MockFileSystem fs;
-    DirectoryNavigator nav(&fs);
+
+    DirectoryNavigator nav(*dir);
     BuiltinCommandFactory factory;
 
     // Register twice
@@ -194,8 +212,8 @@ void test_factory_cleanup_on_destruction(void)
     MockStream stream;
     Terminal term(stream);
     {
-        MockFileSystem fs;
-        DirectoryNavigator nav(&fs);
+
+        DirectoryNavigator nav(*dir);
         BuiltinCommandFactory factory;
         factory.registerFilesystemCommands(term, nav, CMD_LS);
         // Factory goes out of scope here and should clean up
@@ -210,8 +228,8 @@ void test_multiple_factories(void)
     MockStream stream1, stream2;
     Terminal term1(stream1);
     Terminal term2(stream2);
-    MockFileSystem fs;
-    DirectoryNavigator nav(&fs);
+
+    DirectoryNavigator nav(*dir);
 
     BuiltinCommandFactory factory1;
     BuiltinCommandFactory factory2;
@@ -233,8 +251,7 @@ void test_factory_command_execution(void)
 {
     MockStream stream;
     Terminal term(stream);
-    MockFileSystem fs;
-    DirectoryNavigator nav(&fs);
+    DirectoryNavigator nav(*dir);
     BuiltinCommandFactory factory;
 
     factory.registerHelpCommand(term);

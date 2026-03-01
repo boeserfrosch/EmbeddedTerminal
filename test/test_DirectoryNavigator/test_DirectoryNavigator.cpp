@@ -9,37 +9,56 @@
 
 #include <unity.h>
 #include "../src/DirectoryNavigator.h"
-#include "../Mocks/MockFileSystem.h"
+#include "../src/interfaces/IFileSystem.h"
+#include "../src/ETFile.h"
+#include "../Mocks/MockStorageMedia.h"
+#include "StorageSystem.h"
 
 using namespace EmbeddedTerminal;
 
-void setUp(void) {}
-void tearDown(void) {}
+// --- DirectoryNavigator tests ---
+
+IStorageSystem *storage;
+
+void setUp(void)
+{
+    storage = new StorageSystem();
+    auto media = new MockStorageMedia("root", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+
+    storage->mountMedia(media, "");
+}
+void tearDown(void)
+{
+    auto media = storage->media();
+    for (auto m : media)
+    {
+        storage->unmountMedia(m->name());
+        delete m;
+    }
+    delete storage;
+}
 
 // Test basic construction
 void test_navigator_construction(void)
 {
-    MockFileSystem fs;
-    DirectoryNavigator nav(&fs);
+    DirectoryNavigator nav(storage);
     TEST_ASSERT_EQUAL_STRING("/", nav.pwd().c_str());
 }
 
 // Test construction with custom root
 void test_navigator_custom_root(void)
 {
-    MockFileSystem fs;
-    fs.createDirectory("/home");
-    DirectoryNavigator nav(&fs, "/home");
+    TEST_ASSERT_TRUE(storage->mkdir("/home"));
+    DirectoryNavigator nav(storage, "/home");
     TEST_ASSERT_EQUAL_STRING("/home", nav.pwd().c_str());
 }
 
 // Test cd to absolute path
 void test_navigator_cd_absolute(void)
 {
-    MockFileSystem fs;
-    fs.createDirectory("/home");
-    fs.createDirectory("/home/user");
-    DirectoryNavigator nav(&fs);
+    storage->mkdir("/home");
+    storage->mkdir("/home/user");
+    DirectoryNavigator nav(storage);
 
     bool result = nav.cd("/home/user");
     TEST_ASSERT_TRUE(result);
@@ -49,11 +68,11 @@ void test_navigator_cd_absolute(void)
 // Test cd to relative path
 void test_navigator_cd_relative(void)
 {
-    MockFileSystem fs;
-    fs.createDirectory("/home");
-    fs.createDirectory("/home/user");
-    DirectoryNavigator nav(&fs, "/home");
+    storage->mkdir("/home");
+    storage->mkdir("/home/user");
+    DirectoryNavigator nav(storage);
 
+    TEST_ASSERT_TRUE(nav.cd("/home"));
     bool result = nav.cd("user");
     TEST_ASSERT_TRUE(result);
     TEST_ASSERT_EQUAL_STRING("/home/user", nav.pwd().c_str());
@@ -62,10 +81,9 @@ void test_navigator_cd_relative(void)
 // Test cd to parent directory
 void test_navigator_cd_parent(void)
 {
-    MockFileSystem fs;
-    fs.createDirectory("/home");
-    fs.createDirectory("/home/user");
-    DirectoryNavigator nav(&fs, "/home/user");
+    storage->mkdir("/home");
+    storage->mkdir("/home/user");
+    DirectoryNavigator nav(storage, "/home/user");
 
     bool result = nav.cd("..");
     TEST_ASSERT_TRUE(result);
@@ -75,8 +93,7 @@ void test_navigator_cd_parent(void)
 // Test cd to non-existent directory
 void test_navigator_cd_nonexistent(void)
 {
-    MockFileSystem fs;
-    DirectoryNavigator nav(&fs);
+    DirectoryNavigator nav(storage);
 
     bool result = nav.cd("/nonexistent");
     TEST_ASSERT_FALSE(result);
@@ -86,9 +103,8 @@ void test_navigator_cd_nonexistent(void)
 // Test cd to file (should fail)
 void test_navigator_cd_to_file(void)
 {
-    MockFileSystem fs;
-    fs.createFile("/file.txt", "content", 7);
-    DirectoryNavigator nav(&fs);
+    storage->open("/file.txt", "w", true).writeAll("content");
+    DirectoryNavigator nav(storage);
 
     bool result = nav.cd("/file.txt");
     TEST_ASSERT_FALSE(result);
@@ -98,9 +114,8 @@ void test_navigator_cd_to_file(void)
 // Test exists with absolute path
 void test_navigator_exists_absolute(void)
 {
-    MockFileSystem fs;
-    fs.createFile("/file.txt", "data", 4);
-    DirectoryNavigator nav(&fs);
+    storage->open("/file.txt", "w", true).writeAll("data");
+    DirectoryNavigator nav(storage);
 
     TEST_ASSERT_TRUE(nav.exists("/file.txt"));
     TEST_ASSERT_FALSE(nav.exists("/missing.txt"));
@@ -109,10 +124,9 @@ void test_navigator_exists_absolute(void)
 // Test exists with relative path
 void test_navigator_exists_relative(void)
 {
-    MockFileSystem fs;
-    fs.createDirectory("/home");
-    fs.createFile("/home/file.txt", "data", 4);
-    DirectoryNavigator nav(&fs, "/home");
+    storage->mkdir("/home");
+    storage->open("/home/file.txt", "w", true).writeAll("data");
+    DirectoryNavigator nav(storage, "/home");
 
     TEST_ASSERT_TRUE(nav.exists("file.txt"));
     TEST_ASSERT_FALSE(nav.exists("missing.txt"));
@@ -121,11 +135,10 @@ void test_navigator_exists_relative(void)
 // Test ls current directory
 void test_navigator_ls_current(void)
 {
-    MockFileSystem fs;
-    fs.createDirectory("/home");
-    fs.createFile("/home/a.txt", "a", 1);
-    fs.createFile("/home/b.txt", "b", 1);
-    DirectoryNavigator nav(&fs, "/home");
+    storage->mkdir("/home");
+    storage->open("/home/a.txt", "w", true).writeAll("a");
+    storage->open("/home/b.txt", "w", true).writeAll("b");
+    DirectoryNavigator nav(storage, "/home");
 
     auto files = nav.ls();
     TEST_ASSERT_EQUAL(2, files.size());
@@ -134,11 +147,10 @@ void test_navigator_ls_current(void)
 // Test ls with path
 void test_navigator_ls_path(void)
 {
-    MockFileSystem fs;
-    fs.createDirectory("/data");
-    fs.createFile("/data/file1.txt", "1", 1);
-    fs.createFile("/data/file2.txt", "2", 1);
-    DirectoryNavigator nav(&fs);
+    storage->mkdir("/data");
+    storage->open("/data/file1.txt", "w", true).writeAll("1");
+    storage->open("/data/file2.txt", "w", true).writeAll("2");
+    DirectoryNavigator nav(storage);
 
     auto files = nav.ls("/data");
     TEST_ASSERT_EQUAL(2, files.size());
@@ -147,57 +159,52 @@ void test_navigator_ls_path(void)
 // Test mkdir absolute path
 void test_navigator_mkdir_absolute(void)
 {
-    MockFileSystem fs;
-    DirectoryNavigator nav(&fs);
+    DirectoryNavigator nav(storage);
 
     bool result = nav.mkdir("/newdir");
     TEST_ASSERT_TRUE(result);
-    TEST_ASSERT_TRUE(fs.exists("/newdir"));
+    TEST_ASSERT_TRUE(storage->exists("/newdir"));
 }
 
 // Test mkdir relative path
 void test_navigator_mkdir_relative(void)
 {
-    MockFileSystem fs;
-    fs.createDirectory("/home");
-    DirectoryNavigator nav(&fs, "/home");
+    storage->mkdir("/home");
+    DirectoryNavigator nav(storage, "/home");
 
     bool result = nav.mkdir("subdir");
     TEST_ASSERT_TRUE(result);
-    TEST_ASSERT_TRUE(fs.exists("/home/subdir"));
+    TEST_ASSERT_TRUE(storage->exists("/home/subdir"));
 }
 
 // Test rmdir
 void test_navigator_rmdir(void)
 {
-    MockFileSystem fs;
-    fs.createDirectory("/tempdir");
-    DirectoryNavigator nav(&fs);
+    storage->mkdir("/tempdir");
+    DirectoryNavigator nav(storage);
 
     bool result = nav.rmdir("/tempdir");
     TEST_ASSERT_TRUE(result);
-    TEST_ASSERT_FALSE(fs.exists("/tempdir"));
+    TEST_ASSERT_FALSE(storage->exists("/tempdir"));
 }
 
 // Test remove file
 void test_navigator_remove(void)
 {
-    MockFileSystem fs;
-    fs.createFile("/file.txt", "data", 4);
-    DirectoryNavigator nav(&fs);
+    storage->open("/file.txt", "w", true).writeAll("data");
+    DirectoryNavigator nav(storage);
 
     bool result = nav.remove("/file.txt");
     TEST_ASSERT_TRUE(result);
-    TEST_ASSERT_FALSE(fs.exists("/file.txt"));
+    TEST_ASSERT_FALSE(storage->exists("/file.txt"));
 }
 
 // Test isDirectory
 void test_navigator_is_directory(void)
 {
-    MockFileSystem fs;
-    fs.createDirectory("/dir");
-    fs.createFile("/file.txt", "data", 4);
-    DirectoryNavigator nav(&fs);
+    storage->mkdir("/dir");
+    storage->open("/file.txt", "w", true).writeAll("data");
+    DirectoryNavigator nav(storage);
 
     TEST_ASSERT_TRUE(nav.isDirectory("/dir"));
     TEST_ASSERT_FALSE(nav.isDirectory("/file.txt"));
@@ -207,11 +214,10 @@ void test_navigator_is_directory(void)
 // Test isEmpty
 void test_navigator_is_empty(void)
 {
-    MockFileSystem fs;
-    fs.createDirectory("/empty");
-    fs.createDirectory("/nonempty");
-    fs.createFile("/nonempty/file.txt", "data", 4);
-    DirectoryNavigator nav(&fs);
+    storage->mkdir("/empty");
+    storage->mkdir("/nonempty");
+    storage->open("/nonempty/file.txt", "w", true).writeAll("data");
+    DirectoryNavigator nav(storage);
 
     TEST_ASSERT_TRUE(nav.isEmpty("/empty"));
     TEST_ASSERT_FALSE(nav.isEmpty("/nonempty"));
@@ -220,32 +226,29 @@ void test_navigator_is_empty(void)
 // Test pwd with path (resolve path)
 void test_navigator_pwd_with_path(void)
 {
-    MockFileSystem fs;
-    fs.createDirectory("/home");
-    DirectoryNavigator nav(&fs, "/home");
+    storage->mkdir("/home");
+    DirectoryNavigator nav(storage, "/home");
 
     ETString resolved = nav.pwd("subdir");
     TEST_ASSERT_EQUAL_STRING("/home/subdir", resolved.c_str());
 }
 
-// Test getFileSystem accessor
-void test_navigator_get_filesystem(void)
+// Test getStorageSystem accessor
+void test_navigator_get_storage_system(void)
 {
-    MockFileSystem fs;
-    DirectoryNavigator nav(&fs);
+    DirectoryNavigator nav(storage);
 
-    IFileSystem *retrieved = nav.getFileSystem();
-    TEST_ASSERT_EQUAL_PTR(&fs, retrieved);
+    IStorageSystem *retrieved = nav.getStorageSystem();
+    TEST_ASSERT_EQUAL_PTR(storage, retrieved);
 }
 
 // Test complex path resolution with .. and .
 void test_navigator_complex_path_resolution(void)
 {
-    MockFileSystem fs;
-    fs.createDirectory("/a");
-    fs.createDirectory("/a/b");
-    fs.createDirectory("/a/b/c");
-    DirectoryNavigator nav(&fs, "/a/b/c");
+    TEST_ASSERT_TRUE(storage->mkdir("/a"));
+    TEST_ASSERT_TRUE(storage->mkdir("/a/b"));
+    TEST_ASSERT_TRUE(storage->mkdir("/a/b/c"));
+    DirectoryNavigator nav(storage, "/a/b/c");
 
     ETString resolved = nav.pwd("../../x");
     TEST_ASSERT_EQUAL_STRING("/a/x", resolved.c_str());
@@ -254,9 +257,8 @@ void test_navigator_complex_path_resolution(void)
 // Test cd with . (current directory)
 void test_navigator_cd_current(void)
 {
-    MockFileSystem fs;
-    fs.createDirectory("/home");
-    DirectoryNavigator nav(&fs, "/home");
+    storage->mkdir("/home");
+    DirectoryNavigator nav(storage, "/home");
 
     bool result = nav.cd(".");
     TEST_ASSERT_TRUE(result);
@@ -266,14 +268,113 @@ void test_navigator_cd_current(void)
 // Test path normalization (multiple slashes)
 void test_navigator_path_normalization(void)
 {
-    MockFileSystem fs;
-    fs.createDirectory("/home");
-    DirectoryNavigator nav(&fs);
+    storage->mkdir("/home");
+    DirectoryNavigator nav(storage);
 
     ETString resolved = nav.pwd("//home//");
     // Should normalize to /home
     TEST_ASSERT_TRUE(resolved.find("/home") != ETString::npos);
 }
+
+// --- DirectoryWalker tests (merged) ---
+
+class NavigatorTest : public EmbeddedTerminal::DirectoryNavigator
+{
+public:
+    NavigatorTest(EmbeddedTerminal::IStorageSystem *fs, const ETString &root = "/") : EmbeddedTerminal::DirectoryNavigator(fs, root) {}
+    ETString resolvePathMock(const char *path) const { return resolvePath(path); }
+};
+
+void test_resolvePath()
+{
+    storage->mkdir("/home");
+    NavigatorTest nav(storage, "/home");
+    // Absolute path
+    TEST_ASSERT_EQUAL_STRING("/home", nav.pwd().c_str());
+    TEST_ASSERT_EQUAL_STRING("/etc", nav.resolvePathMock("/etc").c_str());
+    // Relative path
+    TEST_ASSERT_EQUAL_STRING("/home/docs", nav.resolvePathMock("docs").c_str());
+    // Empty path
+    TEST_ASSERT_EQUAL_STRING("/home", nav.resolvePathMock("").c_str());
+}
+
+void test_cd_pwd()
+{
+    storage->mkdir("/home");
+    EmbeddedTerminal::DirectoryNavigator nav(storage, "/home");
+    TEST_ASSERT_EQUAL_STRING("/home", nav.pwd().c_str());
+    TEST_ASSERT_TRUE(nav.cd("/"));
+    TEST_ASSERT_EQUAL_STRING("/", nav.pwd().c_str());
+    TEST_ASSERT_FALSE(nav.cd("/notfound"));
+    TEST_ASSERT_TRUE(nav.cd("/home"));
+    TEST_ASSERT_EQUAL_STRING(nav.pwd().c_str(), "/home");
+}
+
+void test_mkdir_rmdir()
+{
+    storage->mkdir("/home");
+    EmbeddedTerminal::DirectoryNavigator nav(storage, "/home");
+    TEST_ASSERT_TRUE(nav.mkdir("/newdir"));
+    TEST_ASSERT_TRUE(storage->exists("/newdir"));
+    TEST_ASSERT_TRUE(nav.rmdir("/newdir"));
+    TEST_ASSERT_FALSE(storage->exists("/newdir"));
+}
+
+void test_remove()
+{
+    storage->open("/file.txt", FILE_MODE_WRITE, true).write("data", 4);
+    EmbeddedTerminal::DirectoryNavigator nav(storage);
+    TEST_ASSERT_TRUE(nav.remove("/file.txt"));
+    TEST_ASSERT_FALSE(storage->exists("/file.txt"));
+}
+
+void test_cd_pwd_cd_back_to_pwd(void)
+{
+    storage->mkdir("/folder");
+    storage->mkdir("/folder/another");
+    storage->mkdir("/folder/another/deeper");
+    storage->mkdir("/folder2");
+    EmbeddedTerminal::DirectoryNavigator dir(storage, "/");
+
+    TEST_ASSERT_EQUAL_STRING("/", dir.pwd().c_str());
+    TEST_ASSERT_TRUE(dir.pwd().isAbsolute());
+
+    // Change to /folder
+    Path folder = "folder";
+    TEST_ASSERT_FALSE(folder.isAbsolute());
+    TEST_ASSERT_TRUE(dir.cd("folder"));
+    TEST_ASSERT_TRUE(dir.pwd().isAbsolute());
+    TEST_ASSERT_EQUAL_STRING("/folder", dir.pwd().c_str());
+    auto pwd = dir.pwd();
+    // Change to /folder/another
+    TEST_ASSERT_TRUE(dir.cd("another"));
+    TEST_ASSERT_EQUAL_STRING("/folder/another", dir.pwd().c_str());
+
+    TEST_ASSERT_TRUE(dir.cd(pwd));
+    TEST_ASSERT_EQUAL_STRING(pwd.c_str(), dir.pwd().c_str());
+
+    // Change to /folder/another/deeper
+    TEST_ASSERT_TRUE(dir.cd("/folder/another/deeper"));
+    TEST_ASSERT_EQUAL_STRING("/folder/another/deeper", dir.pwd().c_str());
+
+    // Go back to /folder/another
+    TEST_ASSERT_TRUE(dir.cd(".."));
+    TEST_ASSERT_EQUAL_STRING("/folder/another", dir.pwd().c_str());
+
+    // Go back to /folder
+    TEST_ASSERT_TRUE(dir.cd(".."));
+    TEST_ASSERT_EQUAL_STRING("/folder", dir.pwd().c_str());
+
+    // Change to /folder2 using absolute path
+    TEST_ASSERT_TRUE(dir.cd("/folder2"));
+    TEST_ASSERT_EQUAL_STRING("/folder2", dir.pwd().c_str());
+
+    // Go back to root
+    TEST_ASSERT_TRUE(dir.cd("/"));
+    TEST_ASSERT_EQUAL_STRING("/", dir.pwd().c_str());
+}
+
+// --- Test runner ---
 
 void process_tests()
 {
@@ -296,10 +397,18 @@ void process_tests()
     RUN_TEST(test_navigator_is_directory);
     RUN_TEST(test_navigator_is_empty);
     RUN_TEST(test_navigator_pwd_with_path);
-    RUN_TEST(test_navigator_get_filesystem);
+    RUN_TEST(test_navigator_get_storage_system);
     RUN_TEST(test_navigator_complex_path_resolution);
     RUN_TEST(test_navigator_cd_current);
     RUN_TEST(test_navigator_path_normalization);
+
+    // DirectoryWalker tests
+    RUN_TEST(test_resolvePath);
+    RUN_TEST(test_cd_pwd);
+    RUN_TEST(test_mkdir_rmdir);
+    RUN_TEST(test_remove);
+    RUN_TEST(test_cd_pwd_cd_back_to_pwd);
+
     UNITY_END();
 }
 

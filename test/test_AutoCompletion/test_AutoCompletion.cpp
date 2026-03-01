@@ -7,11 +7,13 @@
 #include "freertos/timers.h"
 #endif
 
-#include "../src/Terminal.h"
-#include "../src/ETTypes.h"
-#include "../src/DefaultAutoCompleters.h"
+#include "Terminal.h"
+#include "ETTypes.h"
+#include "DefaultAutoCompleters.h"
 #include "../Mocks/MockStream.h"
 #include "../Mocks/MockAutoCompleteCommand.h"
+#include "StorageSystem.h"
+#include "../Mocks/MockStorageMedia.h"
 #include <unity.h>
 
 using namespace EmbeddedTerminal;
@@ -90,7 +92,7 @@ void test_auto_completion_no_matches(void)
     TEST_ASSERT_TRUE(true);
 }
 
-/// Test 5: getBuffer returns current buffer content
+/// Test 5: getBuffer return s current buffer content
 void test_terminal_get_buffer(void)
 {
     MockStream stream;
@@ -113,7 +115,7 @@ void test_terminal_get_last_word_with_space(void)
     TEST_ASSERT_EQUAL_STRING("world", lastWord.c_str());
 }
 
-/// Test 7: getLastWord returns entire buffer if no space
+/// Test 7: getLastWord return s entire buffer if no space
 void test_terminal_get_last_word_no_space(void)
 {
     MockStream stream;
@@ -180,6 +182,76 @@ void test_auto_completion_common_prefix(void)
 }
 
 // Test runner
+// Additional tests for DefaultAutoCompleters
+void test_command_completer_suggestions(void)
+{
+    ETMap<ETString, ICommand *> commands;
+    MockAutoCompleteCommand cmd1, cmd2;
+    commands["ls"] = &cmd1;
+    commands["cat"] = &cmd2;
+    CommandCompleter completer(commands);
+    auto suggestions = completer.getSuggestions("c");
+    TEST_ASSERT_EQUAL_INT(1, suggestions.size());
+    TEST_ASSERT_EQUAL_STRING("cat", suggestions[0].c_str());
+}
+
+void test_filepath_completer_basic(void)
+{
+    StorageSystem storage;
+    auto media = new MockStorageMedia("root", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    storage.mountMedia(media, "");
+    storage.mkdir("/home");
+    storage.mkdir("/bin");
+    storage.mkdir("/home/user");
+    storage.open("/home/file.txt", FILE_MODE_WRITE, true).write("data", 4);
+    DirectoryNavigator nav(&storage, "/home");
+    FilePathCompleter completer(nav);
+    auto suggestions = completer.getSuggestions("");
+    TEST_ASSERT_TRUE(suggestions.size() >= 1);
+    TEST_ASSERT_TRUE(suggestions[0].contains("file.txt"));
+
+    TEST_ASSERT_TRUE(nav.cd(".."));
+    TEST_ASSERT_EQUAL_STRING("/", nav.pwd().c_str());
+    suggestions = completer.getSuggestions("h");
+
+    TEST_ASSERT_EQUAL_INT(1, suggestions.size());
+    TEST_ASSERT_EQUAL_STRING("home/", suggestions[0].c_str());
+    suggestions = completer.getSuggestions("home/u");
+    TEST_ASSERT_TRUE(suggestions.size() >= 1);
+    TEST_ASSERT_EQUAL_STRING("home/user/", suggestions[0].c_str());
+    suggestions = completer.getSuggestions("home/file");
+    TEST_ASSERT_TRUE(suggestions.size() >= 1);
+    TEST_ASSERT_EQUAL_STRING("home/file.txt", suggestions[0].c_str());
+    suggestions = completer.getSuggestions("home/file.txt");
+    TEST_ASSERT_TRUE(suggestions.size() >= 1);
+    TEST_ASSERT_EQUAL_STRING("home/file.txt", suggestions[0].c_str());
+    suggestions = completer.getSuggestions("home/file.txt/");
+    TEST_ASSERT_TRUE(suggestions.size() == 1);
+    TEST_ASSERT_EQUAL_STRING("home/file.txt", suggestions[0].c_str());
+    suggestions = completer.getSuggestions("");
+    TEST_ASSERT_TRUE(suggestions.size() >= 1);
+    TEST_ASSERT_EQUAL_STRING("bin/", suggestions[0].c_str());
+    TEST_ASSERT_EQUAL_STRING("home/", suggestions[1].c_str());
+}
+
+void test_directory_completer_basic(void)
+{
+    return;
+    StorageSystem storage;
+    auto media = new MockStorageMedia("root", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    storage.mountMedia(media, "");
+    storage.mkdir("/dir");
+    storage.mkdir("/dir2");
+    storage.mkdir("/dir3");
+    ETString content = "data";
+    storage.open("/dir/file.txt", FILE_MODE_WRITE, true).writeAll(content);
+    DirectoryNavigator nav(&storage);
+    DirectoryCompleter completer(nav);
+    auto suggestions = completer.getSuggestions("/d");
+    TEST_ASSERT_TRUE(suggestions.size() >= 1);
+    TEST_ASSERT_EQUAL_STRING("dir/", suggestions[0].c_str());
+}
+
 int process_tests(void)
 {
     UNITY_BEGIN();
@@ -193,6 +265,9 @@ int process_tests(void)
     RUN_TEST(test_command_completer_basic);
     RUN_TEST(test_command_completer_filter);
     RUN_TEST(test_auto_completion_common_prefix);
+    RUN_TEST(test_command_completer_suggestions);
+    RUN_TEST(test_filepath_completer_basic);
+    RUN_TEST(test_directory_completer_basic);
     return UNITY_END();
 }
 

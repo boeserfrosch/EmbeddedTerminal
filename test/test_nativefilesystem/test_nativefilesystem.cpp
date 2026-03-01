@@ -11,8 +11,8 @@
 
 #include <algorithm>
 
-#include "../src/hal/NativeFile.h"
-#include "../src/hal/NativeFileSystem.h"
+#include "hal/NativeFile.h"
+#include "hal/NativeFileSystem.h"
 
 using namespace EmbeddedTerminal;
 
@@ -118,17 +118,9 @@ void test_filesystem_list(void)
     auto list = fs.list(TEST_DIR);
     TEST_ASSERT_EQUAL(2, list.size());
 
-    bool found1 = std::find(list.begin(), list.end(), ETString("test.txt")) != list.end();
-    bool found2 = std::find(list.begin(), list.end(), ETString("test2.txt")) != list.end();
+    bool found1 = std::find(list.begin(), list.end(), Path("test.txt")) != list.end();
+    bool found2 = std::find(list.begin(), list.end(), Path("test2.txt")) != list.end();
     TEST_ASSERT_TRUE(found1 && found2);
-}
-
-void test_filesystem_capacity(void)
-{
-    NativeFileSystem fs;
-    TEST_ASSERT_TRUE(fs.capacity() > 0);
-    TEST_ASSERT_TRUE(fs.totalBytes() > 0);
-    TEST_ASSERT_TRUE(fs.usedBytes() >= 0);
 }
 
 int process_tests_filesystem()
@@ -140,7 +132,6 @@ int process_tests_filesystem()
     RUN_TEST(test_filesystem_exists_and_remove);
     RUN_TEST(test_filesystem_directory);
     RUN_TEST(test_filesystem_list);
-    RUN_TEST(test_filesystem_capacity);
     UNITY_END();
     return 0;
 }

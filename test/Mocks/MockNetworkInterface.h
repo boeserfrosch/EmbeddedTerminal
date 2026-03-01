@@ -7,42 +7,30 @@
 class MockNetworkInterface : public EmbeddedTerminal::INetworkInterface
 {
 public:
-    ETMap<ETString, EmbeddedTerminal::NetworkInfo> interfaces;
+    EmbeddedTerminal::NetworkInfo info_;
 
-    MockNetworkInterface() : interfaces()
+    MockNetworkInterface()
+    {
+        info_.name = "MockInterface";
+        info_.ip = "192.168.1.100";
+        info_.mac = "00:11:22:33:44:55";
+        info_.netmask = "255.255.255.0";
+        info_.gateway = "192.168.1.1";
+        info_.isUp = true;
+    }
+
+    MockNetworkInterface(EmbeddedTerminal::NetworkInfo info) : info_(info)
     {
     }
 
-    void addInterface(ETString name, ETString ip, ETString mac = "", ETString netmask = "", ETString gateway = "", bool isup = false)
+    EmbeddedTerminal::NetworkInfo info() const override
     {
-        EmbeddedTerminal::NetworkInfo iface;
-        iface.name = name;
-        iface.ip = ip;
-        iface.mac = mac;
-        iface.gateway = gateway;
-        iface.netmask = netmask;
-        iface.isUp = isup;
-        interfaces[name.c_str()] = iface;
-    }
-
-    ETMap<ETString, EmbeddedTerminal::NetworkInfo> getInterfaces() const override
-    {
-        return interfaces;
-    }
-
-    EmbeddedTerminal::NetworkInfo getInterface(const ETString &name) const override
-    {
-        if (interfaces.find(name) == interfaces.end())
-            return EmbeddedTerminal::NetworkInfo();
-        auto it = interfaces.find(name);
-        return it->second;
+        return info_;
     }
 
     ETString ping(const ETString &target) override
     {
-        // Mock implementation: simulate ping based on target
-        // For testing purposes, return a simple response
-        if (target.empty() || target == "10.255.255.255" || target == "invalid")
+        if (target.empty() || target == "invalid" || target == "10.255.255.255")
         {
             return "Host " + target + " is not reachable\n";
         }

@@ -1,9 +1,9 @@
 #ifndef MOCK_AUTO_COMPLETE_COMMAND_H
 #define MOCK_AUTO_COMPLETE_COMMAND_H
 
-#include "../../src/interfaces/ICommand.h"
-#include "../../src/interfaces/IAutoCompleter.h"
-#include "../../src/ETTypes.h"
+#include "interfaces/ICommand.h"
+#include "interfaces/IAutoCompleter.h"
+#include "ETTypes.h"
 
 class MockAutoCompleteCommand : public EmbeddedTerminal::ICommand
 {

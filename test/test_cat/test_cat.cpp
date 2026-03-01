@@ -12,17 +12,35 @@
 #include "../Mocks/MockFileSystem.h"
 #include "../Mocks/MockStream.h"
 #include "../Mocks/CommandRuntimeTestUtils.h"
+#include "StorageSystem.h"
+#include "../Mocks/MockStorageMedia.h"
 
 #include <unity.h>
 
-void setUp(void) {}
-void tearDown(void) {}
+IStorageSystem *storage = nullptr;
+
+void setUp(void)
+{
+    storage = new StorageSystem();
+    auto media = new MockStorageMedia("mock", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    storage->mountMedia(media, "/");
+}
+void tearDown(void)
+{
+    auto medias = storage->media();
+    for (auto media : medias)
+    {
+        storage->unmountMedia(media->name());
+        delete media;
+    }
+    delete storage;
+    storage = nullptr;
+}
 
 void test_cat_trigger_small_file(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
-    fs.createFile("/file.txt", "hello1234", 9); // Small file
+    EmbeddedTerminal::DirectoryNavigator dir(storage);
+    storage->open("/file.txt", "w", true).writeAll("hello1234"); // Small file
     EmbeddedTerminal::cmd::cat cat(dir);
 
     ETString keyword = "cat";
@@ -33,20 +51,24 @@ void test_cat_trigger_small_file(void)
 
 void test_cat_trigger_large_file(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
-    fs.createFile("/big.txt", "ABC", 2000); // Fake large file
+    EmbeddedTerminal::DirectoryNavigator dir(storage);
+    auto file = storage->open("/big.txt", "w", true);
+    for (int i = 0; i < 1000; i++)
+    {
+        file.writeAll("0123456789"); // 10KB total
+    }
     EmbeddedTerminal::cmd::cat cat(dir);
     ETString keyword = "cat";
     ETString arg = "big.txt";
     ETString result = cat.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("... File truncated ...") != ETString::npos);
+    TEST_ASSERT_TRUE(dir.exists("/big.txt"));
+    TEST_ASSERT_TRUE(dir.exists("big.txt"));
+    TEST_ASSERT_TRUE_MESSAGE(result.find("... File truncated ...") != ETString::npos, ("Expected truncation message for large file got: " + result).c_str());
 }
 
 void test_cat_trigger_file_not_exists(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
+    EmbeddedTerminal::DirectoryNavigator dir(storage);
     EmbeddedTerminal::cmd::cat cat(dir);
 
     ETString keyword = "cat";
@@ -57,8 +79,7 @@ void test_cat_trigger_file_not_exists(void)
 
 void test_cat_usage(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
+    EmbeddedTerminal::DirectoryNavigator dir(storage);
     EmbeddedTerminal::cmd::cat cat(dir);
     ETString keyword = "cat";
     ETString result = cat.usage(keyword);
@@ -67,8 +88,7 @@ void test_cat_usage(void)
 
 void test_cat_trigger_edge_cases(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
+    EmbeddedTerminal::DirectoryNavigator dir(storage);
     EmbeddedTerminal::cmd::cat cat(dir);
     ETString keyword = "cat";
     ETString arg = "   ";
@@ -81,9 +101,8 @@ void test_cat_trigger_edge_cases(void)
 
 void test_cat_execute_small_file_writes_stdout(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
-    fs.createFile("/file.txt", "hello1234", 9);
+    EmbeddedTerminal::DirectoryNavigator dir(storage);
+    storage->open("/file.txt", "w", true).writeAll("hello1234");
     EmbeddedTerminal::cmd::cat cat(dir);
     MockStream stream;
 
@@ -106,8 +125,7 @@ void test_cat_execute_small_file_writes_stdout(void)
 
 void test_cat_execute_missing_file_writes_stderr(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
+    EmbeddedTerminal::DirectoryNavigator dir(storage);
     EmbeddedTerminal::cmd::cat cat(dir);
     MockStream stream;
 
@@ -130,23 +148,25 @@ void test_cat_execute_missing_file_writes_stderr(void)
 
 void test_cat_manual_stream_debug(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
+    EmbeddedTerminal::DirectoryNavigator dir(storage);
     ETString largeContent = "";
     for (int i = 0; i < 30; i++)
     {
         largeContent += "0123456789";
     }
     largeContent += "Extra";
-    fs.createFile("/large.txt", largeContent, 0);
+    auto file = storage->open("/large.txt", "w", true);
+    file.writeAll(largeContent);
+    file.close();
 
     // Manually read the file Chunk by chunk
     auto file1 = dir.open("large.txt", "r", false);
     TEST_ASSERT_TRUE(file1.isOpen());
+    TEST_ASSERT_EQUAL(0, file1.position());
 
     unsigned char buf1[256];
     size_t read1 = file1.read(buf1, 256);
-    TEST_ASSERT_EQUAL(256u, read1);
+    TEST_ASSERT_EQUAL_INT(256, read1);
     file1.close();
 
     // Second read should start from beginning
@@ -156,21 +176,22 @@ void test_cat_manual_stream_debug(void)
 
     unsigned char buf2[256];
     size_t read2 = file2.read(buf2, 256);
-    TEST_ASSERT_EQUAL(49u, read2); // Should read remaining 49 bytes
+    TEST_ASSERT_EQUAL_INT(49, read2); // Should read remaining 49 bytes
     file2.close();
 }
 
 void test_cat_execute_streaming_simple(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
+    EmbeddedTerminal::DirectoryNavigator dir(storage);
     ETString largeContent = "";
     for (int i = 0; i < 60; i++)
     {
         largeContent += "0123456789";
     }
     largeContent += "Extra";
-    fs.createFile("/large.txt", largeContent, 0);
+    auto file = storage->open("/large.txt", "w", true);
+    file.writeAll(largeContent);
+    file.close();
 
     EmbeddedTerminal::cmd::cat cat(dir);
     MockStream stream;
@@ -187,8 +208,8 @@ void test_cat_execute_streaming_simple(void)
 
     TEST_ASSERT_EQUAL(CommandExecutionState::Running, result1.state);
     TEST_ASSERT_EQUAL(0, result1.exitCode);
-    TEST_ASSERT_TRUE(context.variables.find("__cat_path") != context.variables.end());
-    TEST_ASSERT_TRUE(context.variables.find("__cat_pos") != context.variables.end());
+    TEST_ASSERT_TRUE(context.variables.find("cat__path") != context.variables.end());
+    TEST_ASSERT_TRUE(context.variables.find("cat__pos") != context.variables.end());
 
     // Second invocation
     CommandInvocation invocation2{"cat", "large.txt", context, stdinChannel, stdoutChannel, stderrChannel};

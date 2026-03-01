@@ -11,28 +11,40 @@
 #include "../Mocks/MockFileSystem.h"
 #include "../Mocks/MockStream.h"
 #include "../Mocks/CommandRuntimeTestUtils.h"
+#include "StorageSystem.h"
+#include "../Mocks/MockStorageMedia.h"
 
-void setUp(void) {}
-void tearDown(void) {}
+IStorageSystem *storage = nullptr;
+DirectoryNavigator *dir = nullptr;
+
+void setUp(void)
+{
+    storage = new StorageSystem();
+    auto media = new MockStorageMedia("mock", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    storage->mountMedia(media, "/");
+    dir = new DirectoryNavigator(storage);
+    storage->open("file.txt", "w", true).writeAll("hello"); // File
+    storage->mkdir("dir1");                                 // Directory
+}
+void tearDown(void)
+{
+    auto medias = storage->media();
+    for (auto media : medias)
+    {
+        storage->unmountMedia(media->name());
+        delete media;
+    }
+    delete dir;
+    dir = nullptr;
+    delete storage;
+    storage = nullptr;
+}
 
 using namespace EmbeddedTerminal;
-MockFileSystem FS;
-DirectoryNavigator dir(&FS);
-class TestRm : public cmd::rm
-{
-
-public:
-    TestRm() : cmd::rm(dir)
-    {
-        // Setup mock files
-        FS.createFile("file.txt", "hello", 5); // File
-        FS.createDirectory("dir1");            // Directory
-    }
-};
 
 void test_rm_valid_file(void)
 {
-    TestRm rm;
+    cmd::rm rm(*dir);
     ETString keyword = "rm";
     ETString arg = "file.txt";
     ETString result = rm.trigger(keyword, arg);
@@ -41,7 +53,7 @@ void test_rm_valid_file(void)
 
 void test_rm_nonexistent_file(void)
 {
-    TestRm rm;
+    cmd::rm rm(*dir);
     ETString keyword = "rm";
     ETString arg = "no_file.txt";
     ETString result = rm.trigger(keyword, arg);
@@ -50,7 +62,7 @@ void test_rm_nonexistent_file(void)
 
 void test_rm_directory_instead_of_file(void)
 {
-    TestRm rm;
+    cmd::rm rm(*dir);
     ETString keyword = "rm";
     ETString arg = "dir1";
     ETString result = rm.trigger(keyword, arg);
@@ -59,7 +71,7 @@ void test_rm_directory_instead_of_file(void)
 
 void test_rm_usage(void)
 {
-    TestRm rm;
+    cmd::rm rm(*dir);
     ETString keyword = "rm";
     ETString result = rm.usage(keyword);
     TEST_ASSERT_TRUE(result.find("Remove the specified file\n") != ETString::npos);
@@ -67,7 +79,7 @@ void test_rm_usage(void)
 
 void test_rm_edge_cases(void)
 {
-    TestRm rm;
+    cmd::rm rm(*dir);
     ETString keyword = "rm";
     ETString arg = "   ";
     ETString result = rm.trigger(keyword, arg);
@@ -76,7 +88,7 @@ void test_rm_edge_cases(void)
 
 void test_rm_auto_completion_file_suggestions(void)
 {
-    TestRm rm;
+    cmd::rm rm(*dir);
     ETVector<ETString> suggestions = rm.getSuggestions("fi");
     TEST_ASSERT_TRUE(suggestions.size() > 0);
     TEST_ASSERT_TRUE(suggestions[0].contains("file"));
@@ -84,7 +96,7 @@ void test_rm_auto_completion_file_suggestions(void)
 
 void test_rm_auto_completion_directory_suggestions(void)
 {
-    TestRm rm;
+    cmd::rm rm(*dir);
     ETVector<ETString> suggestions = rm.getSuggestions("di");
     TEST_ASSERT_TRUE(suggestions.size() > 0);
     TEST_ASSERT_TRUE(suggestions[0].contains("dir"));
@@ -92,7 +104,7 @@ void test_rm_auto_completion_directory_suggestions(void)
 
 void test_rm_execute_writes_stdout(void)
 {
-    TestRm rm;
+    cmd::rm rm(*dir);
 
     MockStream stream;
     ETMap<ETString, ETString> vars;

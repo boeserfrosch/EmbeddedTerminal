@@ -6,15 +6,33 @@
 #include "../Mocks/MockFileSystem.h"
 #include "../Mocks/CommandRuntimeTestUtils.h"
 #include "commands/download.h"
+#include "StorageSystem.h"
+#include "../Mocks/MockStorageMedia.h"
 
-void setUp(void) {}
-void tearDown(void) {}
+IStorageSystem *storage = nullptr;
+
+void setUp(void)
+{
+    storage = new StorageSystem();
+    auto media = new MockStorageMedia("mock", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    storage->mountMedia(media, "/");
+}
+void tearDown(void)
+{
+    auto medias = storage->media();
+    for (auto media : medias)
+    {
+        storage->unmountMedia(media->name());
+        delete media;
+    }
+    delete storage;
+    storage = nullptr;
+}
 
 void test_download_basic(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
-    fs.createFile("/file.txt", "hello1234", 9); // Small file
+    EmbeddedTerminal::DirectoryNavigator dir(storage);
+    storage->open("/file.txt", "w", true).writeAll("hello1234"); // Small file
     EmbeddedTerminal::cmd::download download(dir);
 
     TEST_ASSERT_TRUE(true);
@@ -26,8 +44,7 @@ void test_download_basic(void)
 
 void test_download_invalid_path(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
+    EmbeddedTerminal::DirectoryNavigator dir(storage);
     EmbeddedTerminal::cmd::download download(dir);
     auto result = download.trigger("download", "   ");
     TEST_ASSERT_TRUE(result.find("Expected parameter") != ETString::npos);
@@ -35,8 +52,7 @@ void test_download_invalid_path(void)
 
 void test_download_file_not_found(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
+    EmbeddedTerminal::DirectoryNavigator dir(storage);
     EmbeddedTerminal::cmd::download download(dir);
     auto result = download.trigger("download", "nofile.txt");
     TEST_ASSERT_TRUE(result.find("did not exist") != ETString::npos);
@@ -44,9 +60,8 @@ void test_download_file_not_found(void)
 
 void test_download_is_directory(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
-    fs.createDirectory("/mydir");
+    EmbeddedTerminal::DirectoryNavigator dir(storage);
+    storage->mkdir("/mydir");
     EmbeddedTerminal::cmd::download download(dir);
     auto result = download.trigger("download", "mydir");
     TEST_ASSERT_TRUE(result.find("is a directory") != ETString::npos);
@@ -54,14 +69,13 @@ void test_download_is_directory(void)
 
 void test_download_streaming(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
+    EmbeddedTerminal::DirectoryNavigator dir(storage);
     ETString bigfileContent = "";
     for (int i = 0; i < 600; i++)
     {
         bigfileContent += "ABCDEFGHIJ";
     }
-    fs.createFile("/bigfile.txt", bigfileContent, bigfileContent.length());
+    storage->open("/bigfile.txt", "w", true).writeAll(bigfileContent);
 
     EmbeddedTerminal::cmd::download download(dir);
 
@@ -112,8 +126,7 @@ void test_download_streaming(void)
 
 void test_download_streaming_error(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
+    EmbeddedTerminal::DirectoryNavigator dir(storage);
     EmbeddedTerminal::cmd::download download(dir);
     MockStream stream;
     EmptyInputChannel stdinChannel;
@@ -133,8 +146,7 @@ void test_download_streaming_error(void)
 
 void test_download_usage(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
+    EmbeddedTerminal::DirectoryNavigator dir(storage);
     EmbeddedTerminal::cmd::download download(dir);
     ETString usage = download.usage("download");
     TEST_ASSERT_TRUE(usage.find("Download a specific file") != ETString::npos);
@@ -143,11 +155,10 @@ void test_download_usage(void)
 
 void test_download_auto_completion(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
-    fs.createFile("/file1.txt", "content", 7);
-    fs.createFile("/file2.txt", "content", 7);
-    fs.createDirectory("/mydir");
+    EmbeddedTerminal::DirectoryNavigator dir(storage);
+    storage->open("/file1.txt", "w", true).writeAll("content");
+    storage->open("/file2.txt", "w", true).writeAll("content");
+    storage->mkdir("/mydir");
     EmbeddedTerminal::cmd::download download(dir);
 
     ETVector<ETString> suggestions = download.getSuggestions("f");

@@ -12,33 +12,43 @@
 #include "../Mocks/MockStream.h"
 #include "../Mocks/CommandRuntimeTestUtils.h"
 #include "DirectoryNavigator.h"
+#include "StorageSystem.h"
+#include "../Mocks/MockStorageMedia.h"
 
-void setUp(void) {}
-void tearDown(void) {}
+IStorageSystem *storage = nullptr;
+DirectoryNavigator *dir = nullptr;
 
-MockFileSystem FS;
-DirectoryNavigator dir(&FS);
-
-class TestLs : public cmd::ls
+void setUp(void)
 {
-
-public:
-    TestLs() : cmd::ls(dir)
+    storage = new StorageSystem();
+    auto media = new MockStorageMedia("mock", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    storage->mountMedia(media, "/");
+    dir = new DirectoryNavigator(storage);
+    storage->open("/file.txt", "w", true).writeAll("hello");
+    storage->mkdir("/dir1");
+    storage->mkdir("/dir2");
+    storage->open("/dir2/foo.txt", "w", true).writeAll("bar");
+    storage->open("/dir3/foo.txt", "w", true).writeAll("bar");
+    storage->open("/dir3/bar.txt", "w", true).writeAll("bar");
+    storage->open("/dir3/baz.txt", "w", true).writeAll("bar");
+}
+void tearDown(void)
+{
+    auto medias = storage->media();
+    for (auto media : medias)
     {
-        // Setup mock files and directories
-        FS.createFile("/file.txt", "hello", 5);
-        FS.createDirectory("/dir1");
-        FS.createDirectory("/dir2");
-        FS.createFile("/dir2/foo.txt", "bar", 4);
-        FS.createFile("/dir3/foo.txt", "bar", 4);
-        FS.createFile("/dir3/bar.txt", "bar", 4);
-        FS.createFile("/dir3/baz.txt", "bar", 4);
+        storage->unmountMedia(media->name());
+        delete media;
     }
-};
+    delete dir;
+    dir = nullptr;
+    delete storage;
+    storage = nullptr;
+}
 
 void test_ls_valid_directory(void)
 {
-    TestLs ls;
+    cmd::ls ls(*dir);
     ETString keyword = "ls";
     ETString arg = "-l dir2";
     ETString result = ls.trigger(keyword, arg);
@@ -51,7 +61,7 @@ void test_ls_valid_directory(void)
 
 void test_ls_edge_cases(void)
 {
-    TestLs ls;
+    cmd::ls ls(*dir);
     ETString keyword = "ls";
     ETString arg = "   ";
     ETString result = ls.trigger(keyword, arg);
@@ -60,7 +70,7 @@ void test_ls_edge_cases(void)
 
 void test_ls_output_format(void)
 {
-    TestLs ls;
+    cmd::ls ls(*dir);
     ETString keyword = "ls";
     ETString arg = "dir3";
     ETString result = ls.trigger(keyword, arg);
@@ -73,7 +83,7 @@ void test_ls_output_format(void)
 
 void test_ls_flag_l(void)
 {
-    TestLs ls;
+    cmd::ls ls(*dir);
     ETString keyword = "ls";
     ETString arg = "-l dir2";
     ETString result = ls.trigger(keyword, arg);
@@ -86,7 +96,7 @@ void test_ls_flag_l(void)
 
 void test_ls_nonexistent_directory(void)
 {
-    TestLs ls;
+    cmd::ls ls(*dir);
     ETString keyword = "ls";
     ETString arg = "non_exist";
     ETString result = ls.trigger(keyword, arg);
@@ -95,7 +105,7 @@ void test_ls_nonexistent_directory(void)
 
 void test_ls_execute_writes_stdout(void)
 {
-    TestLs ls;
+    cmd::ls ls(*dir);
 
     MockStream stream;
     ETMap<ETString, ETString> vars;

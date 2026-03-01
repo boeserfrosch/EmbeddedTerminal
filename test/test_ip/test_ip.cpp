@@ -8,18 +8,37 @@
 #include <freertos/timers.h>
 #endif
 #include "commands/ip.h"
-#include "../Mocks/MockNetworkInterface.h"
+#include "../Mocks/MockNetworkSystem.h"
 #include "../Mocks/MockStream.h"
 #include "../Mocks/CommandRuntimeTestUtils.h"
 
-void setUp(void) {}
-void tearDown(void) {}
+INetworkSystem *network = nullptr;
+
+void setUp(void)
+{
+    network = new MockNetworkSystem();
+    // Create a mock network interface and add it to the system
+    auto mockInterface = new MockNetworkInterface();
+    network->addInterface(mockInterface->info().name, mockInterface);
+}
+
+void tearDown(void)
+{
+    auto interfaces = network->interfaces();
+    for (auto iface : interfaces)
+    {
+        network->removeInterface(iface->info().name);
+        delete iface;
+    }
+    delete network;
+    network = nullptr;
+}
 
 void test_ip_valid(void)
 {
-    MockNetworkInterface net;
-    net.addInterface("test", "192.168.1.123", "", "", "", true);
-    EmbeddedTerminal::cmd::ip ip(net);
+
+    network->addInterface("test", new MockNetworkInterface(NetworkInfo("test", "192.168.1.123", "", "", "", true)));
+    EmbeddedTerminal::cmd::ip ip(*network);
     ETString keyword = "ip";
     ETString additional = "";
     ETString result = ip.trigger(keyword, additional);
@@ -28,8 +47,14 @@ void test_ip_valid(void)
 }
 void test_no_interface(void)
 {
-    MockNetworkInterface net;
-    EmbeddedTerminal::cmd::ip ip(net);
+    auto interfaces = network->interfaces();
+    for (auto iface : interfaces)
+    {
+        network->removeInterface(iface->info().name);
+        delete iface;
+    }
+
+    EmbeddedTerminal::cmd::ip ip(*network);
     ETString keyword = "ip";
     ETString additional = "";
     ETString result = ip.trigger(keyword, additional);
@@ -38,9 +63,9 @@ void test_no_interface(void)
 
 void test_ip_not_connected(void)
 {
-    MockNetworkInterface net;
-    net.addInterface("test", "", "", "", "", false);
-    EmbeddedTerminal::cmd::ip ip(net);
+
+    network->addInterface("test", new MockNetworkInterface(NetworkInfo("test", "", "", "", "", false)));
+    EmbeddedTerminal::cmd::ip ip(*network);
     ETString keyword = "ip";
     ETString additional = "";
     ETString result = ip.trigger(keyword, additional);
@@ -49,8 +74,8 @@ void test_ip_not_connected(void)
 
 void test_ip_usage(void)
 {
-    MockNetworkInterface net;
-    EmbeddedTerminal::cmd::ip ip(net);
+
+    EmbeddedTerminal::cmd::ip ip(*network);
     ETString keyword = "ip";
     ETString result = ip.usage(keyword);
     TEST_ASSERT_TRUE(result.find("Returns info for all network interfaces") != ETString::npos);
@@ -58,10 +83,10 @@ void test_ip_usage(void)
 
 void test_ip_single_cases(void)
 {
-    MockNetworkInterface net;
-    net.addInterface("foo", "", "", "", "", false);
-    net.addInterface("bar", "", "", "", "", false);
-    EmbeddedTerminal::cmd::ip ip(net);
+
+    network->addInterface("foo", new MockNetworkInterface(NetworkInfo("foo", "", "", "", "", false)));
+    network->addInterface("bar", new MockNetworkInterface(NetworkInfo("bar", "", "", "", "", false)));
+    EmbeddedTerminal::cmd::ip ip(*network);
     ETString keyword = "ip";
     ETString additional = "bar";
     ETString result = ip.trigger(keyword, additional);
@@ -75,10 +100,10 @@ void test_ip_single_cases(void)
 
 void test_unknown_iface(void)
 {
-    MockNetworkInterface net;
-    net.addInterface("foo", "", "", "", "", false);
-    net.addInterface("bar", "", "", "", "", false);
-    EmbeddedTerminal::cmd::ip ip(net);
+
+    network->addInterface("foo", new MockNetworkInterface(NetworkInfo("foo", "", "", "", "", false)));
+    network->addInterface("bar", new MockNetworkInterface(NetworkInfo("bar", "", "", "", "", false)));
+    EmbeddedTerminal::cmd::ip ip(*network);
     ETString keyword = "ip";
     ETString additional = "baz";
     ETString result = ip.trigger(keyword, additional);
@@ -87,9 +112,9 @@ void test_unknown_iface(void)
 
 void test_ip_execute_writes_stdout(void)
 {
-    MockNetworkInterface net;
-    net.addInterface("test", "192.168.1.123", "", "", "", true);
-    EmbeddedTerminal::cmd::ip ip(net);
+
+    network->addInterface("test", new MockNetworkInterface(NetworkInfo("test", "192.168.1.123", "", "", "", true)));
+    EmbeddedTerminal::cmd::ip ip(*network);
 
     MockStream stream;
     ETMap<ETString, ETString> vars;

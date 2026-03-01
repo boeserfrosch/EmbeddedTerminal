@@ -9,21 +9,41 @@
 #endif
 #include "commands/xxd.h"
 #include "../src/DirectoryNavigator.h"
-#include "../Mocks/MockFileSystem.h"
 #include "../Mocks/MockStream.h"
 #include "../Mocks/CommandRuntimeTestUtils.h"
+#include "StorageSystem.h"
+#include "../Mocks/MockStorageMedia.h"
 
 #include <unity.h>
 
-void setUp(void) {}
-void tearDown(void) {}
+IStorageSystem *storage = nullptr;
+DirectoryNavigator *dir = nullptr;
+
+void setUp(void)
+{
+    storage = new StorageSystem();
+    auto media = new MockStorageMedia("mock", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    storage->mountMedia(media, "");
+    dir = new DirectoryNavigator(storage);
+}
+void tearDown(void)
+{
+    auto medias = storage->media();
+    for (auto media : medias)
+    {
+        storage->unmountMedia(media->name());
+        delete media;
+    }
+    delete dir;
+    dir = nullptr;
+    delete storage;
+    storage = nullptr;
+}
 
 void test_xxd_trigger_small_file(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
-    fs.createFile("/file.txt", "hello1234", 9); // Small file
-    EmbeddedTerminal::cmd::xxd xxd(dir);
+    storage->open("/file.txt", "w", true).writeAll("hello1234"); // Small file
+    EmbeddedTerminal::cmd::xxd xxd(*dir);
 
     ETString keyword = "xxd";
     ETString arg = "file.txt";
@@ -33,10 +53,18 @@ void test_xxd_trigger_small_file(void)
 
 void test_xxd_trigger_large_file(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
-    fs.createFile("/big.txt", "ABCABC", 2000); // Fake large file
-    EmbeddedTerminal::cmd::xxd xxd(dir);
+    // Fake large file by writing a small string but pretending it's large. The xxd command should read 512 bytes and not truncate since we simulate a large file.
+    auto file = storage->open("/big.txt", "w", true);
+    for (int i = 0; i < 512; i++)
+    {
+        file.write("ABCDEFGHIJKLMNOPQRSTUVWXYZ", 26);
+    }
+    file.close();
+
+    TEST_ASSERT_TRUE(storage->exists("/big.txt"));
+    TEST_ASSERT_TRUE(storage->exists("big.txt"));
+
+    EmbeddedTerminal::cmd::xxd xxd(*dir);
     ETString keyword = "xxd";
     ETString arg = "big.txt";
     ETString result = xxd.trigger(keyword, arg);
@@ -48,9 +76,7 @@ void test_xxd_trigger_large_file(void)
 
 void test_xxd_trigger_file_not_exists(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
-    EmbeddedTerminal::cmd::xxd xxd(dir);
+    EmbeddedTerminal::cmd::xxd xxd(*dir);
 
     ETString keyword = "xxd";
     ETString arg = "nofile.txt";
@@ -60,9 +86,7 @@ void test_xxd_trigger_file_not_exists(void)
 
 void test_xxd_usage(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
-    EmbeddedTerminal::cmd::xxd xxd(dir);
+    EmbeddedTerminal::cmd::xxd xxd(*dir);
 
     ETString keyword = "xxd";
     ETString result = xxd.usage(keyword);
@@ -71,28 +95,24 @@ void test_xxd_usage(void)
 
 void test_xxd_trigger_edge_cases(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
-    EmbeddedTerminal::cmd::xxd xxd(dir);
+    EmbeddedTerminal::cmd::xxd xxd(*dir);
 
     // Test empty path
     ETString result = xxd.trigger("xxd", "   ");
     TEST_ASSERT_TRUE(result.find("path or name to file expected") != ETString::npos);
 
     // Test directory instead of file
-    fs.createDirectory("/dir");
+    storage->mkdir("/dir");
     result = xxd.trigger("xxd", "dir");
     TEST_ASSERT_TRUE(result.find("did not exist!") != ETString::npos);
 }
 
 void test_xxd_get_suggestions(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
-    fs.createFile("/file1.txt", "data", 4);
-    fs.createFile("/file2.txt", "data", 4);
-    fs.createDirectory("/dir");
-    EmbeddedTerminal::cmd::xxd xxd(dir);
+    storage->open("/file1.txt", "w", true).writeAll("data");
+    storage->open("/file2.txt", "w", true).writeAll("data");
+    storage->mkdir("/dir");
+    EmbeddedTerminal::cmd::xxd xxd(*dir);
 
     ETVector<ETString> suggestions = xxd.getSuggestions("fi");
     TEST_ASSERT_EQUAL(2, suggestions.size());
@@ -102,10 +122,8 @@ void test_xxd_get_suggestions(void)
 
 void test_xxd_execute_writes_stdout(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
-    fs.createFile("/file.txt", "hello1234", 9);
-    EmbeddedTerminal::cmd::xxd xxd(dir);
+    storage->open("/file.txt", "w", true).writeAll("hello1234");
+    EmbeddedTerminal::cmd::xxd xxd(*dir);
 
     MockStream stream;
     ETMap<ETString, ETString> vars;
@@ -125,9 +143,7 @@ void test_xxd_execute_writes_stdout(void)
 
 void test_xxd_execute_missing_file_writes_stderr(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
-    EmbeddedTerminal::cmd::xxd xxd(dir);
+    EmbeddedTerminal::cmd::xxd xxd(*dir);
 
     MockStream stream;
     ETMap<ETString, ETString> vars;
@@ -146,16 +162,14 @@ void test_xxd_execute_missing_file_writes_stderr(void)
 
 void test_xxd_execute_navigates_on_next_key(void)
 {
-    MockFileSystem fs;
-    EmbeddedTerminal::DirectoryNavigator dir(&fs);
     ETString content = "";
     for (int i = 0; i < 30; i++)
     {
         content += "0123456789";
     }
-    fs.createFile("/big.bin", content, 0);
+    storage->open("/big.bin", "w", true).writeAll(content.c_str());
 
-    EmbeddedTerminal::cmd::xxd xxd(dir);
+    EmbeddedTerminal::cmd::xxd xxd(*dir);
     MockStream stream;
     ETMap<ETString, ETString> vars;
     CommandContext context{vars, 0, true};
