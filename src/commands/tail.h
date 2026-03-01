@@ -30,7 +30,7 @@ namespace EmbeddedTerminal
         {
 
         public:
-            tail(DirectoryNavigator &dir) : _dir(dir), _completer(dir)
+            tail(DirectoryNavigator &dir) : dir_(dir), completer_(dir)
             {
             }
             ETString usage(const ETString &keyword);
@@ -50,24 +50,24 @@ namespace EmbeddedTerminal
                 Streaming
             };
 
-            TailState _getState(CommandInvocation &invocation);
+            TailState getState_(CommandInvocation &invocation);
 
-            CommandResult _parseOptions(CommandInvocation &invocation);
-            CommandResult _findStartPosition(CommandInvocation &invocation);
-            CommandResult _streamFile(CommandInvocation &invocation);
+            CommandResult parseOptions_(CommandInvocation &invocation);
+            CommandResult findStartPosition_(CommandInvocation &invocation);
+            CommandResult streamFile_(CommandInvocation &invocation);
 
-            CommandResult _error(size_t errorCode, CommandInvocation &invocation);
-            CommandResult _success(CommandInvocation &invocation);
+            CommandResult error_(size_t errorCode, CommandInvocation &invocation);
+            CommandResult success_(CommandInvocation &invocation);
 
-            DirectoryNavigator &_dir;
-            FilePathCompleter _completer;
+            DirectoryNavigator dir_;
+            FilePathCompleter completer_;
 
         protected:
-            const char *SESSION_KEY_PATH = "__tail_path";
-            const char *SESSION_KEY_POS = "__tail_pos";
-            const char *SESSION_KEY_STATE = "__tail_state";
-            const char *SESSION_KEY_LINES_TO_FIND = "__tail_lines_to_find";
-            const char *SESSION_KEY_LINES_FOUND = "__tail_lines_found";
+            const char *SESSION_KEY_PATH = "tail__path";
+            const char *SESSION_KEY_POS = "tail__pos";
+            const char *SESSION_KEY_STATE = "tail__state";
+            const char *SESSION_KEY_LINES_TO_FIND = "tail__lines_to_find";
+            const char *SESSION_KEY_LINES_FOUND = "tail__lines_found";
         };
     };
 };

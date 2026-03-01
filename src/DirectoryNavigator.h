@@ -1,225 +1,164 @@
 #ifndef DIRECTORYNAVIGATOR_H
 #define DIRECTORYNAVIGATOR_H
 
-#include "interfaces/IFileSystem.h"
+#include "interfaces/IStorage.h"
+#include "interfaces/IDirectoryNavigator.h"
 #include "ETTypes.h"
 
 namespace EmbeddedTerminal
 {
 
-    class DirectoryNavigator
+    class DirectoryNavigator : public IDirectoryNavigator
     {
     public:
-        DirectoryNavigator(IFileSystem *fs, const ETString &root = "/")
-            : fs_(fs), currentDir_(root)
+        DirectoryNavigator(IStorageSystem *storage, const Path &root = Path::root())
+            : storage_(storage), currentDir_(root)
         {
-            if (!fs_ || !fs_->exists(currentDir_))
+            if (!storage_ || !storage_->exists(currentDir_))
             {
-                currentDir_ = "/";
+                currentDir_ = Path::root();
+            }
+            if (!currentDir_.isAbsolute())
+            {
+                currentDir_ = Path::root();
+            }
+            if (currentDir_.isRoot() || ETString(currentDir_) == "/")
+            {
+                currentDir_ = Path::root();
             }
         }
 
-        ETFile open(const char *path, const char *mode = FILE_MODE_READ, const bool create = false) const
+        ETFile open(const Path &path, const char *mode = FILE_MODE_READ, const bool create = false) const override
         {
-            if (fs_)
+            if (storage_)
             {
-                return fs_->open(resolvePath(path), mode, create);
+                return storage_->open(resolvePath(path), mode, create);
             }
             return ETFile();
         }
-        ETFile open(const ETString &path, const char *mode = FILE_MODE_READ, const bool create = false) const
-        {
-            return open(path.c_str(), mode, create);
-        }
 
-        bool exists(const char *path) const
+        bool exists(const Path &path) const override
         {
-            if (fs_)
+            if (storage_)
             {
-                return fs_->exists(resolvePath(path).c_str());
+
+                return storage_->exists(resolvePath(path));
             }
             return false;
         }
-        bool exists(const ETString &path) const
+        bool cd(const Path &path) override
         {
-            return exists(path.c_str());
-        }
+            if (!storage_)
+                return false;
 
-        // Change directory (cd)
-        bool cd(const char *path)
-        {
-            ETString newPath = resolvePath(path);
-            if (fs_ && fs_->exists(newPath) && fs_->isDirectory(newPath.c_str()))
+            auto newPath = resolvePath(path);
+            // Special case: absolute root path
+            if (path.isRoot() || newPath.isRoot())
+            {
+                if (storage_->exists(Path::root()) && storage_->isDirectory(Path::root()))
+                {
+                    currentDir_ = Path::root();
+                    return true;
+                }
+                return false;
+            }
+            if (storage_->exists(newPath) && storage_->isDirectory(newPath))
             {
                 currentDir_ = newPath;
                 return true;
             }
             return false;
         }
-        bool cd(const ETString &path)
-        {
-            return cd(path.c_str());
-        }
 
-        // Get current directory (pwd)
-        ETString pwd() const
+        Path pwd() const override
         {
             return currentDir_;
         }
 
-        ETString pwd(const char *path) const
+        Path pwd(const Path &path) const override
         {
             return resolvePath(path);
         }
-        ETString pwd(const ETString &path) const
+
+        ETVector<Path> ls() const override
         {
-            return pwd(path.c_str());
+            return ls(currentDir_);
         }
 
-        // List contents (ls)
-        ETVector<ETString> ls() const
+        ETVector<Path> ls(const Path &path, const ETString &prefix = "") const override
         {
-            return ls(currentDir_.c_str());
-        }
-
-        ETVector<ETString> ls(const ETString &path) const
-        {
-            return ls(path.c_str());
-        }
-        ETVector<ETString> ls(const char *path) const
-        {
-            if (fs_)
+            if (!storage_)
             {
-                return fs_->list(resolvePath(path).c_str());
+                return ETVector<Path>();
             }
-            return ETVector<ETString>();
+
+            return storage_->list(resolvePath(path), prefix);
         }
 
-        // Make directory (mkdir)
-        bool mkdir(const ETString &path)
+        bool mkdir(const Path &path) override
         {
-            return mkdir(path.c_str());
-        }
-
-        bool mkdir(const char *path)
-        {
-            if (fs_)
+            if (storage_)
             {
-                return fs_->mkdir(resolvePath(path));
+                return storage_->mkdir(resolvePath(path));
             }
             return false;
         }
 
-        // Remove directory (rmdir)
-        bool rmdir(const ETString &path) { return rmdir(path.c_str()); }
-        bool rmdir(const char *path)
+        bool rmdir(const Path &path) override
         {
-            if (fs_)
+            if (storage_)
             {
-                return fs_->rmdir(resolvePath(path));
+                return storage_->rmdir(resolvePath(path));
             }
             return false;
         }
 
-        bool isEmpty(const char *path)
+        bool isEmpty(const Path &path) override
         {
-            if (fs_)
+            if (storage_)
             {
-                return fs_->isEmpty(resolvePath(path));
-            }
-            return false;
-        }
-        bool isEmpty(ETString path) { return isEmpty(path.c_str()); }
-
-        // Remove file (remove)
-        bool remove(const ETString &path)
-        {
-            return remove(path.c_str());
-        }
-        bool remove(const char *path)
-        {
-            if (fs_)
-            {
-                return fs_->remove(resolvePath(path));
+                return storage_->isEmpty(resolvePath(path));
             }
             return false;
         }
 
-        bool isDirectory(const char *path) const
+        bool remove(const Path &path) override
         {
-            if (fs_)
+            if (storage_)
             {
-                return fs_->isDirectory(resolvePath(path));
+                return storage_->remove(resolvePath(path));
             }
             return false;
         }
-        bool isDirectory(ETString path) const
+
+        bool isDirectory(const Path &path) const override
         {
-            return isDirectory(path.c_str());
+            if (storage_)
+            {
+                return storage_->isDirectory(resolvePath(path));
+            }
+            return false;
         }
 
-        // Get underlying file system
-        IFileSystem* getFileSystem() const
+        IStorageSystem *getStorageSystem() const override
         {
-            return fs_;
+            return storage_;
         }
 
     private:
-        IFileSystem *fs_;
-        ETString currentDir_;
+        IStorageSystem *storage_;
+        Path currentDir_;
 
     protected:
-        // Resolve relative/absolute paths
-        ETString resolvePath(const char *path) const
+        Path resolvePath(const Path &path) const
         {
-            if (path == nullptr || path[0] == '\0')
+            if (path.isEmpty() || path.isRoot())
                 return currentDir_;
-            ETString tempPath;
-            if (path[0] == '/')
-                tempPath = path; // Absolute
-            else
+            if (path.isAbsolute())
             {
-                // Simple join for relative paths
-                if (currentDir_.back() == '/')
-                {
-                    tempPath = currentDir_ + path;
-                }
-                else
-                    tempPath = currentDir_ + "/" + path;
+                return path.isRoot() ? Path::root() : path;
             }
-
-            // Remove . and ..
-            ETVector<ETString> parts;
-            size_t start = 1;
-            size_t end = 0;
-            while ((end = tempPath.find('/', start)) != ETString::npos)
-            {
-                ETString part = tempPath.substr(start, end - start);
-                if (part == "..")
-                {
-                    if (!parts.empty())
-                        parts.pop_back();
-                }
-                else if (part != "." && !part.empty())
-                {
-                    parts.push_back(part);
-                }
-                start = end + 1;
-            }
-            if (start < tempPath.length())
-            {
-                ETString part = tempPath.substr(start);
-                if (part == "..")
-                {
-                    if (!parts.empty())
-                        parts.pop_back();
-                }
-                else if (part != "." && !part.empty())
-                {
-                    parts.push_back(part);
-                }
-            }
-            return "/" + join(parts, "/");
+            return currentDir_ + path;
         }
     };
 

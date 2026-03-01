@@ -3,7 +3,7 @@
 
 #include "Terminal.h"
 #include "interfaces/ICommand.h"
-#include "interfaces/IFileSystem.h"
+#include "interfaces/IStorage.h"
 
 namespace EmbeddedTerminal
 {
@@ -14,14 +14,14 @@ namespace EmbeddedTerminal
         {
 
         public:
-            df(IFileSystem &card) : _card(card)
+            df(IStorageSystem &storage) : storage_(storage)
             {
             }
             ETString usage(const ETString &keyword);
             ETString trigger(const ETString &keyword, const ETString &additional) override;
 
         private:
-            IFileSystem &_card;
+            IStorageSystem& storage_;
         };
     };
 };

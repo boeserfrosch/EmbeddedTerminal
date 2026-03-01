@@ -8,32 +8,32 @@ ETString ls::trigger(const ETString &keyword, const ETString &additional)
     auto param = split(additional, " ");
 
     auto paramCnt = param.size();
-    auto path = _dir.pwd();
+    auto path = dir_.pwd();
     if (param.size() > 0)
     {
         parseConf(param);
         if (param[paramCnt - 1].substr(0, 1) != "-")
         {
-            if (!_dir.isDirectory(param.at(param.size() - 1).c_str()))
+            if (!dir_.isDirectory(param.at(param.size() - 1).c_str()))
             {
                 return param.at(param.size() - 1) + " is not a directory!\n";
             }
-            path = _dir.pwd(param.at(param.size() - 1).c_str());
+            path = dir_.pwd(param.at(param.size() - 1).c_str());
         }
     }
-    auto content = _dir.ls(path);
+    auto content = dir_.ls(path);
 
     ETString result = path + "\n";
     for (const auto &entry : content)
     {
         if (lsConfig.longListing)
         {
-            auto f = _dir.open(path + "/" + entry);
-            result += toETString(f.size()) + " Bytes\t" + f.name() + "\n";
+            auto f = dir_.open(path + "/" + entry);
+            result += toETString(f.size()) + " Bytes\t" + entry.getName() + "\n";
         }
         else
         {
-            result += entry + "\t";
+            result += entry.getName() + "\t";
         }
     }
     result += "\n";
@@ -69,5 +69,5 @@ void ls::parseConf(std::vector<ETString> params)
 ETVector<ETString> ls::getSuggestions(const ETString &partial)
 {
     // Delegate to DirectoryCompleter
-    return _completer.getSuggestions(partial);
+    return completer_.getSuggestions(partial);
 }

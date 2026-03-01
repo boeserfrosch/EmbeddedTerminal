@@ -101,33 +101,33 @@ ETString cmd::download::trigger(const ETString &keyword, const ETString &additio
     {
         return "Expected parameter\n";
     }
-    if (!_dir.exists(param[0].c_str()))
+    if (!dir_.exists(param[0].c_str()))
     {
         return "file did not exist\n";
     }
-    if (_dir.isDirectory(param[0].c_str()))
+    if (dir_.isDirectory(param[0].c_str()))
     {
         return "file is a directory\n";
     }
 
-    auto file = _dir.open(param[0].trim(), FILE_MODE_READ, false);
+    auto file = dir_.open(param[0].trim(), FILE_MODE_READ, false);
 
     return sendFile(file);
 }
 
 CommandResult cmd::download::execute(CommandInvocation &invocation)
 {
-    downloadState state = _handleState(invocation);
-    unsigned char code = _checkState(state, invocation);
+    downloadState state = handleState_(invocation);
+    unsigned char code = checkState_(state, invocation);
     if (code != 0)
     {
-        return _error(code, invocation);
+        return error_(code, invocation);
     }
 
-    auto file = _dir.open(state.path.c_str(), FILE_MODE_READ, false);
+    auto file = dir_.open(state.path.c_str(), FILE_MODE_READ, false);
     if (!file.isOpen())
     {
-        return _error(errorCodes::DOWNLOAD_CMD_ERROR_FAILED_TO_OPEN_FILE, invocation);
+        return error_(errorCodes::DOWNLOAD_CMD_ERROR_FAILED_TO_OPEN_FILE, invocation);
     }
 
     if (state.position == 0)
@@ -142,19 +142,19 @@ CommandResult cmd::download::execute(CommandInvocation &invocation)
     {
         invocation.stdoutChannel.print("\nEOF\n");
         file.close();
-        return _success(invocation);
+        return success_(invocation);
     }
 
     size_t fileSize = file.size();
     size_t numChunks = ((fileSize + RAW_CHUNK - 1) / RAW_CHUNK) - 1;
     size_t chunkIndex = state.position / RAW_CHUNK;
     invocation.stdoutChannel.print("CHUNK " + toETString(chunkIndex) + "/" + toETString(numChunks) + "\n");
-    auto result = _processChunk(file, state.position, invocation);
+    auto result = processChunk_(file, state.position, invocation);
     file.close();
 
     if (result.error)
     {
-        return _error(result.errorCode, invocation);
+        return error_(result.errorCode, invocation);
     }
     else if (result.hasMore)
     {
@@ -162,23 +162,23 @@ CommandResult cmd::download::execute(CommandInvocation &invocation)
     }
     else
     {
-        return _success(invocation);
+        return success_(invocation);
     }
 }
 
 ETString cmd::download::usage(const ETString &keyword)
 {
     return "Download a specific file\n\n" +
-           keyword + " [path] - Download the file under the given path\n If the file did not exists than just a filesize of zero will be returned";
+           keyword + " [path] - Download the file under the given path\n If the file did not exists than just a filesize of zero will be return ed";
 }
 
 ETVector<ETString> cmd::download::getSuggestions(const ETString &partial)
 {
-    FilePathCompleter completer(_dir);
+    FilePathCompleter completer(dir_);
     return completer.getSuggestions(partial);
 }
 
-EmbeddedTerminal::cmd::download::downloadState cmd::download::_handleState(CommandInvocation &invocation)
+EmbeddedTerminal::cmd::download::downloadState cmd::download::handleState_(CommandInvocation &invocation)
 {
     downloadState state;
     // Check if this is a continuation of an ongoing stream
@@ -215,7 +215,7 @@ EmbeddedTerminal::cmd::download::downloadState cmd::download::_handleState(Comma
     return result;
 }
 
-unsigned char cmd::download::_checkState(const downloadState &state, CommandInvocation &invocation)
+unsigned char cmd::download::checkState_(const downloadState &state, CommandInvocation &invocation)
 {
     if (state.path.empty())
     {
@@ -223,13 +223,13 @@ unsigned char cmd::download::_checkState(const downloadState &state, CommandInvo
         invocation.context.variables.erase(SESSION_KEY_POS);
         return errorCodes::DOWNLOAD_CMD_ERROR_INVALID_PATH;
     }
-    if (!_dir.exists(state.path.c_str()))
+    if (!dir_.exists(state.path.c_str()))
     {
         invocation.context.variables.erase(SESSION_KEY_PATH);
         invocation.context.variables.erase(SESSION_KEY_POS);
         return errorCodes::DOWNLOAD_CMD_ERROR_FILE_NOT_FOUND;
     }
-    if (_dir.isDirectory(state.path.c_str()))
+    if (dir_.isDirectory(state.path.c_str()))
     {
         invocation.context.variables.erase(SESSION_KEY_PATH);
         invocation.context.variables.erase(SESSION_KEY_POS);
@@ -238,7 +238,7 @@ unsigned char cmd::download::_checkState(const downloadState &state, CommandInvo
     return 0;
 }
 
-EmbeddedTerminal::cmd::download::processChunkResult cmd::download::_processChunk(ETFile &file, size_t filePos, CommandInvocation &invocation)
+EmbeddedTerminal::cmd::download::processChunkResult cmd::download::processChunk_(ETFile &file, size_t filePos, CommandInvocation &invocation)
 {
     if (!file.seek(filePos))
     {
@@ -278,7 +278,7 @@ EmbeddedTerminal::cmd::download::processChunkResult cmd::download::_processChunk
     return processChunkResult(true, false, errorCodes::DOWNLOAD_CMD_ERROR_NONE);
 }
 
-CommandResult cmd::download::_error(size_t errorCode, CommandInvocation &invocation)
+CommandResult cmd::download::error_(size_t errorCode, CommandInvocation &invocation)
 {
     using namespace errorCodes;
     invocation.context.variables.erase(SESSION_KEY_PATH);
@@ -312,7 +312,7 @@ CommandResult cmd::download::_error(size_t errorCode, CommandInvocation &invocat
     return CommandResult::completed(errorCode);
 }
 
-CommandResult cmd::download::_success(CommandInvocation &invocation)
+CommandResult cmd::download::success_(CommandInvocation &invocation)
 {
     invocation.context.variables.erase(SESSION_KEY_PATH);
     invocation.context.variables.erase(SESSION_KEY_POS);

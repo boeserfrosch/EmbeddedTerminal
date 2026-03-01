@@ -8,11 +8,11 @@ ETString tail::trigger(const ETString &keyword, const ETString &additional)
     {
         return "Expected parameter\n" + usage(keyword);
     }
-    if (!_dir.exists(fileName.c_str()) || _dir.isDirectory(fileName.c_str()))
+    if (!dir_.exists(fileName.c_str()) || dir_.isDirectory(fileName.c_str()))
     {
         return "file " + fileName + " did not exist!\n";
     }
-    auto file = _dir.open(fileName.c_str(), "r", false);
+    auto file = dir_.open(fileName.c_str(), "r", false);
     if (file.size() > 512)
     {
         truncated = true;
@@ -37,26 +37,26 @@ ETString tail::usage(const ETString &keyword)
 
 ETVector<ETString> tail::getSuggestions(const ETString &partial)
 {
-    return _completer.getSuggestions(partial);
+    return completer_.getSuggestions(partial);
 }
 
 EmbeddedTerminal::CommandResult tail::execute(CommandInvocation &invocation)
 {
-    auto state = _getState(invocation);
+    auto state = getState_(invocation);
 
     switch (state)
     {
     case TailState::Initial:
-        return _parseOptions(invocation);
+        return parseOptions_(invocation);
     case TailState::FindingStartPosition:
-        return _findStartPosition(invocation);
+        return findStartPosition_(invocation);
     case TailState::Streaming:
-        return _streamFile(invocation);
+        return streamFile_(invocation);
     }
     return CommandResult::completed(errorCodes::TAIL_CMD_ERROR_NONE);
 }
 
-tail::TailState tail::_getState(CommandInvocation &invocation)
+tail::TailState tail::getState_(CommandInvocation &invocation)
 {
     auto it = invocation.context.variables.find(SESSION_KEY_STATE);
     if (it == invocation.context.variables.end())
@@ -76,7 +76,7 @@ tail::TailState tail::_getState(CommandInvocation &invocation)
     return TailState::Initial;
 }
 
-EmbeddedTerminal::CommandResult tail::_parseOptions(CommandInvocation &invocation)
+EmbeddedTerminal::CommandResult tail::parseOptions_(CommandInvocation &invocation)
 {
     OptionParser parser;
     parser.addOption("-n", "--lines", "Number of lines to display from the end of the file", true);
@@ -84,7 +84,7 @@ EmbeddedTerminal::CommandResult tail::_parseOptions(CommandInvocation &invocatio
 
     if (!parseResult.success)
     {
-        return _error(errorCodes::TAIL_CMD_ERROR_INVALID_OPTIONS, invocation);
+        return error_(errorCodes::TAIL_CMD_ERROR_INVALID_OPTIONS, invocation);
     }
 
     size_t linesToFind = 10; // Default to last 10 lines
@@ -99,23 +99,23 @@ EmbeddedTerminal::CommandResult tail::_parseOptions(CommandInvocation &invocatio
 
     if (linesToFind <= 0)
     {
-        return _error(errorCodes::TAIL_CMD_ERROR_INVALID_NUMBER_OF_LINES, invocation);
+        return error_(errorCodes::TAIL_CMD_ERROR_INVALID_NUMBER_OF_LINES, invocation);
     }
 
     ETString fileName = parseResult.remainingArguments.trim();
     printf("Parsed options: linesToFind=%zu, fileName='%s'\n", linesToFind, fileName.c_str());
     if (fileName.empty())
     {
-        return _error(errorCodes::TAIL_CMD_ERROR_INVALID_OPTIONS, invocation);
+        return error_(errorCodes::TAIL_CMD_ERROR_INVALID_OPTIONS, invocation);
     }
-    if (!_dir.exists(fileName.c_str()) || _dir.isDirectory(fileName.c_str()))
+    if (!dir_.exists(fileName.c_str()) || dir_.isDirectory(fileName.c_str()))
     {
-        return _error(errorCodes::TAIL_CMD_ERROR_FILE_NOT_FOUND, invocation);
+        return error_(errorCodes::TAIL_CMD_ERROR_FILE_NOT_FOUND, invocation);
     }
-    auto file = _dir.open(fileName.c_str(), "r", false);
+    auto file = dir_.open(fileName.c_str(), "r", false);
     if (!file.isOpen())
     {
-        return _error(errorCodes::TAIL_CMD_ERROR_FAILED_TO_OPEN_FILE, invocation);
+        return error_(errorCodes::TAIL_CMD_ERROR_FAILED_TO_OPEN_FILE, invocation);
     }
 
     invocation.context.variables[SESSION_KEY_PATH] = fileName;
@@ -127,23 +127,23 @@ EmbeddedTerminal::CommandResult tail::_parseOptions(CommandInvocation &invocatio
     return CommandResult::running(0);
 }
 
-EmbeddedTerminal::CommandResult tail::_findStartPosition(CommandInvocation &invocation)
+EmbeddedTerminal::CommandResult tail::findStartPosition_(CommandInvocation &invocation)
 {
     ETString fileName = invocation.context.variables[SESSION_KEY_PATH];
     size_t linesToFind = ETString::toull(invocation.context.variables[SESSION_KEY_LINES_TO_FIND].c_str());
     size_t seekOffsetPos = ETString::toull(invocation.context.variables[SESSION_KEY_POS].c_str());
     size_t linesFound = ETString::toull(invocation.context.variables[SESSION_KEY_LINES_FOUND].c_str());
 
-    auto file = _dir.open(fileName.c_str(), "r", false);
+    auto file = dir_.open(fileName.c_str(), "r", false);
     if (!file.isOpen())
     {
-        return _error(errorCodes::TAIL_CMD_ERROR_FAILED_TO_OPEN_FILE, invocation);
+        return error_(errorCodes::TAIL_CMD_ERROR_FAILED_TO_OPEN_FILE, invocation);
     }
 
     if (!file.seek(0))
     {
         file.close();
-        return _error(errorCodes::TAIL_CMD_ERROR_FAILED_TO_SEEK, invocation);
+        return error_(errorCodes::TAIL_CMD_ERROR_FAILED_TO_SEEK, invocation);
     }
 
     if (seekOffsetPos >= file.size())
@@ -168,7 +168,7 @@ EmbeddedTerminal::CommandResult tail::_findStartPosition(CommandInvocation &invo
     if (bytesRead == 0)
     {
         file.close();
-        return _error(errorCodes::TAIL_CMD_ERROR_FAILED_TO_READ, invocation);
+        return error_(errorCodes::TAIL_CMD_ERROR_FAILED_TO_READ, invocation);
     }
 
     for (ssize_t i = bytesRead - 1; i >= 0; i--)
@@ -196,28 +196,28 @@ EmbeddedTerminal::CommandResult tail::_findStartPosition(CommandInvocation &invo
     return CommandResult::running(errorCodes::TAIL_CMD_ERROR_NONE);
 }
 
-EmbeddedTerminal::CommandResult tail::_streamFile(CommandInvocation &invocation)
+EmbeddedTerminal::CommandResult tail::streamFile_(CommandInvocation &invocation)
 {
     ETString fileName = invocation.context.variables[SESSION_KEY_PATH];
     size_t fileEndPosOffset = ETString::toull(invocation.context.variables[SESSION_KEY_POS].c_str());
 
-    auto file = _dir.open(fileName.c_str(), "r", false);
+    auto file = dir_.open(fileName.c_str(), "r", false);
     if (!file.isOpen())
     {
-        return _error(errorCodes::TAIL_CMD_ERROR_FAILED_TO_OPEN_FILE, invocation);
+        return error_(errorCodes::TAIL_CMD_ERROR_FAILED_TO_OPEN_FILE, invocation);
     }
 
     auto fileSize = file.size();
     if (fileEndPosOffset > fileSize)
     {
         file.close();
-        return _error(errorCodes::TAIL_CMD_ERROR_FAILED_TO_SEEK, invocation);
+        return error_(errorCodes::TAIL_CMD_ERROR_FAILED_TO_SEEK, invocation);
     }
 
     if (!file.seek(fileSize - fileEndPosOffset))
     {
         file.close();
-        return _error(errorCodes::TAIL_CMD_ERROR_FAILED_TO_SEEK, invocation);
+        return error_(errorCodes::TAIL_CMD_ERROR_FAILED_TO_SEEK, invocation);
     }
 
     // We emit in chunks for non blocking behavior and to support large files and slow storage or long lines that exceed the buffer size
@@ -227,7 +227,7 @@ EmbeddedTerminal::CommandResult tail::_streamFile(CommandInvocation &invocation)
     if (bytesRead == 0)
     {
         file.close();
-        return _error(errorCodes::TAIL_CMD_ERROR_FAILED_TO_READ, invocation);
+        return error_(errorCodes::TAIL_CMD_ERROR_FAILED_TO_READ, invocation);
     }
 
     ETString chunk(std::string(reinterpret_cast<const char *>(buffer), bytesRead));
@@ -240,7 +240,7 @@ EmbeddedTerminal::CommandResult tail::_streamFile(CommandInvocation &invocation)
 
     if (newPos == 0)
     {
-        return _success(invocation);
+        return success_(invocation);
     }
     else
     {
@@ -248,7 +248,7 @@ EmbeddedTerminal::CommandResult tail::_streamFile(CommandInvocation &invocation)
     }
 }
 
-EmbeddedTerminal::CommandResult tail::_error(size_t errorCode, CommandInvocation &invocation)
+EmbeddedTerminal::CommandResult tail::error_(size_t errorCode, CommandInvocation &invocation)
 {
     invocation.context.variables.erase(SESSION_KEY_PATH);
     invocation.context.variables.erase(SESSION_KEY_POS);
@@ -287,7 +287,7 @@ EmbeddedTerminal::CommandResult tail::_error(size_t errorCode, CommandInvocation
     return CommandResult::completed(errorCode);
 }
 
-EmbeddedTerminal::CommandResult tail::_success(CommandInvocation &invocation)
+EmbeddedTerminal::CommandResult tail::success_(CommandInvocation &invocation)
 {
     invocation.context.variables.erase(SESSION_KEY_PATH);
     invocation.context.variables.erase(SESSION_KEY_POS);

@@ -11,15 +11,20 @@ namespace EmbeddedTerminal
         {
 
         public:
-            ip(INetworkInterface &network) : _net(network)
+            /**
+             * @brief Constructor for the ip command.
+             * @param networks Reference to the INetworkSystem to query for network interfaces.
+             */
+            ip(INetworkSystem &networks) : net_(networks)
             {
             }
+
             ETString usage(const ETString &keyword);
             ETString trigger(const ETString &keyword, const ETString &additional) override;
 
         private:
-            INetworkInterface &_net;
+            INetworkSystem& net_;
         };
     };
 };
-#endif // CAT_H
+#endif // IP_H

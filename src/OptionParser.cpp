@@ -2,7 +2,7 @@
 
 void EmbeddedTerminal::OptionParser::addOption(const ETString &shortOpt, const ETString &longOpt, const ETString &description, bool requiresValue)
 {
-    _options.push_back({shortOpt, longOpt, description, requiresValue});
+    options_.push_back({shortOpt, longOpt, description, requiresValue});
 }
 
 EmbeddedTerminal::OptionParser::ParseResult EmbeddedTerminal::OptionParser::parse(const ETString &input)
@@ -10,7 +10,7 @@ EmbeddedTerminal::OptionParser::ParseResult EmbeddedTerminal::OptionParser::pars
     ParseResult result;
     ETString remaining = input;
 
-    for (const auto &opt : _options)
+    for (const auto &opt : options_)
     {
         size_t pos = remaining.find(opt.longOpt);
         size_t optNameLength = opt.longOpt.length();
@@ -72,7 +72,7 @@ EmbeddedTerminal::OptionParser::ParseResult EmbeddedTerminal::OptionParser::pars
     }
 
     // Check for required remaining arguments
-    for (const auto &reqArg : _requiredRemainingArguments)
+    for (const auto &reqArg : requiredRemainingArguments_)
     {
         if (remaining.trim().empty())
         {
@@ -98,5 +98,5 @@ EmbeddedTerminal::OptionParser::ParseResult EmbeddedTerminal::OptionParser::pars
 
 void EmbeddedTerminal::OptionParser::addRequiredRemainingArgument(const ETString &name)
 {
-    _requiredRemainingArguments.push_back(name);
+    requiredRemainingArguments_.push_back(name);
 }

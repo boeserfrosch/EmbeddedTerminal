@@ -6,19 +6,19 @@ ETString rmdir::trigger(const ETString &keyword, const ETString &additional)
     ETString folderName = additional.trim();
     if (folderName.empty())
         return "Can not remove folder with no name\n";
-    if (!_dir.exists(folderName))
+    if (!dir_.exists(folderName))
     {
         return folderName + " did not exists\n";
     }
-    if (!_dir.isDirectory(folderName))
+    if (!dir_.isDirectory(folderName))
     {
         return folderName + " is not a directory\n";
     }
-    if (!_dir.isEmpty(folderName.c_str()))
+    if (!dir_.isEmpty(folderName.c_str()))
     {
         return folderName + " is not empty\n";
     }
-    if (!_dir.rmdir(folderName))
+    if (!dir_.rmdir(folderName))
     {
         return "Could not remove " + folderName + "\n";
     }
@@ -32,5 +32,5 @@ ETString rmdir::usage(const ETString &keyword)
 
 ETVector<ETString> rmdir::getSuggestions(const ETString &partial)
 {
-    return _completer.getSuggestions(partial);
+    return completer_.getSuggestions(partial);
 }

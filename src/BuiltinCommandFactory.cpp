@@ -9,181 +9,182 @@ namespace EmbeddedTerminal
     BuiltinCommandFactory::~BuiltinCommandFactory()
     {
         // Clean up all owned command objects
-        for (auto &pair : _builtinCommands)
+        for (auto &pair : builtinCommands_)
         {
             delete pair.second;
         }
-        _builtinCommands.clear();
+        builtinCommands_.clear();
     }
 
     void BuiltinCommandFactory::registerFilesystemCommands(Terminal &terminal, DirectoryNavigator &nav, uint32_t flags)
     {
         if (flags & CMD_CAT)
         {
-            auto it = _builtinCommands.find(CMD_NAME_CAT);
-            if (it == _builtinCommands.end())
+            auto it = builtinCommands_.find(CMD_NAME_CAT);
+            if (it == builtinCommands_.end())
             {
                 cmd::cat *catCmd = new cmd::cat(nav);
                 if (catCmd != nullptr)
                 {
-                    _builtinCommands[CMD_NAME_CAT] = catCmd;
+                    builtinCommands_[CMD_NAME_CAT] = catCmd;
                 }
             }
-            if (_builtinCommands.find(CMD_NAME_CAT) != _builtinCommands.end())
+
+            if (builtinCommands_.find(CMD_NAME_CAT) != builtinCommands_.end())
             {
-                terminal.registerCommand(CMD_NAME_CAT, _builtinCommands[CMD_NAME_CAT]);
+                terminal.registerCommand(CMD_NAME_CAT, builtinCommands_[CMD_NAME_CAT]);
             }
         }
 
         if (flags & CMD_CD)
         {
-            auto it = _builtinCommands.find(CMD_NAME_CD);
-            if (it == _builtinCommands.end())
+            auto it = builtinCommands_.find(CMD_NAME_CD);
+            if (it == builtinCommands_.end())
             {
                 cmd::cd *cdCmd = new cmd::cd(nav);
                 if (cdCmd != nullptr)
                 {
-                    _builtinCommands[CMD_NAME_CD] = cdCmd;
+                    builtinCommands_[CMD_NAME_CD] = cdCmd;
                 }
             }
-            if (_builtinCommands.find(CMD_NAME_CD) != _builtinCommands.end())
+            if (builtinCommands_.find(CMD_NAME_CD) != builtinCommands_.end())
             {
-                terminal.registerCommand(CMD_NAME_CD, _builtinCommands[CMD_NAME_CD]);
+                terminal.registerCommand(CMD_NAME_CD, builtinCommands_[CMD_NAME_CD]);
             }
         }
 
         if (flags & CMD_DOWNLOAD)
         {
-            auto it = _builtinCommands.find(CMD_NAME_DOWNLOAD);
-            if (it == _builtinCommands.end())
+            auto it = builtinCommands_.find(CMD_NAME_DOWNLOAD);
+            if (it == builtinCommands_.end())
             {
                 cmd::download *downloadCmd = new cmd::download(nav);
                 if (downloadCmd != nullptr)
                 {
-                    _builtinCommands[CMD_NAME_DOWNLOAD] = downloadCmd;
+                    builtinCommands_[CMD_NAME_DOWNLOAD] = downloadCmd;
                 }
             }
-            if (_builtinCommands.find(CMD_NAME_DOWNLOAD) != _builtinCommands.end())
+            if (builtinCommands_.find(CMD_NAME_DOWNLOAD) != builtinCommands_.end())
             {
-                terminal.registerCommand(CMD_NAME_DOWNLOAD, _builtinCommands[CMD_NAME_DOWNLOAD]);
+                terminal.registerCommand(CMD_NAME_DOWNLOAD, builtinCommands_[CMD_NAME_DOWNLOAD]);
             }
         }
 
         if (flags & CMD_LS)
         {
-            auto it = _builtinCommands.find(CMD_NAME_LS);
-            if (it == _builtinCommands.end())
+            auto it = builtinCommands_.find(CMD_NAME_LS);
+            if (it == builtinCommands_.end())
             {
                 cmd::ls *lsCmd = new cmd::ls(nav);
                 if (lsCmd != nullptr)
                 {
-                    _builtinCommands[CMD_NAME_LS] = lsCmd;
+                    builtinCommands_[CMD_NAME_LS] = lsCmd;
                 }
             }
-            if (_builtinCommands.find(CMD_NAME_LS) != _builtinCommands.end())
+            if (builtinCommands_.find(CMD_NAME_LS) != builtinCommands_.end())
             {
-                terminal.registerCommand(CMD_NAME_LS, _builtinCommands[CMD_NAME_LS]);
+                terminal.registerCommand(CMD_NAME_LS, builtinCommands_[CMD_NAME_LS]);
             }
         }
 
         if (flags & CMD_MKDIR)
         {
-            auto it = _builtinCommands.find(CMD_NAME_MKDIR);
-            if (it == _builtinCommands.end())
+            auto it = builtinCommands_.find(CMD_NAME_MKDIR);
+            if (it == builtinCommands_.end())
             {
                 cmd::mkdir *mkdirCmd = new cmd::mkdir(nav);
                 if (mkdirCmd != nullptr)
                 {
-                    _builtinCommands[CMD_NAME_MKDIR] = mkdirCmd;
+                    builtinCommands_[CMD_NAME_MKDIR] = mkdirCmd;
                 }
             }
-            if (_builtinCommands.find(CMD_NAME_MKDIR) != _builtinCommands.end())
+            if (builtinCommands_.find(CMD_NAME_MKDIR) != builtinCommands_.end())
             {
-                terminal.registerCommand(CMD_NAME_MKDIR, _builtinCommands[CMD_NAME_MKDIR]);
+                terminal.registerCommand(CMD_NAME_MKDIR, builtinCommands_[CMD_NAME_MKDIR]);
             }
         }
 
         if (flags & CMD_RM)
         {
-            auto it = _builtinCommands.find(CMD_NAME_RM);
-            if (it == _builtinCommands.end())
+            auto it = builtinCommands_.find(CMD_NAME_RM);
+            if (it == builtinCommands_.end())
             {
                 cmd::rm *rmCmd = new cmd::rm(nav);
                 if (rmCmd != nullptr)
                 {
-                    _builtinCommands[CMD_NAME_RM] = rmCmd;
+                    builtinCommands_[CMD_NAME_RM] = rmCmd;
                 }
             }
-            if (_builtinCommands.find(CMD_NAME_RM) != _builtinCommands.end())
+            if (builtinCommands_.find(CMD_NAME_RM) != builtinCommands_.end())
             {
-                terminal.registerCommand(CMD_NAME_RM, _builtinCommands[CMD_NAME_RM]);
+                terminal.registerCommand(CMD_NAME_RM, builtinCommands_[CMD_NAME_RM]);
             }
         }
 
         if (flags & CMD_RMDIR)
         {
-            auto it = _builtinCommands.find(CMD_NAME_RMDIR);
-            if (it == _builtinCommands.end())
+            auto it = builtinCommands_.find(CMD_NAME_RMDIR);
+            if (it == builtinCommands_.end())
             {
                 cmd::rmdir *rmdirCmd = new cmd::rmdir(nav);
                 if (rmdirCmd != nullptr)
                 {
-                    _builtinCommands[CMD_NAME_RMDIR] = rmdirCmd;
+                    builtinCommands_[CMD_NAME_RMDIR] = rmdirCmd;
                 }
             }
-            if (_builtinCommands.find(CMD_NAME_RMDIR) != _builtinCommands.end())
+            if (builtinCommands_.find(CMD_NAME_RMDIR) != builtinCommands_.end())
             {
-                terminal.registerCommand(CMD_NAME_RMDIR, _builtinCommands[CMD_NAME_RMDIR]);
+                terminal.registerCommand(CMD_NAME_RMDIR, builtinCommands_[CMD_NAME_RMDIR]);
             }
         }
 
         if (flags & CMD_PWD)
         {
-            auto it = _builtinCommands.find(CMD_NAME_PWD);
-            if (it == _builtinCommands.end())
+            auto it = builtinCommands_.find(CMD_NAME_PWD);
+            if (it == builtinCommands_.end())
             {
                 cmd::pwd *pwdCmd = new cmd::pwd(nav);
                 if (pwdCmd != nullptr)
                 {
-                    _builtinCommands[CMD_NAME_PWD] = pwdCmd;
+                    builtinCommands_[CMD_NAME_PWD] = pwdCmd;
                 }
             }
-            if (_builtinCommands.find(CMD_NAME_PWD) != _builtinCommands.end())
+            if (builtinCommands_.find(CMD_NAME_PWD) != builtinCommands_.end())
             {
-                terminal.registerCommand(CMD_NAME_PWD, _builtinCommands[CMD_NAME_PWD]);
+                terminal.registerCommand(CMD_NAME_PWD, builtinCommands_[CMD_NAME_PWD]);
             }
         }
 
         if (flags & CMD_TAIL)
         {
-            auto it = _builtinCommands.find(CMD_NAME_TAIL);
-            if (it == _builtinCommands.end())
+            auto it = builtinCommands_.find(CMD_NAME_TAIL);
+            if (it == builtinCommands_.end())
             {
                 cmd::tail *tailCmd = new cmd::tail(nav);
                 if (tailCmd != nullptr)
                 {
-                    _builtinCommands[CMD_NAME_TAIL] = tailCmd;
+                    builtinCommands_[CMD_NAME_TAIL] = tailCmd;
                 }
             }
-            if (_builtinCommands.find(CMD_NAME_TAIL) != _builtinCommands.end())
+            if (builtinCommands_.find(CMD_NAME_TAIL) != builtinCommands_.end())
             {
-                terminal.registerCommand(CMD_NAME_TAIL, _builtinCommands[CMD_NAME_TAIL]);
+                terminal.registerCommand(CMD_NAME_TAIL, builtinCommands_[CMD_NAME_TAIL]);
             }
         }
         if (flags & CMD_XXD)
         {
-            auto it = _builtinCommands.find(CMD_NAME_XXD);
-            if (it == _builtinCommands.end())
+            auto it = builtinCommands_.find(CMD_NAME_XXD);
+            if (it == builtinCommands_.end())
             {
                 cmd::xxd *xxdCmd = new cmd::xxd(nav);
                 if (xxdCmd != nullptr)
                 {
-                    _builtinCommands[CMD_NAME_XXD] = xxdCmd;
+                    builtinCommands_[CMD_NAME_XXD] = xxdCmd;
                 }
             }
-            if (_builtinCommands.find(CMD_NAME_XXD) != _builtinCommands.end())
+            if (builtinCommands_.find(CMD_NAME_XXD) != builtinCommands_.end())
             {
-                terminal.registerCommand(CMD_NAME_XXD, _builtinCommands[CMD_NAME_XXD]);
+                terminal.registerCommand(CMD_NAME_XXD, builtinCommands_[CMD_NAME_XXD]);
             }
         }
     }
@@ -192,78 +193,79 @@ namespace EmbeddedTerminal
     {
         if (flags & CMD_DF)
         {
-            auto it = _builtinCommands.find(CMD_NAME_DF);
-            if (it == _builtinCommands.end())
+            auto it = builtinCommands_.find(CMD_NAME_DF);
+            if (it == builtinCommands_.end())
             {
-                cmd::df *dfCmd = new cmd::df(*nav.getFileSystem());
+                cmd::df *dfCmd = new cmd::df(*nav.getStorageSystem());
                 if (dfCmd != nullptr)
                 {
-                    _builtinCommands[CMD_NAME_DF] = dfCmd;
+                    builtinCommands_[CMD_NAME_DF] = dfCmd;
                 }
             }
-            if (_builtinCommands.find(CMD_NAME_DF) != _builtinCommands.end())
+            if (builtinCommands_.find(CMD_NAME_DF) != builtinCommands_.end())
             {
-                terminal.registerCommand(CMD_NAME_DF, _builtinCommands[CMD_NAME_DF]);
+                terminal.registerCommand(CMD_NAME_DF, builtinCommands_[CMD_NAME_DF]);
             }
         }
     }
 
-    void BuiltinCommandFactory::registerNetworkCommands(Terminal &terminal, INetworkInterface &net, uint32_t flags)
+    void BuiltinCommandFactory::registerNetworkCommands(Terminal &terminal, INetworkSystem &net, uint32_t flags)
     {
         if (flags & CMD_IP)
         {
-            auto it = _builtinCommands.find(CMD_NAME_IP);
-            if (it == _builtinCommands.end())
+            auto it = builtinCommands_.find(CMD_NAME_IP);
+            if (it == builtinCommands_.end())
             {
                 cmd::ip *ipCmd = new cmd::ip(net);
                 if (ipCmd != nullptr)
                 {
-                    _builtinCommands[CMD_NAME_IP] = ipCmd;
+                    builtinCommands_[CMD_NAME_IP] = ipCmd;
                 }
             }
-            if (_builtinCommands.find(CMD_NAME_IP) != _builtinCommands.end())
+            if (builtinCommands_.find(CMD_NAME_IP) != builtinCommands_.end())
             {
-                terminal.registerCommand(CMD_NAME_IP, _builtinCommands[CMD_NAME_IP]);
+                terminal.registerCommand(CMD_NAME_IP, builtinCommands_[CMD_NAME_IP]);
             }
         }
 
         if (flags & CMD_PING)
         {
-            auto it = _builtinCommands.find(CMD_NAME_PING);
-            if (it == _builtinCommands.end())
+            auto it = builtinCommands_.find(CMD_NAME_PING);
+            if (it == builtinCommands_.end())
             {
                 cmd::ping *pingCmd = new cmd::ping(net);
                 if (pingCmd != nullptr)
                 {
-                    _builtinCommands[CMD_NAME_PING] = pingCmd;
+                    builtinCommands_[CMD_NAME_PING] = pingCmd;
                 }
             }
-            if (_builtinCommands.find(CMD_NAME_PING) != _builtinCommands.end())
+            if (builtinCommands_.find(CMD_NAME_PING) != builtinCommands_.end())
             {
-                terminal.registerCommand(CMD_NAME_PING, _builtinCommands[CMD_NAME_PING]);
+                terminal.registerCommand(CMD_NAME_PING, builtinCommands_[CMD_NAME_PING]);
             }
         }
     }
 
     void BuiltinCommandFactory::registerHelpCommand(Terminal &terminal)
     {
-        auto it = _builtinCommands.find(CMD_NAME_HELP);
-        if (it == _builtinCommands.end())
+        auto it = builtinCommands_.find(CMD_NAME_HELP);
+        if (it == builtinCommands_.end())
         {
             cmd::help *helpCmd = new cmd::help(terminal);
             if (helpCmd != nullptr)
             {
-                _builtinCommands[CMD_NAME_HELP] = helpCmd;
+                builtinCommands_[CMD_NAME_HELP] = helpCmd;
             }
         }
-        if (_builtinCommands.find(CMD_NAME_HELP) != _builtinCommands.end())
+
+        if (builtinCommands_.find(CMD_NAME_HELP) != builtinCommands_.end())
         {
-            terminal.registerCommand(CMD_NAME_HELP, _builtinCommands[CMD_NAME_HELP]);
+            terminal.registerCommand(CMD_NAME_HELP, builtinCommands_[CMD_NAME_HELP]);
         }
     }
 
     void BuiltinCommandFactory::registerAllCommands(Terminal &terminal, DirectoryNavigator &nav,
-                                                    INetworkInterface &net)
+                                                    INetworkSystem &net)
     {
         registerFilesystemCommands(terminal, nav, CMD_FILESYSTEM_ALL);
         registerDiskCommands(terminal, nav, CMD_DISK_ALL);

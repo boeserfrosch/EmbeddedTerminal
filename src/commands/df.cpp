@@ -3,16 +3,44 @@
 using namespace EmbeddedTerminal::cmd;
 ETString df::trigger(const ETString &keyword, const ETString &additional)
 {
-    char sizeStr[256];
-    auto dim = 1024 * 1024.0;
-    auto dimStr = "MB";
-    auto cSize = (float)(_card.capacity() / dim);
-    auto totalBytes = (float)(_card.totalBytes() / dim);
-    auto usedBytes = (float)(_card.usedBytes() / dim);
-    auto freeBytes = (float)(totalBytes - usedBytes);
-    snprintf(sizeStr, 256, "SD Card: \tSize %.1f %s, \tTotal %.1f %s, \tUsed: %.1f %s (Free: %3.1f %s )\n", cSize, dimStr, totalBytes, dimStr, usedBytes, dimStr, (freeBytes / totalBytes) * 100, "%");
+    const float dim = 1024.0f * 1024.0f;
+    ETString result = "Filesystem\tSize\tUsed\tFree\n";
 
-    return sizeStr;
+    ETVector<IStorageMedia *> medias;
+    ETString path = additional.trim();
+    if (path.empty())
+    {
+        medias = storage_.media();
+    }
+    else
+    {
+        auto media = storage_.getMediaFromPath(path);
+        if (!media)
+        {
+            return "Storage media not found\n";
+        }
+        medias.push_back(media);
+    }
+
+    for (auto *media : medias)
+    {
+        const float sizeMb = static_cast<float>(media->totalBytes()) / dim;
+        const float usedMb = static_cast<float>(media->usedBytes()) / dim;
+        const float freeMb = static_cast<float>(media->freeBytes()) / dim;
+
+        result += media->name();
+        result += "\tSize ";
+        result += toETString(static_cast<unsigned long>(sizeMb));
+        result += ".0 MB";
+        result += "\tUsed ";
+        result += toETString(static_cast<unsigned long>(usedMb));
+        result += ".0 MB";
+        result += "\tFree ";
+        result += toETString(static_cast<unsigned long>(freeMb));
+        result += ".0 MB\n";
+    }
+
+    return result;
 }
 
 ETString df::usage(const ETString &keyword)

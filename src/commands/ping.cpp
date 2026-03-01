@@ -20,7 +20,7 @@ ETString ping::trigger(const ETString &keyword, const ETString &additional)
     }
 
     // Delegate to network interface implementation
-    return _net.ping(target);
+    return net_.ping(target);
 }
 ETString ping::usage(const ETString &keyword)
 {

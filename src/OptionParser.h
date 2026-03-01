@@ -28,8 +28,8 @@ namespace EmbeddedTerminal
             ETString description;
             bool requiresValue;
         };
-        ETVector<OptionDefinition> _options;
-        ETVector<ETString> _requiredRemainingArguments;
+        ETVector<OptionDefinition> options_;
+        ETVector<ETString> requiredRemainingArguments_;
     };
 } // namespace EmbeddedTerminal
 

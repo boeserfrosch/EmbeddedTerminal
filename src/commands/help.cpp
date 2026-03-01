@@ -8,7 +8,7 @@ ETString cmd::help::buildHelpOutput(const ETString &additional)
     auto parts = split(params, " ");
 
     ETString result = "Available commands\n";
-    auto commands = _terminal.getCommands();
+    auto commands = terminal_.getCommands();
 
     if (params.empty())
     {
@@ -54,6 +54,6 @@ ETString cmd::help::usage(const ETString &keyword)
 
 ETVector<ETString> cmd::help::getSuggestions(const ETString &partial)
 {
-    CommandCompleter completer(_terminal.getCommands());
+    CommandCompleter completer(terminal_.getCommands());
     return completer.getSuggestions(partial);
 }

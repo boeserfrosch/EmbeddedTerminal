@@ -3,59 +3,56 @@
 
 namespace EmbeddedTerminal
 {
-    namespace
+    class StreamInputChannel : public IInputChannel
     {
-        class StreamInputChannel : public IInputChannel
+    public:
+        explicit StreamInputChannel(ITerminalStream &stream) : stream_(stream)
         {
-        public:
-            explicit StreamInputChannel(ITerminalStream &stream) : _stream(stream)
-            {
-            }
+        }
 
-            bool available() override
-            {
-                return _stream.available();
-            }
-
-            ETString readAll() override
-            {
-                return _stream.readAll();
-            }
-
-        private:
-            ITerminalStream &_stream;
-        };
-
-        class StreamOutputChannel : public IOutputChannel
+        bool available() override
         {
-        public:
-            StreamOutputChannel(ITerminalStream &stream, TerminalChannel channel)
-                : _stream(stream), _channel(channel)
-            {
-            }
+            return stream_.available();
+        }
 
-            void print(const ETString &s) override
-            {
-                _stream.printTo(_channel, s);
-            }
+        ETString readAll() override
+        {
+            return stream_.readAll();
+        }
 
-        private:
-            ITerminalStream &_stream;
-            TerminalChannel _channel;
-        };
-    }
+    private:
+        ITerminalStream &stream_;
+    };
 
-    Terminal::Terminal(ITerminalStream &input) : _input(input)
+    class StreamOutputChannel : public IOutputChannel
+    {
+    public:
+        StreamOutputChannel(ITerminalStream &stream, TerminalChannel channel)
+            : stream_(stream), channel_(channel)
+        {
+        }
+
+        void print(const ETString &s) override
+        {
+            stream_.printTo(channel_, s);
+        }
+
+    private:
+        ITerminalStream &stream_;
+        TerminalChannel channel_;
+    };
+
+    Terminal::Terminal(ITerminalStream &input) : input_(input)
 #if defined(ARDUINO)
                                                  ,
-                                                 _ownedStream(nullptr)
+                                                 ownedStream_(nullptr)
 #endif
     {
         buffer.reserve(BUFFER_RESERVE_SIZE);
     }
 
 #if defined(ARDUINO)
-    Terminal::Terminal(Stream &stream) : _ownedStream(new ArduinoStream(stream)), _input(*_ownedStream)
+    Terminal::Terminal(Stream &stream) : ownedStream_(new ArduinoStream(stream)), input_(ownedStream_)
     {
         buffer.reserve(BUFFER_RESERVE_SIZE);
     }
@@ -64,9 +61,10 @@ namespace EmbeddedTerminal
     Terminal::~Terminal()
     {
 #if defined(ARDUINO)
-        if (_ownedStream != nullptr)
+        if (ownedStream_ != nullptr)
         {
-            delete _ownedStream;
+            delete ownedStream_;
+            ownedStream_ = nullptr;
         }
 #endif
         // Terminal does NOT own commands - caller is responsible for cleanup
@@ -74,11 +72,11 @@ namespace EmbeddedTerminal
 
     void Terminal::loop()
     {
-        if (!_input.available())
+        if (!input_.available())
             return;
 
         // Read input and append to buffer
-        ETString inputLine = _input.readAll();
+        ETString inputLine = input_.readAll();
 
         // Check for TAB character (0x09) for auto completion
         bool hasTab = inputLine.contains('\t');
@@ -93,13 +91,13 @@ namespace EmbeddedTerminal
             }
         }
 
-        _input.print(inputLine);
+        input_.print(inputLine);
         buffer += inputLine;
 
         // Handle auto completion after buffer is updated
         if (hasTab)
         {
-            _handleAutoCompletion();
+            handleAutoCompletion_();
         }
 
         size_t delimPosition;
@@ -145,23 +143,23 @@ namespace EmbeddedTerminal
         }
 
         // Store command pointer - Terminal does NOT take ownership
-        _observer[trimmedKeyword] = observer;
+        observer_[trimmedKeyword] = observer;
     }
 
     const ETMap<ETString, ICommand *> &Terminal::getCommands() const
     {
-        return _observer;
+        return observer_;
     }
 
     void Terminal::deregisterCommand(const ETString &keyword)
     {
         ETString trimmedKeyword = keyword;
         trimmedKeyword.trim();
-        auto it = _observer.find(trimmedKeyword);
-        if (it != _observer.end())
+        auto it = observer_.find(trimmedKeyword);
+        if (it != observer_.end())
         {
             // Just remove from map - Terminal does NOT own commands
-            _observer.erase(it);
+            observer_.erase(it);
         }
     }
 
@@ -172,29 +170,28 @@ namespace EmbeddedTerminal
 
         if (trimmedKeyword.empty())
             return;
-        auto search = _observer.find(trimmedKeyword);
-        if (search != _observer.end())
+        auto search = observer_.find(trimmedKeyword);
+        if (search != observer_.end())
         {
-            StreamInputChannel stdinChannel(_input);
-            StreamOutputChannel stdoutChannel(_input, TerminalChannel::StdOut);
-            StreamOutputChannel stderrChannel(_input, TerminalChannel::StdErr);
+            StreamInputChannel stdinChannel(input_);
+            StreamOutputChannel stdoutChannel(input_, TerminalChannel::StdOut);
+            StreamOutputChannel stderrChannel(input_, TerminalChannel::StdErr);
 
-            CommandContext context{_sessionVariables, _lastExitCode, true};
+            CommandContext context(sessionVariables_, lastExitCode_, true);
             CommandInvocation invocation{trimmedKeyword, additional, context, stdinChannel, stdoutChannel, stderrChannel};
             CommandResult result = search->second->execute(invocation);
-
-            _lastExitCode = result.exitCode;
+            lastExitCode_ = result.exitCode;
         }
         else
         {
-            _lastExitCode = 127;
-            _input.printfTo(TerminalChannel::StdErr, "%s is unknown!\n", trimmedKeyword.c_str());
+            lastExitCode_ = 127;
+            input_.printfTo(TerminalChannel::StdErr, "%s is unknown!\n", trimmedKeyword.c_str());
         }
     }
 
     int Terminal::getLastExitCode() const
     {
-        return _lastExitCode;
+        return lastExitCode_;
     }
 
     const ETString &Terminal::getBuffer() const
@@ -213,7 +210,7 @@ namespace EmbeddedTerminal
         return buffer;
     }
 
-    void Terminal::_handleAutoCompletion()
+    void Terminal::handleAutoCompletion_()
     {
         // Get the keyword (first word in buffer)
         ETString keywordPart = buffer;
@@ -227,17 +224,17 @@ namespace EmbeddedTerminal
         ETString partialArg = getLastWord();
 
         // Lookup the command and check if it has auto completion support
-        auto search = _observer.find(keywordPart);
-        if (search != _observer.end())
+        auto search = observer_.find(keywordPart);
+        if (search != observer_.end())
         {
             ICommand *cmd = search->second;
-            // Call getSuggestions directly - it returns empty vector if not overridden
+            // Call getSuggestions directly - it return s empty vector if not overridden
             ETVector<ETString> suggestions = cmd->getSuggestions(partialArg);
 
             if (suggestions.empty())
             {
                 // No matches, just beep
-                _input.print("\a");
+                input_.print("\a");
                 return;
             }
 
@@ -249,7 +246,7 @@ namespace EmbeddedTerminal
                 {
                     ETString toAppend = match.substr(partialArg.length());
                     buffer += toAppend;
-                    _input.print(toAppend);
+                    input_.print(toAppend);
                 }
             }
             else
@@ -272,14 +269,14 @@ namespace EmbeddedTerminal
                 {
                     ETString toAppend = commonPrefix.substr(partialArg.length());
                     buffer += toAppend;
-                    _input.print(toAppend);
+                    input_.print(toAppend);
                 }
 
                 // Display remaining options
-                _input.print("\n");
+                input_.print("\n");
                 for (const auto &suggestion : suggestions)
                 {
-                    _input.printf("  %s\n", suggestion.c_str());
+                    input_.printf("  %s\n", suggestion.c_str());
                 }
             }
         }

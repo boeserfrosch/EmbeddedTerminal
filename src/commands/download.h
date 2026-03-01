@@ -27,7 +27,7 @@ namespace EmbeddedTerminal
         {
 
         public:
-            download(DirectoryNavigator &dir) : _dir(dir)
+            download(DirectoryNavigator &dir) : dir_(dir)
             {
             }
             ETString usage(const ETString &keyword);
@@ -36,8 +36,8 @@ namespace EmbeddedTerminal
             ETVector<ETString> getSuggestions(const ETString &partial) override;
 
         protected:
-            static constexpr const char *SESSION_KEY_PATH = "__download_path";
-            static constexpr const char *SESSION_KEY_POS = "__download_pos";
+            static constexpr const char *SESSION_KEY_PATH = "download__path";
+            static constexpr const char *SESSION_KEY_POS = "download__pos";
 
         private:
             struct downloadState
@@ -55,13 +55,13 @@ namespace EmbeddedTerminal
                 processChunkResult(bool hasMore, bool error = false, size_t errorCode = 0) : hasMore(hasMore), error(error), errorCode(errorCode) {}
             };
 
-            downloadState _handleState(CommandInvocation &invocation);
-            unsigned char _checkState(const downloadState &state, CommandInvocation &invocation);
-            processChunkResult _processChunk(ETFile &file, size_t filePos, CommandInvocation &invocation);
-            CommandResult _error(size_t errorCode, CommandInvocation &invocation);
-            CommandResult _success(CommandInvocation &invocation);
+            downloadState handleState_(CommandInvocation &invocation);
+            unsigned char checkState_(const downloadState &state, CommandInvocation &invocation);
+            processChunkResult processChunk_(ETFile &file, size_t filePos, CommandInvocation &invocation);
+            CommandResult error_(size_t errorCode, CommandInvocation &invocation);
+            CommandResult success_(CommandInvocation &invocation);
 
-            DirectoryNavigator &_dir;
+            DirectoryNavigator dir_;
         };
     };
 };

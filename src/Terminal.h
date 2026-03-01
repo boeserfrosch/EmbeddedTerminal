@@ -53,10 +53,10 @@ namespace EmbeddedTerminal
         void call(const ETString &keyword, const ETString &additional);
 
     private:
-        ETMap<ETString, ICommand *> _observer;
-        ITerminalStream &_input;
+        ETMap<ETString, ICommand *> observer_;
+        ITerminalStream &input_;
 #if defined(ARDUINO)
-        ArduinoStream *_ownedStream;
+        ArduinoStream ownedStream_;
 #endif
 
         // Constants
@@ -64,11 +64,11 @@ namespace EmbeddedTerminal
 
         ETString buffer;
         ETString lineDelimiter = "\n";
-        int _lastExitCode = 0;
-        ETMap<ETString, ETString> _sessionVariables;
+        int lastExitCode_ = 0;
+        ETMap<ETString, ETString> sessionVariables_;
 
         // Auto completion helper
-        void _handleAutoCompletion();
+        void handleAutoCompletion_();
     };
 }
 #endif // TERMINAL_H

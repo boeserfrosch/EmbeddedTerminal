@@ -4,7 +4,7 @@ using namespace EmbeddedTerminal::cmd;
 ETString ip::trigger(const ETString &keyword, const ETString &additional)
 {
     ETString result;
-    auto interfaces = _net.getInterfaces();
+    auto interfaces = net_.interfaces();
     if (interfaces.empty())
     {
         return "No interface available\n";
@@ -13,30 +13,29 @@ ETString ip::trigger(const ETString &keyword, const ETString &additional)
     ETString params = additional.trim();
     if (!params.empty())
     {
-        auto iface = _net.getInterface(params);
-        if (iface.name.empty())
+        auto iface = net_.getInterface(params);
+        if (!iface || iface->info().name.empty())
         {
             return "Unknown interface\n";
         }
-        result += iface.name + ": ";
-        result += iface.ip + " ";
-        result += iface.mac + " ";
-        result += iface.netmask + " ";
-        result += iface.gateway + " ";
-        result += (iface.isUp ? "UP" : "DOWN");
+        result += iface->info().name + ": ";
+        result += iface->info().ip + " ";
+        result += iface->info().mac + " ";
+        result += iface->info().netmask + " ";
+        result += iface->info().gateway + " ";
+        result += (iface->info().isUp ? "UP" : "DOWN");
         result += "\n";
         return result;
     }
 
-    for (const auto &ifacePair : interfaces)
+    for (const auto &iface : interfaces)
     {
-        auto iface = ifacePair.second;
-        result += iface.name + ": ";
-        result += iface.ip + " ";
-        result += iface.mac + " ";
-        result += iface.netmask + " ";
-        result += iface.gateway + " ";
-        result += (iface.isUp ? "UP" : "DOWN");
+        result += iface->info().name + ": ";
+        result += iface->info().ip + " ";
+        result += iface->info().mac + " ";
+        result += iface->info().netmask + " ";
+        result += iface->info().gateway + " ";
+        result += (iface->info().isUp ? "UP" : "DOWN");
         result += "\n";
     }
     return result;

@@ -12,11 +12,11 @@ namespace EmbeddedTerminal
             {
                 return "path or name to file expected\n";
             }
-            if (!_dir.exists(path.c_str()) || _dir.isDirectory(path.c_str()))
+            if (!dir_.exists(path.c_str()) || dir_.isDirectory(path.c_str()))
             {
                 return "file " + path + " did not exist!\n";
             }
-            auto file = _dir.open(path.c_str(), "r", false);
+            auto file = dir_.open(path.c_str(), "r", false);
             if (file.size() < 512)
             {
                 auto content = file.readAll();
@@ -34,9 +34,9 @@ namespace EmbeddedTerminal
         CommandResult cat::executeStream(CommandInvocation &invocation)
         {
 
-            CatState state = _handleState(invocation);
-            unsigned char code = _checkState(state, invocation);
-            if (code != 0)
+            CatState state = handleState_(invocation);
+            auto code = checkState_(state, invocation);
+            if (code != errorCodes::CAT_CMD_ERROR_NONE)
             {
                 return CommandResult::completed(code);
             }
@@ -44,30 +44,30 @@ namespace EmbeddedTerminal
             ETString path = state.path;
             size_t filePos = state.position;
 
-            auto file = _dir.open(path.c_str(), "r", false);
+            auto file = dir_.open(path.c_str(), "r", false);
             if (!file.isOpen())
             {
                 invocation.context.variables.erase(SESSION_KEY_PATH);
                 invocation.context.variables.erase(SESSION_KEY_POS);
                 invocation.stderrChannel.print("failed to open file\n");
-                return CommandResult::completed(2);
+                return CommandResult::completed(errorCodes::CAT_CMD_ERROR_FAILED_TO_OPEN_FILE);
             }
 
             // Seek to current position
             file.seek(filePos);
 
-            bool hasMore = _processChunk(file, filePos, invocation);
+            bool hasMore = processChunk_(file, filePos, invocation);
 
             file.close();
             if (hasMore)
             {
-                return CommandResult::running(0);
+                return CommandResult::running(errorCodes::CAT_CMD_ERROR_NONE);
             }
             else
             {
                 invocation.context.variables.erase(SESSION_KEY_PATH);
                 invocation.context.variables.erase(SESSION_KEY_POS);
-                return CommandResult::completed(0);
+                return CommandResult::completed(errorCodes::CAT_CMD_ERROR_NONE);
             }
         }
 
@@ -90,10 +90,10 @@ namespace EmbeddedTerminal
         ETVector<ETString> cat::getSuggestions(const ETString &partial)
         {
             // Delegate to FilePathCompleter
-            return _completer.getSuggestions(partial);
+            return completer_.getSuggestions(partial);
         }
 
-        EmbeddedTerminal::cmd::cat::CatState cat::_handleState(CommandInvocation &invocation)
+        EmbeddedTerminal::cmd::cat::CatState cat::handleState_(CommandInvocation &invocation)
         {
             // Check if this is a continuation of an ongoing stream
             auto &vars = invocation.context.variables;
@@ -129,27 +129,27 @@ namespace EmbeddedTerminal
             return state;
         }
 
-        unsigned char cat::_checkState(const CatState &state, CommandInvocation &invocation)
+        errorCodes::CatCmdErrorCode cat::checkState_(const CatState &state, CommandInvocation &invocation)
         {
             if (state.path.empty())
             {
                 invocation.stderrChannel.print("path or name to file expected\n");
-                return 1; // No file specified
+                return errorCodes::CAT_CMD_ERROR_INVALID_PATH; // No file specified
             }
-            if (!_dir.exists(state.path.c_str()))
+            if (!dir_.exists(state.path.c_str()))
             {
                 invocation.stderrChannel.print("file did not exist\n");
-                return 2; // File does not exist
+                return errorCodes::CAT_CMD_ERROR_FILE_NOT_FOUND; // File does not exist
             }
-            if (_dir.isDirectory(state.path.c_str()))
+            if (dir_.isDirectory(state.path.c_str()))
             {
                 invocation.stderrChannel.print("file is a directory\n");
-                return 2; // File does not exist or is a directory
+                return errorCodes::CAT_CMD_ERROR_IS_DIRECTORY; // File does not exist or is a directory
             }
-            return 0; // State is valid
+            return errorCodes::CAT_CMD_ERROR_NONE; // State is valid
         }
 
-        bool cat::_processChunk(ETFile &file, size_t filePos, CommandInvocation &invocation)
+        bool cat::processChunk_(ETFile &file, size_t filePos, CommandInvocation &invocation)
         {
             // Read and emit one chunk (512 bytes max)
             unsigned char buffer[CHUNK_SIZE];

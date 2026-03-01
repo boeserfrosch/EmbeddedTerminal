@@ -1,27 +1,31 @@
 ﻿#include "commands/xxd.h"
 ETString EmbeddedTerminal::cmd::xxd::trigger(const ETString &keyword, const ETString &additional)
 {
-    ETString path = additional.trim();
-    if (path.empty())
+    Path path = additional.trim();
+    if (path.isEmpty())
     {
         return "path or name to file expected\n";
     }
-    if (!_dir.exists(path.c_str()) || _dir.isDirectory(path.c_str()))
+    if (!dir_.exists(path))
     {
         return "file " + path + " did not exist!\n";
     }
-    auto file = _dir.open(path.c_str(), "r", false);
+    if (dir_.isDirectory(path))
+    {
+        return "file " + path + " did not exist!\n";
+    }
+    auto file = dir_.open(path, "r", false);
     if (file.size() < 512)
     {
         auto content = file.readAll();
         file.close();
-        return _generateHexDump(content.c_str(), content.length()) + "\n";
+        return generateHexDump_(content.c_str(), content.length()) + "\n";
     }
 
     char buffer[512];
     file.read(buffer, 512);
     file.close();
-    ETString result = _generateHexDump(buffer, 512);
+    ETString result = generateHexDump_(buffer, 512);
     return result + "\n ... output truncated, file is larger than 512 bytes\n";
 }
 
@@ -33,28 +37,36 @@ ETString EmbeddedTerminal::cmd::xxd::usage(const ETString &keyword)
 ETVector<ETString> EmbeddedTerminal::cmd::xxd::getSuggestions(const ETString &partial)
 {
     // Delegate to FilePathCompleter
-    FilePathCompleter completer(_dir);
-    return completer.getSuggestions(partial);
+    FilePathCompleter completer(dir_);
+    ETVector<ETString> suggestions = completer.getSuggestions(partial);
+    for (auto &suggestion : suggestions)
+    {
+        if (!suggestion.empty() && suggestion[0] != '/')
+        {
+            suggestion = "/" + suggestion;
+        }
+    }
+    return suggestions;
 }
 
 EmbeddedTerminal::CommandResult EmbeddedTerminal::cmd::xxd::execute(CommandInvocation &invocation)
 {
-    auto state = _handleCommandState(invocation);
-    errorCodes::XXDCmdErrorCode code = _checkCommandState(state, invocation);
+    auto state = handleCommandState_(invocation);
+    errorCodes::XXDCmdErrorCode code = checkCommandState_(state, invocation);
 
     if (code != errorCodes::XXDCmdErrorCode::XXD_CMD_ERROR_NONE)
     {
-        return _error(code, invocation);
+        return error_(code, invocation);
     }
 
-    return _streamHexDump(invocation, state);
+    return streamHexDump_(invocation, state);
 }
 
-EmbeddedTerminal::CommandResult EmbeddedTerminal::cmd::xxd::_streamHexDump(CommandInvocation &invocation, const XXDState &state)
+EmbeddedTerminal::CommandResult EmbeddedTerminal::cmd::xxd::streamHexDump_(CommandInvocation &invocation, const XXDState &state)
 {
     char chunkBuffer[CHUNK_SIZE];
 
-    auto executionState = _handleKeyStrokes(invocation);
+    auto executionState = handleKeyStrokes_(invocation);
 
     if (executionState.exitCommand)
     {
@@ -73,12 +85,12 @@ EmbeddedTerminal::CommandResult EmbeddedTerminal::cmd::xxd::_streamHexDump(Comma
 
     if (executionState.hasChanges || effectivePosition == 0)
     {
-        auto file = _dir.open(state.path.c_str(), "r", false);
-        auto code = _checkFile(file);
+        auto file = dir_.open(state.path.c_str(), "r", false);
+        auto code = checkFile_(file);
         if (code != errorCodes::XXDCmdErrorCode::XXD_CMD_ERROR_NONE)
         {
             file.close();
-            return _error(code, invocation);
+            return error_(code, invocation);
         }
 
         file.seek(effectivePosition);
@@ -87,17 +99,17 @@ EmbeddedTerminal::CommandResult EmbeddedTerminal::cmd::xxd::_streamHexDump(Comma
         if (readBytes == 0)
         {
             file.close();
-            return _error(errorCodes::XXDCmdErrorCode::XXD_CMD_ERROR_FAILED_TO_READ, invocation);
+            return error_(errorCodes::XXDCmdErrorCode::XXD_CMD_ERROR_FAILED_TO_READ, invocation);
         }
         file.close();
 
-        invocation.stdoutChannel.print(_generateHexDump(chunkBuffer, readBytes, effectivePosition));
+        invocation.stdoutChannel.print(generateHexDump_(chunkBuffer, readBytes, effectivePosition));
     }
 
     return CommandResult::completed(errorCodes::XXDCmdErrorCode::XXD_CMD_ERROR_NONE);
 }
 
-EmbeddedTerminal::cmd::xxd::HandleKeyStrokesResult EmbeddedTerminal::cmd::xxd::_handleKeyStrokes(CommandInvocation &invocation)
+EmbeddedTerminal::cmd::xxd::HandleKeyStrokesResult EmbeddedTerminal::cmd::xxd::handleKeyStrokes_(CommandInvocation &invocation)
 {
     // We want to walk through the input and check for key strokes to navigate through the file (e.g., for pagination).
     // 'n' for next m bytes (bytesPerLine), 'p' for previous m bytes, 'q' to quit.
@@ -109,7 +121,7 @@ EmbeddedTerminal::cmd::xxd::HandleKeyStrokesResult EmbeddedTerminal::cmd::xxd::_
         ETString input = invocation.stdinChannel.readAll().trim();
         if (input == "n")
         {
-            auto file = _dir.open(invocation.context.variables[SESSION_KEY_PATH].c_str(), "r", false);
+            auto file = dir_.open(invocation.context.variables[SESSION_KEY_PATH].c_str(), "r", false);
             auto fileSize = file.size();
             file.close();
 
@@ -163,7 +175,7 @@ EmbeddedTerminal::cmd::xxd::HandleKeyStrokesResult EmbeddedTerminal::cmd::xxd::_
         else if (input == "G")
         {
             // Go to end
-            auto file = _dir.open(invocation.context.variables[SESSION_KEY_PATH].c_str(), "r", false);
+            auto file = dir_.open(invocation.context.variables[SESSION_KEY_PATH].c_str(), "r", false);
             auto fileSize = file.size();
             file.close();
 
@@ -207,7 +219,7 @@ EmbeddedTerminal::cmd::xxd::HandleKeyStrokesResult EmbeddedTerminal::cmd::xxd::_
  *
  * @return A formatted hex dump string representing the content
  */
-ETString EmbeddedTerminal::cmd::xxd::_generateHexDump(const char *content, size_t length, size_t startOffset, size_t bytesPerLine)
+ETString EmbeddedTerminal::cmd::xxd::generateHexDump_(const char *content, size_t length, size_t startOffset, size_t bytesPerLine)
 {
     ETString result = "";
     for (size_t i = 0; i < length; i += bytesPerLine)
@@ -235,7 +247,7 @@ ETString EmbeddedTerminal::cmd::xxd::_generateHexDump(const char *content, size_
     return result;
 }
 
-EmbeddedTerminal::cmd::xxd::XXDState EmbeddedTerminal::cmd::xxd::_handleCommandState(CommandInvocation &invocation)
+EmbeddedTerminal::cmd::xxd::XXDState EmbeddedTerminal::cmd::xxd::handleCommandState_(CommandInvocation &invocation)
 {
     XXDState state;
 
@@ -261,21 +273,21 @@ EmbeddedTerminal::cmd::xxd::XXDState EmbeddedTerminal::cmd::xxd::_handleCommandS
     return state;
 }
 
-EmbeddedTerminal::cmd::errorCodes::XXDCmdErrorCode EmbeddedTerminal::cmd::xxd::_checkCommandState(const XXDState &state, CommandInvocation &invocation)
+EmbeddedTerminal::cmd::errorCodes::XXDCmdErrorCode EmbeddedTerminal::cmd::xxd::checkCommandState_(const XXDState &state, CommandInvocation &invocation)
 {
     if (state.path.empty())
     {
         return errorCodes::XXDCmdErrorCode::XXD_CMD_ERROR_INVALID_PATH;
     }
-    if (!_dir.exists(state.path.c_str()))
+    if (!dir_.exists(state.path.c_str()))
     {
         return errorCodes::XXDCmdErrorCode::XXD_CMD_ERROR_FILE_NOT_FOUND;
     }
-    if (_dir.isDirectory(state.path.c_str()))
+    if (dir_.isDirectory(state.path.c_str()))
     {
         return errorCodes::XXDCmdErrorCode::XXD_CMD_ERROR_IS_DIRECTORY;
     }
-    auto file = _dir.open(state.path.c_str(), "r", false);
+    auto file = dir_.open(state.path.c_str(), "r", false);
     if (!file.isOpen())
     {
         return errorCodes::XXDCmdErrorCode::XXD_CMD_ERROR_FAILED_TO_OPEN_FILE;
@@ -289,7 +301,7 @@ EmbeddedTerminal::cmd::errorCodes::XXDCmdErrorCode EmbeddedTerminal::cmd::xxd::_
     return errorCodes::XXDCmdErrorCode::XXD_CMD_ERROR_NONE;
 }
 
-EmbeddedTerminal::cmd::errorCodes::XXDCmdErrorCode EmbeddedTerminal::cmd::xxd::_checkFile(ETFile &file)
+EmbeddedTerminal::cmd::errorCodes::XXDCmdErrorCode EmbeddedTerminal::cmd::xxd::checkFile_(ETFile &file)
 {
     if (!file.isOpen())
     {
@@ -303,7 +315,7 @@ EmbeddedTerminal::cmd::errorCodes::XXDCmdErrorCode EmbeddedTerminal::cmd::xxd::_
     return errorCodes::XXDCmdErrorCode::XXD_CMD_ERROR_NONE;
 }
 
-EmbeddedTerminal::CommandResult EmbeddedTerminal::cmd::xxd::_error(errorCodes::XXDCmdErrorCode errorCode, CommandInvocation &invocation)
+EmbeddedTerminal::CommandResult EmbeddedTerminal::cmd::xxd::error_(errorCodes::XXDCmdErrorCode errorCode, CommandInvocation &invocation)
 {
     switch (errorCode)
     {

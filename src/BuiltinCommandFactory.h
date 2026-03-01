@@ -55,10 +55,10 @@ namespace EmbeddedTerminal
          * Register network commands (ip, download)
          *
          * @param terminal Terminal instance to register commands with
-         * @param net INetworkInterface dependency for network operations
+         * @param net INetworkSystem dependency for network operations
          * @param flags Bitflags selecting which commands to register (default: all)
          */
-        void registerNetworkCommands(Terminal &terminal, INetworkInterface &net,
+        void registerNetworkCommands(Terminal &terminal, INetworkSystem &net,
                                      uint32_t flags = CMD_NETWORK_ALL);
 
         /**
@@ -73,10 +73,10 @@ namespace EmbeddedTerminal
          *
          * @param terminal Terminal instance to register commands with
          * @param nav DirectoryNavigator dependency (provides IFileSystem access)
-         * @param net INetworkInterface dependency
+         * @param net INetworkSystem dependency
          */
         void registerAllCommands(Terminal &terminal, DirectoryNavigator &nav,
-                                 INetworkInterface &net);
+                                 INetworkSystem &net);
 
         /**
          * Deregister filesystem commands from terminal
@@ -122,7 +122,7 @@ namespace EmbeddedTerminal
 
     private:
         // Built-in command objects owned by this factory
-        ETMap<ETString, ICommand *> _builtinCommands;
+        ETMap<ETString, ICommand *> builtinCommands_;
     };
 }
 #endif // BUILTIN_COMMAND_FACTORY_H

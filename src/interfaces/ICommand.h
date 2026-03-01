@@ -8,12 +8,22 @@
 
 namespace EmbeddedTerminal
 {
+    /**
+     * @brief Interface for terminal commands.
+     *
+     * Defines the contract for command execution and metadata retrieval.
+     */
     class ICommand : public IAutoCompleter
     {
     public:
         virtual ~ICommand() = default;
         virtual ETString usage(const ETString &keyword) = 0;
 
+        /**
+         * @brief Executes the command with the given arguments.
+         * @param args Arguments for the command.
+         * @return Execution result or status code.
+         */
         virtual CommandResult execute(CommandInvocation &invocation)
         {
             ETString response = trigger(invocation.keyword, invocation.arguments);
@@ -25,7 +35,7 @@ namespace EmbeddedTerminal
             return CommandResult::completed(0);
         }
 
-        /// @brief Default implementation returns no suggestions
+        /// @brief Default implementation return s no suggestions
         /// Commands can override this to provide auto completion
         virtual ETVector<ETString> getSuggestions(const ETString &partial) override
         {

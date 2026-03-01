@@ -14,7 +14,7 @@ namespace EmbeddedTerminal
         {
 
         public:
-            help(Terminal &terminal) : _terminal(terminal)
+            help(Terminal &terminal) : terminal_(terminal)
             {
             }
             ETString usage(const ETString &keyword);
@@ -28,7 +28,7 @@ namespace EmbeddedTerminal
 
         private:
             ETString buildHelpOutput(const ETString &additional);
-            Terminal &_terminal;
+            Terminal& terminal_;
         };
     };
 };

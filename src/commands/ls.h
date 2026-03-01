@@ -14,7 +14,7 @@ namespace EmbeddedTerminal
         {
 
         public:
-            ls(DirectoryNavigator &dir) : _dir(dir), _completer(dir)
+            ls(DirectoryNavigator &dir) : dir_(dir), completer_(dir)
             {
             }
             ETString usage(const ETString &keyword);
@@ -32,8 +32,8 @@ namespace EmbeddedTerminal
             void parseConf(std::vector<ETString> params);
 
         private:
-            DirectoryNavigator &_dir;
-            DirectoryCompleter _completer;
+            DirectoryNavigator dir_;
+            DirectoryCompleter completer_;
         };
     };
 };

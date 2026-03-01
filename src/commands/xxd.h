@@ -31,7 +31,7 @@ namespace EmbeddedTerminal
         {
 
         public:
-            xxd(DirectoryNavigator &dir) : _dir(dir)
+            xxd(DirectoryNavigator &dir) : dir_(dir)
             {
             }
             ETString usage(const ETString &keyword);
@@ -55,23 +55,23 @@ namespace EmbeddedTerminal
                 bool exitCommand = false;
             };
 
-            XXDState _handleCommandState(CommandInvocation &invocation);
-            errorCodes::XXDCmdErrorCode _checkCommandState(const XXDState &state, CommandInvocation &invocation);
-            HandleKeyStrokesResult _handleKeyStrokes(CommandInvocation &invocation);
-            errorCodes::XXDCmdErrorCode _checkFile(ETFile &file);
+            XXDState handleCommandState_(CommandInvocation &invocation);
+            errorCodes::XXDCmdErrorCode checkCommandState_(const XXDState &state, CommandInvocation &invocation);
+            HandleKeyStrokesResult handleKeyStrokes_(CommandInvocation &invocation);
+            errorCodes::XXDCmdErrorCode checkFile_(ETFile &file);
 
-            ETString _generateHexDump(const char *content, size_t length, size_t startOffset = 0, size_t bytesPerLine = 16);
+            ETString generateHexDump_(const char *content, size_t length, size_t startOffset = 0, size_t bytesPerLine = 16);
 
-            CommandResult _error(errorCodes::XXDCmdErrorCode errorCode, CommandInvocation &invocation);
-            CommandResult _streamHexDump(CommandInvocation &invocation, const XXDState &state);
+            CommandResult error_(errorCodes::XXDCmdErrorCode errorCode, CommandInvocation &invocation);
+            CommandResult streamHexDump_(CommandInvocation &invocation, const XXDState &state);
 
-            static constexpr const char *SESSION_KEY_PATH = "__xxd_path";
-            static constexpr const char *SESSION_KEY_POS = "__xxd_pos";
+            static constexpr const char *SESSION_KEY_PATH = "xxd__path";
+            static constexpr const char *SESSION_KEY_POS = "xxd__pos";
             static constexpr size_t CHUNK_SIZE = 256;
 
             unsigned char *buffer = nullptr;
 
-            EmbeddedTerminal::DirectoryNavigator &_dir;
+            EmbeddedTerminal::DirectoryNavigator dir_;
         };
     };
 };

@@ -6,6 +6,7 @@
 #include "interfaces/ITerminalStream.h"
 #include "DirectoryNavigator.h"
 #include "ETTypes.h"
+#include <unity.h>
 
 namespace EmbeddedTerminal
 {
@@ -53,51 +54,33 @@ namespace EmbeddedTerminal
 
         ETVector<ETString> getSuggestions(const ETString &partial) override
         {
-            ETVector<ETString> suggestions;
+            // Cleanup partial path, change windows backslashes to slashes
+            Path cleanedPartial = Path(partial);
 
-            // Determine the directory and prefix to search for
-            ETString searchDir = "/";
-            ETString searchPrefix = partial;
+            Path basePath = cleanedPartial.getBasePath();
+            ETString name = cleanedPartial.getName();
 
-            // Check if partial contains a path separator
-            size_t lastSlash = partial.find_last_of('/');
-            if (lastSlash != ETString::npos)
+            ETVector<EmbeddedTerminal::Path> suggestions = navigator_.ls(basePath, name);
+            Path absoluteBasePath = navigator_.pwd(basePath);
+
+            // Append base path to suggestions
+            for (auto &s : suggestions)
             {
-                // Path contains directory component
-                searchDir = partial.substr(0, lastSlash);
-                if (searchDir.empty())
-                {
-                    searchDir = "/";
-                }
-                searchPrefix = partial.substr(lastSlash + 1);
+                s = absoluteBasePath + s; // Keep absolute base path
             }
 
-            // List contents of the directory
-            ETVector<ETString> entries = navigator_.ls(searchDir);
-
-            for (const auto &entry : entries)
+            ETVector<ETString> stringSuggestions;
+            bool isPartialAbsolute = !partial.empty() && (partial[0] == '/');
+            for (const auto &s : suggestions)
             {
-                if (entry.startsWith(searchPrefix))
+                ETString suggestionStr = ETString(s) + (navigator_.isDirectory(s) ? "/" : "");
+                if (!isPartialAbsolute && suggestionStr.length() > 0 && suggestionStr[0] == '/')
                 {
-                    // Construct full path for suggestion
-                    ETString fullEntry = searchDir;
-                    if (!searchDir.endsWith('/'))
-                    {
-                        fullEntry += "/";
-                    }
-                    fullEntry += entry;
-
-                    // Add directory indicator if it's a directory
-                    if (navigator_.isDirectory(fullEntry))
-                    {
-                        fullEntry += "/";
-                    }
-
-                    suggestions.push_back(fullEntry);
+                    suggestionStr = suggestionStr.substr(1);
                 }
+                stringSuggestions.push_back(suggestionStr);
             }
-
-            return suggestions;
+            return sort(stringSuggestions);
         }
 
     private:
@@ -114,50 +97,27 @@ namespace EmbeddedTerminal
 
         ETVector<ETString> getSuggestions(const ETString &partial) override
         {
-            ETVector<ETString> suggestions;
+            ETVector<ETString> stringSuggestions;
 
+            Path cleanedPartial = Path(partial);
             // Determine the directory and prefix to search for
-            ETString searchDir = "/";
-            ETString searchPrefix = partial;
-
-            // Check if partial contains a path separator
-            size_t lastSlash = partial.find_last_of('/');
-            if (lastSlash != ETString::npos)
-            {
-                // Path contains directory component
-                searchDir = partial.substr(0, lastSlash);
-                if (searchDir.empty())
-                {
-                    searchDir = "/";
-                }
-                searchPrefix = partial.substr(lastSlash + 1);
-            }
+            Path searchDir = cleanedPartial.getBasePath();
+            ETString searchPrefix = cleanedPartial.getName();
 
             // List contents of the directory
-            ETVector<ETString> entries = navigator_.ls(searchDir);
+            ETVector<Path> entries = navigator_.ls(searchDir, searchPrefix);
+            const Path absoluteSearchDir = navigator_.pwd(searchDir);
 
             for (const auto &entry : entries)
             {
-                if (entry.startsWith(searchPrefix))
+                if (navigator_.isDirectory(entry))
                 {
-                    // Construct full path
-                    ETString fullPath = searchDir;
-                    if (!searchDir.endsWith('/'))
-                    {
-                        fullPath += "/";
-                    }
-                    fullPath += entry;
-
-                    // Only include if it's a directory
-                    if (navigator_.isDirectory(fullPath))
-                    {
-                        fullPath += "/";
-                        suggestions.push_back(fullPath);
-                    }
+                    Path suggestionPath = absoluteSearchDir + entry;
+                    stringSuggestions.push_back(ETString(suggestionPath) + "/");
                 }
             }
 
-            return suggestions;
+            return sort(stringSuggestions);
         }
 
     private:

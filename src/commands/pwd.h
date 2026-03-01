@@ -13,7 +13,7 @@ namespace EmbeddedTerminal
         {
 
         public:
-            pwd(DirectoryNavigator &dir) : _dir(dir)
+            pwd(DirectoryNavigator &dir) : dir_(dir)
             {
             }
             ETString usage(const ETString &keyword);
@@ -21,7 +21,7 @@ namespace EmbeddedTerminal
             ETString trigger(const ETString &keyword, const ETString &additional) override;
 
         private:
-            DirectoryNavigator &_dir;
+            DirectoryNavigator &dir_;
         };
     };
 };

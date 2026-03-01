@@ -11,7 +11,7 @@ namespace EmbeddedTerminal
         class ping : public ICommand
         {
         public:
-            ping(INetworkInterface &network) : _net(network)
+            ping(INetworkSystem &network) : net_(network)
             {
             }
             ETString usage(const ETString &keyword) override;
@@ -19,7 +19,7 @@ namespace EmbeddedTerminal
 
         protected:
         private:
-            INetworkInterface &_net;
+            INetworkSystem& net_;
         };
     } // namespace cmd
 } // namespace EmbeddedTerminal

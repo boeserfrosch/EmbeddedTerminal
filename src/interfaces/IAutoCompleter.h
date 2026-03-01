@@ -5,17 +5,21 @@
 
 namespace EmbeddedTerminal
 {
-    /// @brief Interface for providing auto completion suggestions
-    /// Commands can optionally implement this interface to provide context-aware
-    /// auto completion when the user presses TAB during input.
+    /**
+     * @brief Interface for auto-completion functionality in terminal commands.
+     *
+     * Implementations provide suggestions for command completion based on user input.
+     */
     class IAutoCompleter
     {
     public:
         virtual ~IAutoCompleter() = default;
 
-        /// @brief Get auto completion suggestions for a partial input string
-        /// @param partial The incomplete text being completed (e.g., "tm" when completing "/tm")
-        /// @return Vector of completion suggestions that start with the partial string
+        /**
+         * @brief Suggests possible completions for the given input.
+         * @param partial The current user input string.
+         * @return A sorted list of possible completions.
+         */
         virtual ETVector<ETString> getSuggestions(const ETString &partial) = 0;
     };
 } // namespace EmbeddedTerminal

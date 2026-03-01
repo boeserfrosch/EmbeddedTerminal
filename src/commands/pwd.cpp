@@ -5,7 +5,7 @@ using namespace EmbeddedTerminal::cmd;
 ETString pwd::trigger(const ETString &keyword, const ETString &additional)
 {
     // pwd takes no parameters, just return current directory
-    return _dir.pwd() + "\n";
+    return dir_.pwd() + "\n";
 }
 
 ETString pwd::usage(const ETString &keyword)

@@ -74,11 +74,6 @@ namespace EmbeddedTerminal
             return !file_ || !file_->isOpen();
         }
 
-        ETString name() const
-        {
-            return file_ ? file_->name() : ETString();
-        }
-
         bool isDirectory() const
         {
             return file_ ? file_->isDirectory() : false;

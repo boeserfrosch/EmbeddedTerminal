@@ -14,7 +14,7 @@ namespace EmbeddedTerminal
         {
 
         public:
-            rm(DirectoryNavigator &dir) : _dir(dir), _completer(dir)
+            rm(DirectoryNavigator &dir) : dir_(dir), completer_(dir)
             {
             }
             ETString usage(const ETString &keyword);
@@ -24,8 +24,8 @@ namespace EmbeddedTerminal
             ETVector<ETString> getSuggestions(const ETString &partial) override;
 
         private:
-            DirectoryNavigator &_dir;
-            FilePathCompleter _completer;
+            DirectoryNavigator dir_;
+            FilePathCompleter completer_;
         };
     };
 };

@@ -6,18 +6,18 @@ using namespace EmbeddedTerminal::cmd;
 EmbeddedTerminal::CommandResult EmbeddedTerminal::cmd::cd::execute(CommandInvocation &invocation)
 {
     ETString path = invocation.arguments.trim();
-    ETString checkResult = _checkPath(path);
+    ETString checkResult = checkPath_(path);
     if (!checkResult.empty())
     {
         invocation.stderrChannel.print(checkResult);
         return CommandResult::completed(1); // Error code for invalid path
     }
 
-    if (_dir.cd(path.c_str()))
-    {
-        invocation.stdoutChannel.print("> " + _dir.pwd() + "\n");
-        return CommandResult::completed(0); // Success
-    }
+    if (dir_.cd(path.c_str()))
+        {
+            invocation.stdoutChannel.print("> " + dir_.pwd() + "\n");
+            return CommandResult::completed(0); // Success
+        }
     else
     {
         invocation.stderrChannel.print("Failed to change directory\n");
@@ -28,34 +28,34 @@ EmbeddedTerminal::CommandResult EmbeddedTerminal::cmd::cd::execute(CommandInvoca
 ETString cd::trigger(const ETString &keyword, const ETString &relPath)
 {
     ETString path = relPath.trim();
-    ETString checkResult = _checkPath(path);
+    ETString checkResult = checkPath_(path);
     if (!checkResult.empty())
     {
         return checkResult;
     }
 
-    if (_dir.cd(path.c_str()))
-    {
-        return "> " + _dir.pwd() + "\n"; // Success, no output
-    }
+    if (dir_.cd(path.c_str()))
+        {
+            return "> " + dir_.pwd() + "\n"; // Success, no output
+        }
     else
     {
         return "Failed to change directory\n";
     }
 }
 
-ETString cd::_checkPath(const ETString &relPath)
+ETString cd::checkPath_(const ETString &relPath)
 {
     ETString path = relPath.trim();
     if (path.empty())
     {
         return "Expected parameter\n";
     }
-    if (!_dir.exists(path.c_str()))
+    if (!dir_.exists(path.c_str()))
     {
         return path + " did not exist \n";
     }
-    if (!_dir.isDirectory(path.c_str()))
+    if (!dir_.isDirectory(path.c_str()))
     {
         return path + " is not a directory \n";
     }
@@ -69,5 +69,5 @@ ETString cd::usage(const ETString &keyword)
 ETVector<ETString> cd::getSuggestions(const ETString &partial)
 {
     // Delegate to DirectoryCompleter
-    return _completer.getSuggestions(partial);
+    return completer_.getSuggestions(partial);
 }
