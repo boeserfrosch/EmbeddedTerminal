@@ -3,7 +3,6 @@
 #define ET_PATH_H
 
 #include "ETTypes.h"
-#include <unity.h>
 
 namespace EmbeddedTerminal
 {

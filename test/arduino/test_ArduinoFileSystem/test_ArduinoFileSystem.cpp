@@ -1,6 +1,6 @@
 #include <unity.h>
 #include "hal/arduino/ArduinoFileSystem.h"
-#include "../../Mocks/MockArduinoFS.h"
+#include "../../Mocks/arduino/MockArduinoFS.h"
 
 using namespace EmbeddedTerminal;
 
@@ -8,6 +8,7 @@ static ArduinoFileSystem *fileSystem;
 
 void setUp(void)
 {
+    resetMockArduinoFS();
     fileSystem = new ArduinoFileSystem(MockArduinoFS);
 }
 

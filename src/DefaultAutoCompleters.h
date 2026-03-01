@@ -6,7 +6,6 @@
 #include "interfaces/ITerminalStream.h"
 #include "DirectoryNavigator.h"
 #include "ETTypes.h"
-#include <unity.h>
 
 namespace EmbeddedTerminal
 {

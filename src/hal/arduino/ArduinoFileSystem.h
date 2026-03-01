@@ -1,8 +1,9 @@
 #pragma once
-#ifdef ARDUINO
+#if defined(ARDUINO) || defined(unitTesting)
 #include "interfaces/IFileSystem.h"
 #include "hal/arduino/ArduinoFile.h"
 #include <FS.h>
+#include <cstring>
 
 namespace EmbeddedTerminal
 {
@@ -115,4 +116,4 @@ namespace EmbeddedTerminal
     };
 
 } // namespace EmbeddedTerminal
-#endif // ARDUINO
+#endif // ARDUINO || unitTesting
