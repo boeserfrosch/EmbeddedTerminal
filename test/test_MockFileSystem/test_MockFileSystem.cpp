@@ -1,5 +1,5 @@
 #include <unity.h>
-#include "../../test/Mocks/MockFileSystem.h"
+#include "../Mocks/native/MockFileSystem.h"
 
 using namespace EmbeddedTerminal;
 

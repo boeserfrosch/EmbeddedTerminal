@@ -7,7 +7,7 @@
 #include <freertos/timers.h>
 #endif
 #include "OptionParser.h"
-#include "../Mocks/MockFileSystem.h"
+#include "../Mocks/native/MockFileSystem.h"
 #include "../Mocks/CommandRuntimeTestUtils.h"
 #include "DirectoryNavigator.h"
 #include <unity.h>

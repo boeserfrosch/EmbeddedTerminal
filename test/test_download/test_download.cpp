@@ -3,11 +3,11 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/timers.h>
 #endif
-#include "../Mocks/MockFileSystem.h"
+#include "../Mocks/native/MockFileSystem.h"
 #include "../Mocks/CommandRuntimeTestUtils.h"
 #include "commands/download.h"
 #include "StorageSystem.h"
-#include "../Mocks/MockStorageMedia.h"
+#include "../Mocks/native/MockStorageMedia.h"
 
 IStorageSystem *storage = nullptr;
 

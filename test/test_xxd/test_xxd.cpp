@@ -12,7 +12,7 @@
 #include "../Mocks/MockStream.h"
 #include "../Mocks/CommandRuntimeTestUtils.h"
 #include "StorageSystem.h"
-#include "../Mocks/MockStorageMedia.h"
+#include "../Mocks/native/MockStorageMedia.h"
 
 #include <unity.h>
 

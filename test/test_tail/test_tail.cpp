@@ -7,12 +7,12 @@
 #include <freertos/timers.h>
 #endif
 #include "commands/tail.h"
-#include "../Mocks/MockFileSystem.h"
+#include "../Mocks/native/MockFileSystem.h"
 #include "../Mocks/CommandRuntimeTestUtils.h"
 #include "DirectoryNavigator.h"
 #include <unity.h>
 #include "StorageSystem.h"
-#include "../Mocks/MockStorageMedia.h"
+#include "../Mocks/native/MockStorageMedia.h"
 
 IStorageSystem *storage = nullptr;
 DirectoryNavigator *dir = nullptr;

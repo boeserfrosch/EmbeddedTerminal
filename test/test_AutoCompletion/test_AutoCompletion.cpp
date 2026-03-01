@@ -13,7 +13,7 @@
 #include "../Mocks/MockStream.h"
 #include "../Mocks/MockAutoCompleteCommand.h"
 #include "StorageSystem.h"
-#include "../Mocks/MockStorageMedia.h"
+#include "../Mocks/native/MockStorageMedia.h"
 #include <unity.h>
 
 using namespace EmbeddedTerminal;

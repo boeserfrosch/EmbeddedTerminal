@@ -1,5 +1,5 @@
 #include <unity.h>
-#include "../Mocks/MockFile.h"
+#include "../Mocks/native/MockFile.h"
 
 void setUp(void) {}
 void tearDown(void) {}

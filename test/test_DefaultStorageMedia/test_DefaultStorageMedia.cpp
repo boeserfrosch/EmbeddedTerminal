@@ -3,7 +3,7 @@
 #include "hal/common/StorageMediaAdapter.h"
 #include "hal/native/NativeSuggestedStorageMedia.h"
 #include "StorageSystem.h"
-#include "../Mocks/MockFileSystem.h"
+#include "../Mocks/native/MockFileSystem.h"
 
 using namespace EmbeddedTerminal;
 

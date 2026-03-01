@@ -1,7 +1,7 @@
 #include <unity.h>
 #include "interfaces/IStorage.h"
 #include "ETTypes.h"
-#include "../Mocks/MockStorageMedia.h"
+#include "../Mocks/native/MockStorageMedia.h"
 #include "../src/StorageSystem.h"
 
 using namespace EmbeddedTerminal;

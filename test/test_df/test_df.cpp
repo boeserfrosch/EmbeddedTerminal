@@ -8,12 +8,12 @@
 #include <freertos/timers.h>
 #endif
 #include "commands/df.h"
-#include "../Mocks/MockFileSystem.h"
+#include "../Mocks/native/MockFileSystem.h"
 #include "../Mocks/MockStream.h"
 #include "../Mocks/CommandRuntimeTestUtils.h"
 #include "DirectoryNavigator.h"
 #include "StorageSystem.h"
-#include "../Mocks/MockStorageMedia.h"
+#include "../Mocks/native/MockStorageMedia.h"
 
 using namespace EmbeddedTerminal;
 IStorageSystem *storage = nullptr;

@@ -11,7 +11,7 @@
 #include "../src/DirectoryNavigator.h"
 #include "../src/interfaces/IFileSystem.h"
 #include "../src/ETFile.h"
-#include "../Mocks/MockStorageMedia.h"
+#include "../Mocks/native/MockStorageMedia.h"
 #include "StorageSystem.h"
 
 using namespace EmbeddedTerminal;

@@ -12,11 +12,11 @@
 #include "../src/Terminal.h"
 #include "../src/DirectoryNavigator.h"
 #include "../Mocks/MockStream.h"
-#include "../Mocks/MockFileSystem.h"
+#include "../Mocks/native/MockFileSystem.h"
 #include "../Mocks/MockNetworkInterface.h"
 #include "../Mocks/MockNetworkSystem.h"
 #include "StorageSystem.h"
-#include "../Mocks/MockStorageMedia.h"
+#include "../Mocks/native/MockStorageMedia.h"
 
 using namespace EmbeddedTerminal;
 
