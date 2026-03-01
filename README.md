@@ -11,9 +11,9 @@ The Readme is partially generated using AI but was proven to be inaccurate in so
 - ✅ **Platform Independent**: Works on Arduino, ESP32 (ESP-IDF & Arduino), and native environments
 - ✅ **Command System**: Register and execute custom commands with keyword-based parsing
 - ✅ **Command Runtime v2 (Preview)**: Stream-oriented command execution path with exit-code support
-- ✅ **File System Abstraction**: Unified interface for different file systems (SPIFFS, SD, LittleFS, Native)
+- ✅ **Storage System Abstraction**: Unified mountable storage model via `IStorageSystem` + `IStorageMedia`
 - ✅ **Built-in Commands**: cat, cd, ls, mkdir, rm, rmdir, df, tail, help, ip, download
-- ✅ **Network Interface**: Abstract network interface for displaying connection information
+- ✅ **Network System**: Supports single or multiple interfaces through `INetworkSystem`
 - ✅ **Cross-Platform String Handling**: Custom `ETString` class works across all platforms
 - ✅ **Directory Navigation**: Full path traversal and manipulation
 - ✅ **Comprehensive Testing**: Mock implementations and test suites included
@@ -53,15 +53,36 @@ lib_deps =
 ```cpp
 #include <Terminal.h>
 #include <BuiltinCommandFactory.h>
+#include <StorageSystem.h>
+#include <interfaces/IStorage.h>
 #include <hal/ArduinoFileSystem.h>
 
-ArduinoFileSystem fs;
-DirectoryNavigator nav(&fs);
+class ExampleStorageMedia : public IStorageMedia {
+public:
+    ExampleStorageMedia(const ETString &name, IFileSystem *fs) : name_(name), fs_(fs) {}
+    const char *name() const override { return name_.c_str(); }
+    IFileSystem *fileSystem() override { return fs_; }
+    bool isAvailable() const override { return true; }
+    unsigned long long totalBytes() const override { return 0; }
+    unsigned long long usedBytes() const override { return 0; }
+    unsigned long long capacity() const override { return 0; }
+    unsigned long long freeBytes() const override { return 0; }
+private:
+    ETString name_;
+    IFileSystem *fs_;
+};
+
+ArduinoFileSystem fs(SD);
+StorageSystem storage;
+ExampleStorageMedia media("default", &fs);
+DirectoryNavigator nav(&storage);
 Terminal term(Serial);
 BuiltinCommandFactory factory;
 
 void setup() {
     Serial.begin(115200);
+    SD.begin();
+    storage.mountMedia(&media, "");
     
     // Register all built-in commands using factory
     factory.registerAllCommands(term, nav, nullptr);
@@ -95,8 +116,8 @@ void setup() {
     // Register disk usage command
     factory.registerDiskCommands(term, nav);
     
-    // Register network commands (requires INetworkInterface)
-    // factory.registerNetworkCommands(term, networkInterface);
+    // Register network commands (requires INetworkSystem)
+    // factory.registerNetworkCommands(term, networkSystem);
     
     // Register help command
     factory.registerHelpCommand(term);
@@ -113,20 +134,45 @@ void setup() {
 ```cpp
 #include <Terminal.h>
 #include <BuiltinCommandFactory.h>
+#include <StorageSystem.h>
+#include <interfaces/IStorage.h>
+#include <interfaces/INetworkInterface.h>
 #include <hal/ESPNetworkInterface.h>
 
-ArduinoFileSystem fs;
-DirectoryNavigator nav(&fs);
+class SingleNetworkSystem : public INetworkSystem {
+public:
+    SingleNetworkSystem(const ETString &name, INetworkInterface &iface) : name_(name), iface_(&iface) {}
+    ETVector<INetworkInterface *> interfaces() const override { return ETVector<INetworkInterface *>{iface_}; }
+    INetworkInterface *getInterface(const ETString &name) const override { return name == name_ ? iface_ : nullptr; }
+    bool addInterface(const ETString &, INetworkInterface *) override { return false; }
+    bool removeInterface(const ETString &) override { return false; }
+    ETString ping(const ETString &interfaceName, const ETString &target) override {
+        auto *iface = getInterface(interfaceName);
+        return iface ? iface->ping(target) : "Unknown interface\n";
+    }
+    ETString ping(const ETString &target) override { return iface_->ping(target); }
+private:
+    ETString name_;
+    INetworkInterface *iface_;
+};
+
+ArduinoFileSystem fs(SPIFFS);
+StorageSystem storage;
+DirectoryNavigator nav(&storage);
 ESPNetworkInterface netInterface;
+SingleNetworkSystem netSystem("wlan0", netInterface);
 Terminal term(Serial);
 BuiltinCommandFactory factory;
 
 void setup() {
     Serial.begin(115200);
     WiFi.begin("SSID", "password");
+    SPIFFS.begin(true);
+    // mount storage media before using DirectoryNavigator-backed commands
+    // (see examples for a complete IStorageMedia implementation)
     
     // Register all commands including network
-    factory.registerAllCommands(term, nav, &netInterface);
+    factory.registerAllCommands(term, nav, netSystem);
     
     Serial.println("Terminal ready! Type 'help' for available commands.");
     Serial.print("> ");
@@ -145,18 +191,33 @@ void loop() {
 #include <Terminal.h>
 #include <interfaces/ICommand.h>
 #include <DirectoryNavigator.h>
+#include <StorageSystem.h>
+#include <interfaces/IStorage.h>
 
-// Platform-specific file system
 #if defined(ESP32)
-#include <hal/SDMMCFileSystem.h>
-SDMMCFileSystem fs;
-#elif defined(ARDUINO)
+#include <SPIFFS.h>
 #include <hal/ArduinoFileSystem.h>
-ArduinoFileSystem fs;
+ArduinoFileSystem fs(SPIFFS);
 #else
-#include <hal/NativeFileSystem.h>
-NativeFileSystem fs;
+#include <SD.h>
+#include <hal/ArduinoFileSystem.h>
+ArduinoFileSystem fs(SD);
 #endif
+
+class ExampleStorageMedia : public IStorageMedia {
+public:
+    ExampleStorageMedia(const ETString &name, IFileSystem *fs) : name_(name), fs_(fs) {}
+    const char *name() const override { return name_.c_str(); }
+    IFileSystem *fileSystem() override { return fs_; }
+    bool isAvailable() const override { return true; }
+    unsigned long long totalBytes() const override { return 0; }
+    unsigned long long usedBytes() const override { return 0; }
+    unsigned long long capacity() const override { return 0; }
+    unsigned long long freeBytes() const override { return 0; }
+private:
+    ETString name_;
+    IFileSystem *fs_;
+};
 
 class MyCommand : public ICommand {
 public:
@@ -169,12 +230,15 @@ public:
     }
 };
 
-DirectoryNavigator nav(&fs);
+StorageSystem storage;
+ExampleStorageMedia media("default", &fs);
+DirectoryNavigator nav(&storage);
 MyCommand myCmd;
 Terminal term(Serial);
 
 void setup() {
     Serial.begin(115200);
+    storage.mountMedia(&media, "");
     
     // Register custom command
     term.registerCommand("mycmd", &myCmd);
@@ -237,7 +301,7 @@ If only one match, auto-completes immediately:
 
 #### Adding Auto Completion to Custom Commands
 
-To add auto completion to your custom command, implement the `IAutoCompleter` interface:
+To add auto completion to your custom command, override `getSuggestions(...)` from `ICommand`:
 
 ```cpp
 #include <Terminal.h>
@@ -339,13 +403,13 @@ Factory class for creating and managing built-in commands.
 class BuiltinCommandFactory {
 public:
     // Register all built-in commands
-    void registerAllCommands(Terminal &term, DirectoryNavigator &nav, INetworkInterface *net);
+    void registerAllCommands(Terminal &term, DirectoryNavigator &nav, INetworkSystem &net);
     
     // Register command categories
     void registerFilesystemCommands(Terminal &term, DirectoryNavigator &nav);
     void registerFilesystemCommands(Terminal &term, DirectoryNavigator &nav, uint16_t flags);
     void registerDiskCommands(Terminal &term, DirectoryNavigator &nav);
-    void registerNetworkCommands(Terminal &term, INetworkInterface &net);
+    void registerNetworkCommands(Terminal &term, INetworkSystem &net);
     void registerHelpCommand(Terminal &term);
     
     // Deregister all commands
@@ -405,14 +469,35 @@ public:
 ### File System Integration
 
 ```cpp
-#include <hal/NativeFileSystem.h>  // Or ArduinoFileSystem, SDMMCFileSystem
+#include <hal/NativeFileSystem.h>
+#include <StorageSystem.h>
+#include <interfaces/IStorage.h>
 #include <DirectoryNavigator.h>
 
 NativeFileSystem fs;
-DirectoryNavigator nav(&fs);
+StorageSystem storage;
 
-// Access filesystem from navigator
-IFileSystem* fsPtr = nav.getFileSystem();
+// Provide a media wrapper around your filesystem implementation
+class NativeStorageMedia : public IStorageMedia {
+public:
+    explicit NativeStorageMedia(IFileSystem *fs) : fs_(fs) {}
+    const char *name() const override { return "native"; }
+    IFileSystem *fileSystem() override { return fs_; }
+    bool isAvailable() const override { return true; }
+    unsigned long long totalBytes() const override { return 0; }
+    unsigned long long usedBytes() const override { return 0; }
+    unsigned long long capacity() const override { return 0; }
+    unsigned long long freeBytes() const override { return 0; }
+private:
+    IFileSystem *fs_;
+};
+
+NativeStorageMedia media(&fs);
+storage.mountMedia(&media, "");
+DirectoryNavigator nav(&storage);
+
+// Access storage system from navigator
+IStorageSystem* storagePtr = nav.getStorageSystem();
 ```
 
 ### Network Interface
@@ -421,9 +506,10 @@ IFileSystem* fsPtr = nav.getFileSystem();
 #include <hal/ESPNetworkInterface.h>  // ESP32 WiFi/Ethernet
 
 ESPNetworkInterface netInterface;
+// Wrap one or more interfaces into an INetworkSystem implementation.
 
 // Use with network commands
-factory.registerNetworkCommands(term, netInterface);
+factory.registerNetworkCommands(term, networkSystem);
 ```
 
 ### ICommand Interface
@@ -461,17 +547,14 @@ public:
 ```cpp
 class IFileSystem {
 public:
-    virtual bool exists(const char *path) = 0;
-    virtual bool mkdir(const char *path) = 0;
-    virtual bool rmdir(const char *path) = 0;
-    virtual bool remove(const char *path) = 0;
-    virtual ETVector<ETString> list(const char *path) const = 0;
-    virtual ETFile open(const char *path, const char *mode = "r", bool create = false) = 0;
-    virtual bool isDirectory(const char *path) = 0;
-    virtual bool isEmpty(const char *path) = 0;
-    virtual unsigned long long capacity() const = 0;
-    virtual unsigned long long totalBytes() const = 0;
-    virtual unsigned long long usedBytes() const = 0;
+    virtual ETFile open(const Path &path, const char *mode = FILE_MODE_READ, const bool create = false) = 0;
+    virtual bool exists(const Path &path) = 0;
+    virtual bool isDirectory(const Path &path) = 0;
+    virtual bool isEmpty(const Path &path) = 0;
+    virtual bool remove(const Path &path) = 0;
+    virtual bool mkdir(const Path &path) = 0;
+    virtual bool rmdir(const Path &path) = 0;
+    virtual ETVector<Path> list(const Path &path, const ETString &prefix = "") const = 0;
 };
 ```
 
@@ -494,12 +577,14 @@ EmbeddedTerminal/
 │   │   ├── ICommand.h
 │   │   ├── IFile.h
 │   │   ├── IFileSystem.h
+│   │   ├── IStorage.h
+│   │   ├── IDirectoryNavigator.h
 │   │   ├── ITerminalStream.h
 │   │   └── INetworkInterface.h
 │   └── hal/                     # Hardware abstraction
 │       ├── NativeFileSystem.h
 │       ├── ArduinoFileSystem.h
-│       └── SDMMCFileSystem.h
+│       └── ESPIDFFileSystem.h
 ├── test/                        # Unit tests
 ├── examples/                    # Example sketches
 └── library.json                 # PlatformIO metadata
