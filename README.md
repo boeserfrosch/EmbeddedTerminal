@@ -500,6 +500,40 @@ DirectoryNavigator nav(&storage);
 IStorageSystem* storagePtr = nav.getStorageSystem();
 ```
 
+### Default Storage Media (New)
+
+The library now provides ready-to-use storage media wrappers, split by platform:
+
+- [src/hal/StorageMediaAdapter.h](src/hal/StorageMediaAdapter.h): generic adapter for custom file systems
+- [src/hal/ArduinoSDMMCStorageMedia.h](src/hal/ArduinoSDMMCStorageMedia.h): Arduino ESP32 default using `SD_MMC`
+- [src/hal/ESPIDFSDMMCStorageMedia.h](src/hal/ESPIDFSDMMCStorageMedia.h): ESP-IDF default using an SD_MMC mount point (default `/sdcard`)
+- [src/hal/NativeSuggestedStorageMedia.h](src/hal/NativeSuggestedStorageMedia.h): native suggested default backed by `NativeFileSystem`
+
+You can include all of them through [src/hal/DefaultStorageMedia.h](src/hal/DefaultStorageMedia.h).
+
+```cpp
+#include <StorageSystem.h>
+#include <hal/DefaultStorageMedia.h>
+
+StorageSystem storage;
+
+#if defined(ARDUINO) && defined(ESP32)
+ArduinoSDMMCStorageMedia media;
+media.begin();
+storage.mountMedia(&media, "");
+#elif defined(ESP_PLATFORM) || defined(ESP_32)
+ESPIDFSDMMCStorageMedia media("sdmmc", "/sdcard");
+storage.mountMedia(&media, "");
+#else
+NativeSuggestedStorageMedia media("native", ".");
+storage.mountMedia(&media, "");
+#endif
+
+DirectoryNavigator nav(&storage);
+```
+
+> **See also:** [examples/DefaultStorageMedia/DefaultStorageMedia.ino](examples/DefaultStorageMedia/DefaultStorageMedia.ino)
+
 ### Network Interface
 
 ```cpp
