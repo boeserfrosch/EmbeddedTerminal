@@ -152,4 +152,6 @@ unity-app/
 dependencies/
 .pio/libdeps/
 
-.github/
+.github/*
+!.github/workflows/
+!.github/workflows/**
