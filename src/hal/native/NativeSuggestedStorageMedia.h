@@ -2,8 +2,8 @@
 
 #if defined(__cplusplus) && __cplusplus >= 201703L
 
-#include "../interfaces/IStorage.h"
-#include "NativeFileSystem.h"
+#include "interfaces/IStorage.h"
+#include "hal/native/NativeFileSystem.h"
 #include <filesystem>
 
 namespace EmbeddedTerminal

@@ -42,17 +42,17 @@
 // Platform-specific file system
 #if defined(ESP32)
 #include <SPIFFS.h>
-#include <hal/ArduinoFileSystem.h>
-#include <hal/ESPNetworkInterface.h>
+#include <hal/arduino/ArduinoFileSystem.h>
+#include <hal/espidf/ESPNetworkInterface.h>
 ArduinoFileSystem fileSystem(SPIFFS);
 ESPNetworkInterface networkInterface;
 #elif defined(ARDUINO)
-#include <hal/ArduinoFileSystem.h>
+#include <hal/arduino/ArduinoFileSystem.h>
 #include <SD.h>
 ArduinoFileSystem fileSystem(SD);
 // Note: Network interface not available on basic Arduino
 #else
-#include <hal/NativeFileSystem.h>
+#include <hal/native/NativeFileSystem.h>
 NativeFileSystem fileSystem;
 #endif
 

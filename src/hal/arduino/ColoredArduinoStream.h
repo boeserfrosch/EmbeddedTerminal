@@ -3,7 +3,7 @@
 
 #if defined(ARDUINO) || defined(ESP_PLATFORM)
 
-#include "ArduinoStream.h"
+#include "hal/arduino/ArduinoStream.h"
 
 namespace EmbeddedTerminal
 {
@@ -17,10 +17,8 @@ namespace EmbeddedTerminal
         {
             if (channel == TerminalChannel::StdErr)
             {
-                // ANSI escape code for red text
                 print("\033[31m");
                 print(s);
-                // Reset color
                 print("\033[0m");
             }
             else

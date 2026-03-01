@@ -31,10 +31,10 @@
 // Use appropriate file system for your platform
 #if defined(ESP32)
 #include <SPIFFS.h>
-#include <hal/ArduinoFileSystem.h>
+#include <hal/arduino/ArduinoFileSystem.h>
 ArduinoFileSystem fileSystem(SPIFFS);
 #else
-#include <hal/ArduinoFileSystem.h>
+#include <hal/arduino/ArduinoFileSystem.h>
 #include <SD.h>
 ArduinoFileSystem fileSystem(SD);
 #endif

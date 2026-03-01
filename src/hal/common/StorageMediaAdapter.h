@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../interfaces/IStorage.h"
+#include "interfaces/IStorage.h"
 
 namespace EmbeddedTerminal
 {

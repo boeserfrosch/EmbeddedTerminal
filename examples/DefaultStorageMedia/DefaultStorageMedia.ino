@@ -11,7 +11,7 @@
 #include <BuiltinCommandFactory.h>
 #include <DirectoryNavigator.h>
 #include <StorageSystem.h>
-#include <hal/DefaultStorageMedia.h>
+#include <hal/common/DefaultStorageMedia.h>
 
 using namespace EmbeddedTerminal;
 

@@ -16,7 +16,7 @@
 #include <BuiltinCommandFactory.h>
 #include <interfaces/ICommand.h>
 #include <interfaces/IStorage.h>
-#include <hal/ArduinoFileSystem.h>
+#include <hal/arduino/ArduinoFileSystem.h>
 
 #if defined(ESP32)
 #include <SPIFFS.h>
@@ -25,7 +25,7 @@ ArduinoFileSystem fileSystem(SPIFFS);
 #include <SD.h>
 ArduinoFileSystem fileSystem(SD);
 #else
-#include <hal/NativeFileSystem.h>
+#include <hal/native/NativeFileSystem.h>
 NativeFileSystem fileSystem;
 #endif
 

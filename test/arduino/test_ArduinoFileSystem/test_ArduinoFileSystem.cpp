@@ -1,5 +1,5 @@
 #include <unity.h>
-#include "hal/ArduinoFileSystem.h"
+#include "hal/arduino/ArduinoFileSystem.h"
 #include "../../Mocks/MockArduinoFS.h"
 
 using namespace EmbeddedTerminal;

@@ -3,7 +3,7 @@
 
 #if defined(__cplusplus) && __cplusplus >= 201703L
 
-#include "NativeFile.h"
+#include "hal/native/NativeFile.h"
 #include "interfaces/IFileSystem.h"
 
 #include <cstdio>
@@ -22,10 +22,8 @@ namespace EmbeddedTerminal
         {
             if (create)
             {
-                // Ensure parent directories exist
                 fs::path fsPath(path.c_str());
                 fs::create_directories(fsPath.parent_path());
-                // Create the file if it doesn't exist
                 std::ofstream ofs(fsPath, std::ios::app);
                 ofs.close();
             }
@@ -38,7 +36,7 @@ namespace EmbeddedTerminal
             else if (strcmp(mode, "a") == 0)
                 openMode = std::ios::out | std::ios::app;
             else
-                return ETFile(); // Invalid mode
+                return ETFile();
 
             return ETFile(std::make_shared<NativeFile>(std::fstream(path.c_str(), openMode), false));
         }

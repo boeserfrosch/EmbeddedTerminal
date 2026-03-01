@@ -42,8 +42,8 @@
 #if defined(ESP32)
 #include <WiFi.h>
 #include <SPIFFS.h>
-#include <hal/ArduinoFileSystem.h>
-#include <hal/ESPNetworkInterface.h>
+#include <hal/arduino/ArduinoFileSystem.h>
+#include <hal/espidf/ESPNetworkInterface.h>
 
 // WiFi credentials - UPDATE THESE!
 const char *ssid = "SSID";

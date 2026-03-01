@@ -78,14 +78,6 @@ namespace EmbeddedTerminal
             file_.close();
         }
 
-        // ETString name() const override
-        // {
-        //     Path path = Path(file_.path());
-        //     return path.getName();
-        // }
-
-        // Path path() const override { return Path(file_.path()); }
-
         bool isDirectory() const override
         {
             auto f = file_;

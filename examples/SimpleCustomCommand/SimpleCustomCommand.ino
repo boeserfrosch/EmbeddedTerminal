@@ -25,7 +25,7 @@
 #include <interfaces/ICommand.h>
 #include <DirectoryNavigator.h>
 #include <StorageSystem.h>
-#include <hal/DefaultStorageMedia.h>
+#include <hal/common/DefaultStorageMedia.h>
 
 // Platform-specific file system
 #if defined(ARDUINO) && defined(ESP32)

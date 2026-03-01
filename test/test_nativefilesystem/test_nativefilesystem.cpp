@@ -11,8 +11,8 @@
 
 #include <algorithm>
 
-#include "hal/NativeFile.h"
-#include "hal/NativeFileSystem.h"
+#include "hal/native/NativeFile.h"
+#include "hal/native/NativeFileSystem.h"
 
 using namespace EmbeddedTerminal;
 

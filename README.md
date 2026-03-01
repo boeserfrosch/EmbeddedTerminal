@@ -55,7 +55,7 @@ lib_deps =
 #include <BuiltinCommandFactory.h>
 #include <StorageSystem.h>
 #include <interfaces/IStorage.h>
-#include <hal/ArduinoFileSystem.h>
+#include <hal/arduino/ArduinoFileSystem.h>
 
 class ExampleStorageMedia : public IStorageMedia {
 public:
@@ -137,7 +137,7 @@ void setup() {
 #include <StorageSystem.h>
 #include <interfaces/IStorage.h>
 #include <interfaces/INetworkInterface.h>
-#include <hal/ESPNetworkInterface.h>
+#include <hal/espidf/ESPNetworkInterface.h>
 
 class SingleNetworkSystem : public INetworkSystem {
 public:
@@ -196,11 +196,11 @@ void loop() {
 
 #if defined(ESP32)
 #include <SPIFFS.h>
-#include <hal/ArduinoFileSystem.h>
+#include <hal/arduino/ArduinoFileSystem.h>
 ArduinoFileSystem fs(SPIFFS);
 #else
 #include <SD.h>
-#include <hal/ArduinoFileSystem.h>
+#include <hal/arduino/ArduinoFileSystem.h>
 ArduinoFileSystem fs(SD);
 #endif
 
@@ -469,7 +469,7 @@ public:
 ### File System Integration
 
 ```cpp
-#include <hal/NativeFileSystem.h>
+#include <hal/native/NativeFileSystem.h>
 #include <StorageSystem.h>
 #include <interfaces/IStorage.h>
 #include <DirectoryNavigator.h>
@@ -504,16 +504,16 @@ IStorageSystem* storagePtr = nav.getStorageSystem();
 
 The library now provides ready-to-use storage media wrappers, split by platform:
 
-- [src/hal/StorageMediaAdapter.h](src/hal/StorageMediaAdapter.h): generic adapter for custom file systems
-- [src/hal/ArduinoSDMMCStorageMedia.h](src/hal/ArduinoSDMMCStorageMedia.h): Arduino ESP32 default using `SD_MMC`
-- [src/hal/ESPIDFSDMMCStorageMedia.h](src/hal/ESPIDFSDMMCStorageMedia.h): ESP-IDF default using an SD_MMC mount point (default `/sdcard`)
-- [src/hal/NativeSuggestedStorageMedia.h](src/hal/NativeSuggestedStorageMedia.h): native suggested default backed by `NativeFileSystem`
+- [src/hal/common/StorageMediaAdapter.h](src/hal/common/StorageMediaAdapter.h): generic adapter for custom file systems
+- [src/hal/arduino/ArduinoSDMMCStorageMedia.h](src/hal/arduino/ArduinoSDMMCStorageMedia.h): Arduino ESP32 default using `SD_MMC`
+- [src/hal/espidf/ESPIDFSDMMCStorageMedia.h](src/hal/espidf/ESPIDFSDMMCStorageMedia.h): ESP-IDF default using an SD_MMC mount point (default `/sdcard`)
+- [src/hal/native/NativeSuggestedStorageMedia.h](src/hal/native/NativeSuggestedStorageMedia.h): native suggested default backed by `NativeFileSystem`
 
-You can include all of them through [src/hal/DefaultStorageMedia.h](src/hal/DefaultStorageMedia.h).
+You can include all of them through [src/hal/common/DefaultStorageMedia.h](src/hal/common/DefaultStorageMedia.h).
 
 ```cpp
 #include <StorageSystem.h>
-#include <hal/DefaultStorageMedia.h>
+#include <hal/common/DefaultStorageMedia.h>
 
 StorageSystem storage;
 
@@ -537,7 +537,7 @@ DirectoryNavigator nav(&storage);
 ### Network Interface
 
 ```cpp
-#include <hal/ESPNetworkInterface.h>  // ESP32 WiFi/Ethernet
+#include <hal/espidf/ESPNetworkInterface.h>  // ESP32 WiFi/Ethernet
 
 ESPNetworkInterface netInterface;
 // Wrap one or more interfaces into an INetworkSystem implementation.

@@ -1,5 +1,5 @@
 #pragma once
-#if defined(ESP_PLATFORM) || defined(ESP_32)
+#if defined(ESP_PLATFORM) || defined(ESP32) || defined(ESP_32)
 #include "interfaces/IFile.h"
 #include <memory>
 #include <cstdio>
@@ -110,17 +110,8 @@ namespace EmbeddedTerminal
             }
         }
 
-        // ETString name() const override
-        // {
-        //     // Not portable: just return empty string
-        //     return ETString();
-        // }
-
-        // Path path() const override { return Path(); }
-
         bool isDirectory() const override
         {
-            // Not supported for FILE*
             return false;
         }
 
@@ -133,4 +124,4 @@ namespace EmbeddedTerminal
         FILE *file_;
     };
 }
-#endif // ESP_PLATFORM || ESP_32
+#endif // ESP_PLATFORM || ESP32 || ESP_32

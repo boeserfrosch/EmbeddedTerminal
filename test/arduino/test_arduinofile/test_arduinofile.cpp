@@ -3,7 +3,7 @@
 #endif
 #include <unity.h>
 
-#include "../src/hal/ArduinoFile.h"
+#include "hal/arduino/ArduinoFile.h"
 #include "../test/utils/SD.h"
 
 #if defined(ARDUINO)

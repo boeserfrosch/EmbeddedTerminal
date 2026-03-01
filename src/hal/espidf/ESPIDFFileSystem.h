@@ -1,7 +1,7 @@
 #pragma once
-#if defined(ESP_PLATFORM) || defined(ESP_32)
+#if defined(ESP_PLATFORM) || defined(ESP32) || defined(ESP_32)
 #include "interfaces/IFileSystem.h"
-#include "hal/ESPIDFFile.h"
+#include "hal/espidf/ESPIDFFile.h"
 #include <sys/stat.h>
 #include <dirent.h>
 #include <cstdio>
@@ -141,7 +141,7 @@ namespace EmbeddedTerminal
         {
             Path p = path;
             if (p.isAbsolute())
-                p = Path(".") + p; // Make it relative to mount point
+                p = Path(".") + p;
 
             Path full_path = mount_point_ + p;
             return full_path;

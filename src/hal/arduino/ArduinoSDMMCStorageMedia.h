@@ -2,8 +2,8 @@
 
 #if defined(ARDUINO) && defined(ESP32)
 
-#include "../interfaces/IStorage.h"
-#include "ArduinoFileSystem.h"
+#include "interfaces/IStorage.h"
+#include "hal/arduino/ArduinoFileSystem.h"
 #include <SD_MMC.h>
 
 namespace EmbeddedTerminal

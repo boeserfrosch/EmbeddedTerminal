@@ -10,7 +10,7 @@
 
 #if defined(ARDUINO)
 #include <Arduino.h>
-#include "hal/ArduinoStream.h"
+#include "hal/arduino/ArduinoStream.h"
 #endif
 
 namespace EmbeddedTerminal

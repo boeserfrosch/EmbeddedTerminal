@@ -1,7 +1,7 @@
 #include <unity.h>
 
-#include "hal/StorageMediaAdapter.h"
-#include "hal/NativeSuggestedStorageMedia.h"
+#include "hal/common/StorageMediaAdapter.h"
+#include "hal/native/NativeSuggestedStorageMedia.h"
 #include "StorageSystem.h"
 #include "../Mocks/MockFileSystem.h"
 

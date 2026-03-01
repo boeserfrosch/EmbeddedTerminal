@@ -96,7 +96,7 @@ public:
     virtual ETString ping(const ETString &target) = 0;  // Pure interface
 };
 
-// In hal/ESPNetworkInterface.h - Arduino implementation
+// In hal/espidf/ESPNetworkInterface.h - Arduino implementation
 class ESPNetworkInterface : public INetworkInterface {
     ETString ping(const ETString &target) override {
         IPAddress ip;

@@ -1,9 +1,9 @@
 #pragma once
 
-#if defined(ESP_PLATFORM) || defined(ESP_32)
+#if defined(ESP_PLATFORM) || defined(ESP32) || defined(ESP_32)
 
-#include "../interfaces/IStorage.h"
-#include "ESPIDFFileSystem.h"
+#include "interfaces/IStorage.h"
+#include "hal/espidf/ESPIDFFileSystem.h"
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 

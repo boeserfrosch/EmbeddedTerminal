@@ -31,7 +31,7 @@
 #include <DirectoryNavigator.h>
 #include <StorageSystem.h>
 #include <interfaces/IStorage.h>
-#include <hal/ArduinoFileSystem.h>
+#include <hal/arduino/ArduinoFileSystem.h>
 
 // Platform-specific file system
 #if defined(ESP32)
@@ -41,7 +41,7 @@ ArduinoFileSystem fileSystem(SPIFFS);
 #include <SD.h>
 ArduinoFileSystem fileSystem(SD);
 #else
-#include <hal/NativeFileSystem.h>
+#include <hal/native/NativeFileSystem.h>
 NativeFileSystem fileSystem;
 #endif
 

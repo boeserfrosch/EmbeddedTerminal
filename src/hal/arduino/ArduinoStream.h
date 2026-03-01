@@ -4,8 +4,8 @@
 #if defined(ARDUINO) || defined(ESP_PLATFORM)
 
 #include <Arduino.h>
-#include "../interfaces/ITerminalStream.h"
-#include "../ETTypes.h"
+#include "interfaces/ITerminalStream.h"
+#include "ETTypes.h"
 
 namespace EmbeddedTerminal
 {
@@ -50,7 +50,7 @@ namespace EmbeddedTerminal
 
         void printTo(TerminalChannel channel, const ETString &s) override
         {
-            (void)channel; // Ignoring channel for Arduino Stream
+            (void)channel;
             print(s);
         }
 

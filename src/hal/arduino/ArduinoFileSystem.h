@@ -1,7 +1,7 @@
 #pragma once
 #ifdef ARDUINO
 #include "interfaces/IFileSystem.h"
-#include "hal/ArduinoFile.h"
+#include "hal/arduino/ArduinoFile.h"
 #include <FS.h>
 
 namespace EmbeddedTerminal
@@ -19,17 +19,14 @@ namespace EmbeddedTerminal
                 return ETFile();
 
             File f;
-            // map modes r/w/a to Arduino mode strings
             if (strcmp(mode, FILE_MODE_READ) == 0)
             {
                 f = mount_->open(path, "r");
             }
             else if (strcmp(mode, FILE_MODE_WRITE) == 0)
             {
-                // create/truncate
                 if (create)
                 {
-                    // open for write (create)
                     f = mount_->open(path, "w");
                 }
                 else
@@ -72,13 +69,11 @@ namespace EmbeddedTerminal
             File dir = mount_->open(path);
             if (!dir || !dir.isDirectory())
             {
-                // if file, empty if size==0
                 File f = mount_->open(path);
                 bool r = (f && f.size() == 0);
                 f.close();
                 return r;
             }
-            // directory: check first entry
             File entry = dir.openNextFile();
             bool empty = !entry;
             if (entry)
