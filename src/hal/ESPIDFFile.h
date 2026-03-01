@@ -64,23 +64,6 @@ namespace EmbeddedTerminal
                 result += buf;
             }
             return result;
-
-            // if (!file_)
-            //     return ETString();
-            // fseek(file_, 0, SEEK_SET);
-            // ETString out;
-            // size_t bufferSize = 128;
-            // char buf[bufferSize];
-            // size_t n;
-            // while ((n = fread(buf, 1, bufferSize - 1, file_)) > 0)
-            // {
-            //     if (n < bufferSize - 1)
-            //     {
-            //         buf[n] = '\0';
-            //     }
-            //     out += ETString(buf);
-            // }
-            // return out;
         }
 
         bool writeAll(const ETString &content) override
@@ -127,13 +110,13 @@ namespace EmbeddedTerminal
             }
         }
 
-        ETString name() const override
-        {
-            // Not portable: just return empty string
-            return ETString();
-        }
+        // ETString name() const override
+        // {
+        //     // Not portable: just return empty string
+        //     return ETString();
+        // }
 
-        ETString path() const override { return ETString(); }
+        // Path path() const override { return Path(); }
 
         bool isDirectory() const override
         {

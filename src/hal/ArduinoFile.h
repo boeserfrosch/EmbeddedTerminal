@@ -78,17 +78,13 @@ namespace EmbeddedTerminal
             file_.close();
         }
 
-        ETString name() const override
-        {
-            ETString path = file_.path();
-            // find the last forward‐ or back‐slash
-            size_t pos = max(path.find_last_of("/\\"), path.find_last_of("\\/"));
+        // ETString name() const override
+        // {
+        //     Path path = Path(file_.path());
+        //     return path.getName();
+        // }
 
-            pos = (pos == ETString::npos) ? 0 : pos + 1; // if no slash found, start from beginning
-            return path.substr(pos);
-        }
-
-        ETString path() const override { return file_.path(); }
+        // Path path() const override { return Path(file_.path()); }
 
         bool isDirectory() const override
         {

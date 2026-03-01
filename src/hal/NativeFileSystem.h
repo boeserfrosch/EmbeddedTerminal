@@ -1,7 +1,7 @@
 #ifndef NATIVE_FILE_SYSTEM_H
 #define NATIVE_FILE_SYSTEM_H
 
-#if __cplusplus >= 201703L
+#if defined(__cplusplus) && __cplusplus >= 201703L
 
 #include "NativeFile.h"
 #include "interfaces/IFileSystem.h"
@@ -18,98 +18,83 @@ namespace EmbeddedTerminal
     class NativeFileSystem : public IFileSystem
     {
     public:
-        ETFile open(const char *path, const char *mode = FILE_MODE_READ, const bool create = false) override
+        ETFile open(const Path &path, const char *mode = FILE_MODE_READ, const bool create = false) override
         {
-            return ETFile(std::make_shared<NativeFile>(path, mode, create));
+            if (create)
+            {
+                // Ensure parent directories exist
+                fs::path fsPath(path.c_str());
+                fs::create_directories(fsPath.parent_path());
+                // Create the file if it doesn't exist
+                std::ofstream ofs(fsPath, std::ios::app);
+                ofs.close();
+            }
+
+            auto openMode = std::ios::in;
+            if (strcmp(mode, FILE_MODE_READ) == 0)
+                openMode = std::ios::in;
+            else if (strcmp(mode, "w") == 0)
+                openMode = std::ios::out | std::ios::trunc;
+            else if (strcmp(mode, "a") == 0)
+                openMode = std::ios::out | std::ios::app;
+            else
+                return ETFile(); // Invalid mode
+
+            return ETFile(std::make_shared<NativeFile>(std::fstream(path.c_str(), openMode), false));
         }
 
-        bool exists(const char *path) override
+        bool exists(const Path &path) override
         {
-            return std::filesystem::exists(path);
+            return std::filesystem::exists(path.c_str());
         }
 
-        bool isDirectory(const char *path) override
+        bool isDirectory(const Path &path) override
         {
-            return std::filesystem::is_directory(path);
+            return std::filesystem::is_directory(path.c_str());
         }
 
-        bool isEmpty(const char *path) override
+        bool isEmpty(const Path &path) override
         {
-            if (!std::filesystem::exists(path))
+            if (!std::filesystem::exists(path.c_str()))
                 return true;
-            if (std::filesystem::is_regular_file(path))
-                return std::filesystem::file_size(path) == 0;
-            if (std::filesystem::is_directory(path))
-                return std::filesystem::is_empty(path);
+            if (std::filesystem::is_regular_file(path.c_str()))
+                return std::filesystem::file_size(path.c_str()) == 0;
+            if (std::filesystem::is_directory(path.c_str()))
+                return std::filesystem::is_empty(path.c_str());
             return true;
         }
 
-        bool remove(const char *path) override
+        bool remove(const Path &path) override
         {
-            return std::filesystem::remove(path);
+            return std::filesystem::remove(path.c_str());
         }
 
-        bool mkdir(const char *path) override
+        bool mkdir(const Path &path) override
         {
-            return std::filesystem::create_directories(path);
+            return std::filesystem::create_directories(path.c_str());
         }
 
-        bool rmdir(const char *path) override
+        bool rmdir(const Path &path) override
         {
-            return std::filesystem::remove_all(path) > 0;
+            return std::filesystem::remove_all(path.c_str()) > 0;
         }
 
-        ETVector<ETString> list(const char *path) const override
+        ETVector<Path> list(const Path &path, const ETString &prefix = "") const override
         {
-            ETVector<ETString> result;
-            if (!std::filesystem::exists(path) || !std::filesystem::is_directory(path))
+            ETVector<Path> result;
+            if (!std::filesystem::exists(ETString(path).c_str()) || !std::filesystem::is_directory(ETString(path).c_str()))
                 return result;
 
-            for (const auto &entry : std::filesystem::directory_iterator(path))
+            for (const auto &entry : std::filesystem::directory_iterator(ETString(path).c_str()))
             {
                 auto p = entry.path();
-                result.push_back(p.filename().string());
+                Path pathObj = Path(p.filename().string());
+                if (prefix.empty() || pathObj.getName().startsWith(prefix))
+                {
+                    result.push_back(pathObj);
+                }
             }
             return result;
-        }
-
-        unsigned long long capacity() const override
-        {
-            try
-            {
-                auto spaceInfo = std::filesystem::space(std::filesystem::current_path());
-                return static_cast<unsigned long long>(spaceInfo.capacity);
-            }
-            catch (...)
-            {
-                return 0;
-            }
-        }
-
-        unsigned long long totalBytes() const override
-        {
-            try
-            {
-                auto spaceInfo = std::filesystem::space(std::filesystem::current_path());
-                return static_cast<unsigned long long>(spaceInfo.capacity);
-            }
-            catch (...)
-            {
-                return 0;
-            }
-        }
-
-        unsigned long long usedBytes() const override
-        {
-            try
-            {
-                auto spaceInfo = std::filesystem::space(std::filesystem::current_path());
-                return static_cast<unsigned long long>(spaceInfo.capacity - spaceInfo.available);
-            }
-            catch (...)
-            {
-                return 0;
-            }
         }
     };
 } // namespace EmbeddedTerminal

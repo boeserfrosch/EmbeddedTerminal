@@ -10,19 +10,19 @@ namespace EmbeddedTerminal
     class ArduinoFileSystem : public IFileSystem
     {
     public:
-        explicit ArduinoFileSystem(FS &fs) : _mount(&fs) {}
+        explicit ArduinoFileSystem(FS &fs) : mount_(&fs) {}
         virtual ~ArduinoFileSystem() = default;
 
-        ETFile open(const char *path, const char *mode = FILE_MODE_READ, const bool create = false) override
+        ETFile open(const Path &path, const char *mode = FILE_MODE_READ, const bool create = false) override
         {
-            if (!_mount)
+            if (mount_)
                 return ETFile();
 
             File f;
             // map modes r/w/a to Arduino mode strings
             if (strcmp(mode, FILE_MODE_READ) == 0)
             {
-                f = _mount->open(path, "r");
+                f = mount_->open(path, "r");
             }
             else if (strcmp(mode, FILE_MODE_WRITE) == 0)
             {
@@ -30,58 +30,50 @@ namespace EmbeddedTerminal
                 if (create)
                 {
                     // open for write (create)
-                    f = _mount->open(path, "w");
+                    f = mount_->open(path, "w");
                 }
                 else
                 {
-                    f = _mount->open(path, "r+");
+                    f = mount_->open(path, "r+");
                 }
             }
             else if (strcmp(mode, FILE_MODE_APPEND) == 0)
             {
-                f = _mount->open(path, "a");
+                f = mount_->open(path, "a");
             }
             else
             {
-                f = _mount->open(path, mode);
+                f = mount_->open(path, mode);
             }
 
             if (!f)
                 return ETFile();
 
-            // name: last path component
-            ETString name;
-            const char *p = strrchr(path, '/');
-            if (p)
-                name = ETString(p + 1);
-            else
-                name = ETString(path);
-
-            auto filePtr = std::make_shared<ArduinoFile>(f, name, ETString(path));
+            auto filePtr = std::make_shared<ArduinoFile>(f, path.getName(), path);
             return ETFile(filePtr);
         }
 
-        bool exists(const char *path) override { return _mount && _mount->exists(path); }
+        bool exists(const Path &path) override { return mount_ && mount_->exists(path); }
 
-        bool isDirectory(const char *path) override
+        bool isDirectory(const Path &path) override
         {
-            if (!_mount)
+            if (mount_)
                 return false;
-            File f = _mount->open(path);
+            File f = mount_->open(path);
             bool res = f && f.isDirectory();
             f.close();
             return res;
         }
 
-        bool isEmpty(const char *path) override
+        bool isEmpty(const Path &path) override
         {
-            if (!_mount)
+            if (mount_)
                 return true;
-            File dir = _mount->open(path);
+            File dir = mount_->open(path);
             if (!dir || !dir.isDirectory())
             {
                 // if file, empty if size==0
-                File f = _mount->open(path);
+                File f = mount_->open(path);
                 bool r = (f && f.size() == 0);
                 f.close();
                 return r;
@@ -95,23 +87,27 @@ namespace EmbeddedTerminal
             return empty;
         }
 
-        bool remove(const char *path) override { return _mount && _mount->remove(path); }
-        bool mkdir(const char *path) override { return _mount && _mount->mkdir(path); }
-        bool rmdir(const char *path) override { return _mount && _mount->rmdir(path); }
+        bool remove(const Path &path) override { return mount_ && mount_->remove(path); }
+        bool mkdir(const Path &path) override { return mount_ && mount_->mkdir(path); }
+        bool rmdir(const Path &path) override { return mount_ && mount_->rmdir(path); }
 
-        ETVector<ETString> list(const char *path) const override
+        ETVector<Path> list(const Path &path, const ETString &prefix = "") const override
         {
-            ETVector<ETString> files;
-            if (!_mount)
+            ETVector<Path> files;
+            if (mount_)
                 return files;
-            File dir = _mount->open(path);
+            File dir = mount_->open(path);
             if (!dir || !dir.isDirectory())
                 return files;
 
             ETString name = dir.getNextFileName();
             do
             {
-                files.push_back(name);
+                auto p = Path("./" + name);
+                if (prefix.empty() || name.startsWith(prefix))
+                {
+                    files.push_back(p);
+                }
                 name = dir.getNextFileName();
             } while (!name.empty());
 
@@ -119,34 +115,8 @@ namespace EmbeddedTerminal
             return files;
         }
 
-        unsigned long long capacity() const override
-        {
-            // Not all FS expose capacity via API — returning totalBytes()
-            return totalBytes();
-        }
-        unsigned long long totalBytes() const override
-        {
-            // Some platforms provide totalBytes; attempt to query via FS class if available
-            // Fallback: 0
-#ifdef ESP32
-            return _mount ? _mount->totalBytes() : 0;
-#else
-            (void)_mount;
-            return 0;
-#endif
-        }
-        unsigned long long usedBytes() const override
-        {
-#ifdef ESP32
-            return _mount ? _mount->usedBytes() : 0;
-#else
-            (void)_mount;
-            return 0;
-#endif
-        }
-
     protected:
-        FS *_mount;
+        FS mount_;
     };
 
 } // namespace EmbeddedTerminal

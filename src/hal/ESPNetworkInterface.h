@@ -130,7 +130,7 @@ namespace EmbeddedTerminal
                 }
             }
 
-            // Ping the target (returns average time in ms, 0 if failed)
+            // Ping the target (return s average time in ms, 0 if failed)
             int avgTime = WiFi.ping(ip);
 
             if (avgTime <= 0)
@@ -155,4 +155,3 @@ namespace EmbeddedTerminal
 #endif // ESP32 || ESP_PLATFORM
 
 #endif // ESP_NETWORK_INTERFACE_H
-
