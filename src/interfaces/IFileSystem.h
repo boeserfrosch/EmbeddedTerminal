@@ -4,44 +4,76 @@
 
 #include "ETTypes.h"
 #include "ETFile.h"
+#include "Path.h"
 namespace EmbeddedTerminal
 {
 
+    /**
+     * @brief Interface for file system abstraction.
+     */
     class IFileSystem
     {
     public:
         virtual ~IFileSystem() {}
 
-        virtual ETFile open(const char *path, const char *mode = FILE_MODE_READ, const bool create = false) = 0;
-        virtual ETFile open(const ETString &path, const char *mode = FILE_MODE_READ, const bool create = false)
-        {
-            return open(path.c_str(), mode, create);
-        };
-        virtual bool exists(const char *path) = 0;
-        virtual bool exists(const ETString &path) { return exists(path.c_str()); };
+        /**
+         * @brief Opens a file with the given path and mode.
+         * @param path The path to the file to open.
+         * @param mode The mode to open the file in (e.g., "r" for read, "w" for write).
+         * @param create Whether to create the file if it does not exist (default is false).
+         * @return An ETFile object representing the opened file, or an empty ETFile if the file could not be opened.
+         */
+        virtual ETFile open(const Path &path, const char *mode = FILE_MODE_READ, const bool create = false) = 0;
 
-        virtual bool isDirectory(const char *path) = 0;
-        virtual bool isDirectory(const ETString &path) { return isDirectory(path.c_str()); };
+        /**
+         * @brief Checks if a file or directory exists at the given path.
+         * @param path The path to check for existence.
+         * @return True if the file or directory exists, false otherwise.
+         */
+        virtual bool exists(const Path &path) = 0;
 
-        // Checks if the directory or file is empty
-        virtual bool isEmpty(const char *path) = 0;
-        virtual bool isEmpty(const ETString &path) { return isEmpty(path.c_str()); };
+        /**
+         * @brief Checks if the path is a directory.
+         * @param path The path to check.
+         * @return True if the path is a directory, false otherwise.
+         */
+        virtual bool isDirectory(const Path &path) = 0;
 
-        virtual bool remove(const char *path) = 0;
-        virtual bool remove(const ETString &path) { return remove(path.c_str()); };
+        /**
+         * @brief Checks if the file or directory at the given path is empty.
+         * @param path The path to check.
+         * @return True if the file or directory is empty, false otherwise.
+         */
+        virtual bool isEmpty(const Path &path) = 0;
 
-        virtual bool mkdir(const char *path) = 0;
-        virtual bool mkdir(const ETString &path) { return mkdir(path.c_str()); };
+        /**
+         * @brief Removes the file at the given path.
+         * @param path The path to the file to remove.
+         * @return True if the file was successfully removed, false otherwise.
+         */
+        virtual bool remove(const Path &path) = 0;
 
-        virtual bool rmdir(const char *path) = 0;
-        virtual bool rmdir(const ETString &path) { return rmdir(path.c_str()); };
+        /**
+         * @brief Creates a directory at the given path.
+         * @param path The path to the directory to create.
+         * @return True if the directory was successfully created or already exists, false otherwise.
+         */
+        virtual bool mkdir(const Path &path) = 0;
 
-        virtual ETVector<ETString> list(const char *path) const = 0;
-        virtual ETVector<ETString> list(const ETString &path) const { return list(path.c_str()); };
+        /**
+         * @brief Removes the directory at the given path.
+         * @param path The path to the directory to remove.
+         * @return True if the directory was successfully removed, false otherwise.
+         */
+        virtual bool rmdir(const Path &path) = 0;
 
-        virtual unsigned long long capacity() const = 0;
-        virtual unsigned long long totalBytes() const = 0;
-        virtual unsigned long long usedBytes() const = 0;
+        /**
+         * @brief Lists the contents of the directory at the given path.
+         * @param path The path to the directory to list. If the path is a file, it should return a vector containing just that file name.
+         * @param prefix The prefix to apply to the list of files and directories. If empty, no filtering is applied. The prefix just checks the prefix of the file/directory name, so it will return all entries that start with the prefix string.
+         * @return A vector of Path objects representing the paths of the files and directories contained in the specified directory, or a vector containing just the file path if the path is a file. Returns an empty vector if the path does not exist or is not a directory.
+         */
+        virtual ETVector<Path> list(const Path &path, const ETString &prefix = "") const = 0;
     };
 }
 #endif // IFILESYSTEM_H

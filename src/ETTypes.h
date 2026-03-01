@@ -113,12 +113,26 @@ using ETMap = std::map<K, V>;
 // ETString trim(const ETString &str);
 // ETString cleanupLine(const ETString &line);
 
+inline ETVector<ETString> operator+(const ETVector<ETString> &lhs, const ETVector<ETString> &rhs)
+{
+    ETVector<ETString> result = lhs;
+    result.insert(result.end(), rhs.begin(), rhs.end());
+    return result;
+}
+
+inline ETVector<ETString> &operator+=(ETVector<ETString> &lhs, const ETVector<ETString> &rhs)
+{
+    lhs.insert(lhs.end(), rhs.begin(), rhs.end());
+    return lhs;
+}
+
 template <typename... Args>
 ETString string_format(const ETString &format, Args... args);
 
 void toLower(ETString &data);
 
 ETVector<ETString> split(ETString s, ETString delimiter);
+ETVector<ETString> sort(const ETVector<ETString> &input);
 ETString join(const ETVector<ETString> &elements, const ETString &delimiter);
 
 ETString toETString(size_t src);

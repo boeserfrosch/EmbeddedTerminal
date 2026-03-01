@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <stdexcept>
 #include <memory>
+#include <algorithm>
 
 // ETString implementation
 ETString::ETString() : data("")
@@ -410,6 +411,14 @@ ETVector<ETString> split(ETString s, ETString delimiter)
     if (!s.empty())
         tokens.push_back(s);
     return tokens;
+}
+
+ETVector<ETString> sort(const ETVector<ETString> &input)
+{
+    ETVector<ETString> sorted = input;
+    std::sort(sorted.begin(), sorted.end());
+
+    return sorted;
 }
 
 ETString join(const ETVector<ETString> &elements, const ETString &delimiter)
