@@ -35,18 +35,21 @@
 #include <Terminal.h>
 #include <BuiltinCommandFactory.h>
 #include <DirectoryNavigator.h>
+#include <StorageSystem.h>
+#include <interfaces/IStorage.h>
 
 // ESP32-specific includes
 #if defined(ESP32)
 #include <WiFi.h>
-#include <hal/SDMMCFileSystem.h>
+#include <SPIFFS.h>
+#include <hal/ArduinoFileSystem.h>
 #include <hal/ESPNetworkInterface.h>
 
 // WiFi credentials - UPDATE THESE!
 const char *ssid = "SSID";
 const char *password = "password";
 
-SDMMCFileSystem fileSystem;
+ArduinoFileSystem fileSystem(SPIFFS);
 ESPNetworkInterface networkInterface;
 #else
 #error "This example is designed for ESP32 only"
@@ -54,10 +57,60 @@ ESPNetworkInterface networkInterface;
 
 using namespace EmbeddedTerminal;
 
-// Create instances
-DirectoryNavigator nav(&fileSystem);
+class ExampleStorageMedia : public IStorageMedia
+{
+public:
+    ExampleStorageMedia(const ETString &name, IFileSystem *fs) : name_(name), fs_(fs) {}
+    const char *name() const override { return name_.c_str(); }
+    IFileSystem *fileSystem() override { return fs_; }
+    bool isAvailable() const override { return true; }
+    unsigned long long totalBytes() const override { return 0; }
+    unsigned long long usedBytes() const override { return 0; }
+    unsigned long long capacity() const override { return 0; }
+    unsigned long long freeBytes() const override { return 0; }
+
+private:
+    ETString name_;
+    IFileSystem *fs_;
+};
+
+class SingleNetworkSystem : public INetworkSystem
+{
+public:
+    SingleNetworkSystem(const ETString &name, INetworkInterface &iface) : name_(name), iface_(&iface) {}
+
+    ETVector<INetworkInterface *> interfaces() const override { return ETVector<INetworkInterface *>{iface_}; }
+
+    INetworkInterface *getInterface(const ETString &name) const override
+    {
+        return (name == name_) ? iface_ : nullptr;
+    }
+
+    bool addInterface(const ETString &, INetworkInterface *) override { return false; }
+    bool removeInterface(const ETString &) override { return false; }
+
+    ETString ping(const ETString &interfaceName, const ETString &target) override
+    {
+        auto iface = getInterface(interfaceName);
+        return iface ? iface->ping(target) : "Unknown interface\n";
+    }
+
+    ETString ping(const ETString &target) override
+    {
+        return iface_->ping(target);
+    }
+
+private:
+    ETString name_;
+    INetworkInterface *iface_;
+};
+
+StorageSystem storage;
+ExampleStorageMedia media("default", &fileSystem);
+DirectoryNavigator nav(&storage);
 Terminal term(Serial);
 BuiltinCommandFactory factory;
+SingleNetworkSystem networkSystem("wlan0", networkInterface);
 
 void setup()
 {
@@ -99,8 +152,14 @@ void setup()
     }
     Serial.println();
 
+    if (!SPIFFS.begin(true))
+    {
+        Serial.println("WARNING: SPIFFS mount failed");
+    }
+    storage.mountMedia(&media, "");
+
     // Register all commands including network
-    factory.registerAllCommands(term, nav, &networkInterface);
+    factory.registerAllCommands(term, nav, networkSystem);
 
     // Show available commands
     Serial.println("Terminal ready! Type 'help' for available commands.");

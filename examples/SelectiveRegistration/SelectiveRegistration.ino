@@ -29,14 +29,17 @@
 #include <BuiltinCommandFactory.h>
 #include <BuiltinCommandFlags.h>
 #include <DirectoryNavigator.h>
+#include <StorageSystem.h>
+#include <interfaces/IStorage.h>
+#include <hal/ArduinoFileSystem.h>
 
 // Platform-specific file system
 #if defined(ESP32)
-#include <hal/SDMMCFileSystem.h>
-SDMMCFileSystem fileSystem;
+#include <SPIFFS.h>
+ArduinoFileSystem fileSystem(SPIFFS);
 #elif defined(ARDUINO)
-#include <hal/ArduinoFileSystem.h>
-ArduinoFileSystem fileSystem;
+#include <SD.h>
+ArduinoFileSystem fileSystem(SD);
 #else
 #include <hal/NativeFileSystem.h>
 NativeFileSystem fileSystem;
@@ -45,7 +48,26 @@ NativeFileSystem fileSystem;
 using namespace EmbeddedTerminal;
 
 // Create instances
-DirectoryNavigator nav(&fileSystem);
+class ExampleStorageMedia : public IStorageMedia
+{
+public:
+    ExampleStorageMedia(const ETString &name, IFileSystem *fs) : name_(name), fs_(fs) {}
+    const char *name() const override { return name_.c_str(); }
+    IFileSystem *fileSystem() override { return fs_; }
+    bool isAvailable() const override { return true; }
+    unsigned long long totalBytes() const override { return 0; }
+    unsigned long long usedBytes() const override { return 0; }
+    unsigned long long capacity() const override { return 0; }
+    unsigned long long freeBytes() const override { return 0; }
+
+private:
+    ETString name_;
+    IFileSystem *fs_;
+};
+
+StorageSystem storage;
+ExampleStorageMedia media("default", &fileSystem);
+DirectoryNavigator nav(&storage);
 Terminal term(Serial);
 BuiltinCommandFactory factory;
 
@@ -64,16 +86,20 @@ void setup()
 
 // Initialize file system (platform-specific)
 #if defined(ESP32)
-    if (!fileSystem.begin())
+    if (!SPIFFS.begin(true))
     {
         Serial.println("ERROR: Failed to mount file system!");
-        Serial.println("Make sure SD card is inserted.");
+        Serial.println("SPIFFS mount failed.");
     }
     else
     {
         Serial.println("File system initialized successfully");
     }
+#elif defined(ARDUINO)
+    SD.begin();
 #endif
+
+    storage.mountMedia(&media, "");
 
     // Register only filesystem navigation commands
     factory.registerFilesystemCommands(term, nav, CMD_LS | CMD_CD | CMD_CAT);
@@ -81,7 +107,7 @@ void setup()
     // Register disk usage command
     factory.registerDiskCommands(term, nav);
 
-    // Register network commands (requires INetworkInterface)
+    // Register network commands (requires INetworkSystem)
     // factory.registerNetworkCommands(term, networkInterface);
 
     // Register help command

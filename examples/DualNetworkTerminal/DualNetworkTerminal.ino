@@ -22,21 +22,22 @@
 #include <Arduino.h>
 #include <Terminal.h>
 #include <DirectoryNavigator.h>
+#include <StorageSystem.h>
 #include <commands/ip.h>
 #include <BuiltinCommandFactory.h>
 #include <interfaces/INetworkInterface.h>
+#include <interfaces/IStorage.h>
 
 // Use appropriate file system for your platform
 #if defined(ESP32)
-#include <hal/SDMMCFileSystem.h>
-SDMMCFileSystem fileSystem;
+#include <SPIFFS.h>
+#include <hal/ArduinoFileSystem.h>
+ArduinoFileSystem fileSystem(SPIFFS);
 #else
 #include <hal/ArduinoFileSystem.h>
-ArduinoFileSystem fileSystem;
+#include <SD.h>
+ArduinoFileSystem fileSystem(SD);
 #endif
-
-// Mock network interfaces for demonstration
-#include "../test/Mocks/MockNetworkInterface.h"
 
 using namespace EmbeddedTerminal;
 
@@ -46,16 +47,122 @@ Terminal term(Serial);
 // Create factory instance (owns built-in commands)
 EmbeddedTerminal::BuiltinCommandFactory factory;
 
-// Directory navigator for file commands
-DirectoryNavigator nav(&fileSystem);
+class ExampleStorageMedia : public IStorageMedia
+{
+public:
+    ExampleStorageMedia(const ETString &name, IFileSystem *fs) : name_(name), fs_(fs) {}
+    const char *name() const override { return name_.c_str(); }
+    IFileSystem *fileSystem() override { return fs_; }
+    bool isAvailable() const override { return true; }
+    unsigned long long totalBytes() const override { return 0; }
+    unsigned long long usedBytes() const override { return 0; }
+    unsigned long long capacity() const override { return 0; }
+    unsigned long long freeBytes() const override { return 0; }
+
+private:
+    ETString name_;
+    IFileSystem *fs_;
+};
+
+class StaticNetworkInterface : public INetworkInterface
+{
+public:
+    explicit StaticNetworkInterface(const NetworkInfo &info) : info_(info) {}
+    NetworkInfo info() const override { return info_; }
+    ETString ping(const ETString &target) override
+    {
+        if (!info_.isUp)
+            return "Interface is down\n";
+        return "Ping " + target + " via " + info_.name + " successful\n";
+    }
+
+private:
+    NetworkInfo info_;
+};
+
+class DualNetworkSystem : public INetworkSystem
+{
+public:
+    DualNetworkSystem(INetworkInterface &eth, INetworkInterface &wifi)
+        : interfaces_{&eth, &wifi}
+    {
+    }
+
+    ETVector<INetworkInterface *> interfaces() const override
+    {
+        return interfaces_;
+    }
+
+    INetworkInterface *getInterface(const ETString &name) const override
+    {
+        for (auto *iface : interfaces_)
+        {
+            if (iface->info().name == name)
+                return iface;
+        }
+        return nullptr;
+    }
+
+    bool addInterface(const ETString &, INetworkInterface *) override { return false; }
+    bool removeInterface(const ETString &) override { return false; }
+
+    ETString ping(const ETString &interfaceName, const ETString &target) override
+    {
+        auto *iface = getInterface(interfaceName);
+        return iface ? iface->ping(target) : "Interface not found\n";
+    }
+
+    ETString ping(const ETString &target) override
+    {
+        for (auto *iface : interfaces_)
+        {
+            if (iface->info().isUp)
+                return iface->ping(target);
+        }
+        return "No active interface\n";
+    }
+
+private:
+    ETVector<INetworkInterface *> interfaces_;
+};
+
+class SingleNetworkSystem : public INetworkSystem
+{
+public:
+    explicit SingleNetworkSystem(INetworkInterface &iface) : iface_(&iface) {}
+
+    ETVector<INetworkInterface *> interfaces() const override { return ETVector<INetworkInterface *>{iface_}; }
+    INetworkInterface *getInterface(const ETString &name) const override
+    {
+        return iface_->info().name == name ? iface_ : nullptr;
+    }
+    bool addInterface(const ETString &, INetworkInterface *) override { return false; }
+    bool removeInterface(const ETString &) override { return false; }
+    ETString ping(const ETString &interfaceName, const ETString &target) override
+    {
+        auto *iface = getInterface(interfaceName);
+        return iface ? iface->ping(target) : "Interface not found\n";
+    }
+    ETString ping(const ETString &target) override { return iface_->ping(target); }
+
+private:
+    INetworkInterface *iface_;
+};
+
+StorageSystem storage;
+ExampleStorageMedia media("default", &fileSystem);
+DirectoryNavigator nav(&storage);
 
 // Create separate network interface instances
-MockNetworkInterface ethernetInterface;
-MockNetworkInterface wifiInterface;
+StaticNetworkInterface ethernetInterface(NetworkInfo("eth0", "192.168.1.100", "00:11:22:33:44:55", "255.255.255.0", "192.168.1.1", true));
+StaticNetworkInterface wifiInterface(NetworkInfo("wlan0", "192.168.2.200", "AA:BB:CC:DD:EE:FF", "255.255.255.0", "192.168.2.1", true));
+DualNetworkSystem networkSystem(ethernetInterface, wifiInterface);
+SingleNetworkSystem ethernetOnlySystem(ethernetInterface);
+SingleNetworkSystem wifiOnlySystem(wifiInterface);
 
 // Create separate IP command instances for each network
-cmd::ip ethIpCommand(ethernetInterface);
-cmd::ip wifiIpCommand(wifiInterface);
+cmd::ip ethIpCommand(ethernetOnlySystem);
+cmd::ip wifiIpCommand(wifiOnlySystem);
 
 void setup()
 {
@@ -72,39 +179,24 @@ void setup()
 
 // Initialize file system
 #if defined(ESP32)
-    if (!fileSystem.begin())
+    if (!SPIFFS.begin(true))
     {
-        Serial.println("ERROR: Failed to mount file system!");
+        Serial.println("ERROR: Failed to mount SPIFFS!");
     }
     else
     {
         Serial.println("File system initialized");
     }
+#else
+    SD.begin();
 #endif
 
-    // Configure mock network interfaces with example data
-    // In a real application, these would be actual network interfaces
-    ethernetInterface.addInterface(
-        "eth0",              // name
-        "192.168.1.100",     // ip
-        "00:11:22:33:44:55", // mac
-        "255.255.255.0",     // netmask
-        "192.168.1.1",       // gateway
-        true                 // isUp
-    );
-
-    wifiInterface.addInterface(
-        "wlan0",             // name
-        "192.168.2.200",     // ip
-        "AA:BB:CC:DD:EE:FF", // mac
-        "255.255.255.0",     // netmask
-        "192.168.2.1",       // gateway
-        true                 // isUp
-    );
+    storage.mountMedia(&media, "");
 
     // Register filesystem and disk commands using factory
     factory.registerFilesystemCommands(term, nav, CMD_LS | CMD_CD | CMD_CAT);
     factory.registerDiskCommands(term, nav);
+    factory.registerNetworkCommands(term, networkSystem, CMD_IP);
     factory.registerHelpCommand(term);
 
     // Register SEPARATE IP commands with DIFFERENT keywords

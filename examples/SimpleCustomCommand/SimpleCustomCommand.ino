@@ -24,14 +24,17 @@
 #include <Terminal.h>
 #include <interfaces/ICommand.h>
 #include <DirectoryNavigator.h>
+#include <StorageSystem.h>
+#include <interfaces/IStorage.h>
+#include <hal/ArduinoFileSystem.h>
 
 // Platform-specific file system
 #if defined(ESP32)
-#include <hal/SDMMCFileSystem.h>
-SDMMCFileSystem fs;
+#include <SPIFFS.h>
+ArduinoFileSystem fs(SPIFFS);
 #elif defined(ARDUINO)
-#include <hal/ArduinoFileSystem.h>
-ArduinoFileSystem fs;
+#include <SD.h>
+ArduinoFileSystem fs(SD);
 #else
 #include <hal/NativeFileSystem.h>
 NativeFileSystem fs;
@@ -54,8 +57,26 @@ public:
     }
 };
 
-// Create instances
-DirectoryNavigator nav(&fs);
+class ExampleStorageMedia : public IStorageMedia
+{
+public:
+    ExampleStorageMedia(const ETString &name, IFileSystem *fs) : name_(name), fs_(fs) {}
+    const char *name() const override { return name_.c_str(); }
+    IFileSystem *fileSystem() override { return fs_; }
+    bool isAvailable() const override { return true; }
+    unsigned long long totalBytes() const override { return 0; }
+    unsigned long long usedBytes() const override { return 0; }
+    unsigned long long capacity() const override { return 0; }
+    unsigned long long freeBytes() const override { return 0; }
+
+private:
+    ETString name_;
+    IFileSystem *fs_;
+};
+
+StorageSystem storage;
+ExampleStorageMedia media("default", &fs);
+DirectoryNavigator nav(&storage);
 MyCommand myCmd;
 Terminal term(Serial);
 
@@ -71,6 +92,14 @@ void setup()
     Serial.println("  Simple Custom Command Example");
     Serial.println("========================================");
     Serial.println();
+
+#if defined(ESP32)
+    SPIFFS.begin(true);
+#elif defined(ARDUINO)
+    SD.begin();
+#endif
+
+    storage.mountMedia(&media, "");
 
     // Register custom command
     term.registerCommand("mycmd", &myCmd);

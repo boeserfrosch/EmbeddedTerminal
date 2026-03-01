@@ -43,74 +43,26 @@ namespace EmbeddedTerminal
     class ESPNetworkInterface : public INetworkInterface
     {
     public:
-        ESPNetworkInterface() {}
+        explicit ESPNetworkInterface(const ETString &name = "wlan0") : interfaceName_(name) {}
         ~ESPNetworkInterface() override {}
 
-        ETMap<ETString, NetworkInfo> getInterfaces() const override
+        NetworkInfo info() const override
         {
-            ETMap<ETString, NetworkInfo> interfaces;
+            NetworkInfo result;
 
 #if defined(ARDUINO)
-            // Check WiFi interface (Arduino framework)
             if (WiFi.status() == WL_CONNECTED)
             {
-                NetworkInfo wifiInfo;
-                wifiInfo.name = "wlan0";
-                wifiInfo.ip = WiFi.localIP().toString().c_str();
-                wifiInfo.mac = WiFi.macAddress().c_str();
-                wifiInfo.netmask = WiFi.subnetMask().toString().c_str();
-                wifiInfo.gateway = WiFi.gatewayIP().toString().c_str();
-                wifiInfo.isUp = true;
-                interfaces["wlan0"] = wifiInfo;
+                result.name = interfaceName_;
+                result.ip = WiFi.localIP().toString().c_str();
+                result.mac = WiFi.macAddress().c_str();
+                result.netmask = WiFi.subnetMask().toString().c_str();
+                result.gateway = WiFi.gatewayIP().toString().c_str();
+                result.isUp = true;
             }
-
-#ifdef ETH_PHY_TYPE
-            // Check Ethernet interface (if available)
-            if (ETH.linkUp())
-            {
-                NetworkInfo ethInfo;
-                ethInfo.name = "eth0";
-                ethInfo.ip = ETH.localIP().toString().c_str();
-                ethInfo.mac = ETH.macAddress().c_str();
-                ethInfo.netmask = ETH.subnetMask().toString().c_str();
-                ethInfo.gateway = ETH.gatewayIP().toString().c_str();
-                ethInfo.isUp = true;
-                interfaces["eth0"] = ethInfo;
-            }
-#endif
 #endif // ARDUINO
 
-            return interfaces;
-        }
-
-        NetworkInfo getInterface(const ETString &name) const override
-        {
-            NetworkInfo info;
-
-#if defined(ARDUINO)
-            if (name == "wlan0" && WiFi.status() == WL_CONNECTED)
-            {
-                info.name = "wlan0";
-                info.ip = WiFi.localIP().toString().c_str();
-                info.mac = WiFi.macAddress().c_str();
-                info.netmask = WiFi.subnetMask().toString().c_str();
-                info.gateway = WiFi.gatewayIP().toString().c_str();
-                info.isUp = true;
-            }
-#ifdef ETH_PHY_TYPE
-            else if (name == "eth0" && ETH.linkUp())
-            {
-                info.name = "eth0";
-                info.ip = ETH.localIP().toString().c_str();
-                info.mac = ETH.macAddress().c_str();
-                info.netmask = ETH.subnetMask().toString().c_str();
-                info.gateway = ETH.gatewayIP().toString().c_str();
-                info.isUp = true;
-            }
-#endif
-#endif // ARDUINO
-
-            return info;
+            return result;
         }
 
         ETString ping(const ETString &target) override
@@ -148,6 +100,9 @@ namespace EmbeddedTerminal
             return "Ping not yet implemented for pure ESP-IDF framework\n";
 #endif
         }
+
+    private:
+        ETString interfaceName_;
     };
 
 } // namespace EmbeddedTerminal

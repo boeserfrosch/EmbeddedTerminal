@@ -12,15 +12,18 @@
 #include <Arduino.h>
 #include <Terminal.h>
 #include <DirectoryNavigator.h>
+#include <StorageSystem.h>
 #include <BuiltinCommandFactory.h>
 #include <interfaces/ICommand.h>
+#include <interfaces/IStorage.h>
+#include <hal/ArduinoFileSystem.h>
 
 #if defined(ESP32)
-#include <hal/SDMMCFileSystem.h>
-SDMMCFileSystem fileSystem;
+#include <SPIFFS.h>
+ArduinoFileSystem fileSystem(SPIFFS);
 #elif defined(ARDUINO)
-#include <hal/ArduinoFileSystem.h>
-ArduinoFileSystem fileSystem;
+#include <SD.h>
+ArduinoFileSystem fileSystem(SD);
 #else
 #include <hal/NativeFileSystem.h>
 NativeFileSystem fileSystem;
@@ -53,8 +56,26 @@ Terminal term(Serial);
 // When factory goes out of scope, it deletes all built-in commands
 BuiltinCommandFactory factory;
 
-// Directory navigator
-DirectoryNavigator nav(&fileSystem);
+class ExampleStorageMedia : public IStorageMedia
+{
+public:
+    ExampleStorageMedia(const ETString &name, IFileSystem *fs) : name_(name), fs_(fs) {}
+    const char *name() const override { return name_.c_str(); }
+    IFileSystem *fileSystem() override { return fs_; }
+    bool isAvailable() const override { return true; }
+    unsigned long long totalBytes() const override { return 0; }
+    unsigned long long usedBytes() const override { return 0; }
+    unsigned long long capacity() const override { return 0; }
+    unsigned long long freeBytes() const override { return 0; }
+
+private:
+    ETString name_;
+    IFileSystem *fs_;
+};
+
+StorageSystem storage;
+ExampleStorageMedia media("default", &fileSystem);
+DirectoryNavigator nav(&storage);
 
 // Custom command - YOU own this, YOU must delete it
 RebootCommand rebootCmd;
@@ -71,8 +92,12 @@ void setup()
     Serial.println();
 
 #if defined(ESP32)
-    fileSystem.begin();
+    SPIFFS.begin(true);
+#elif defined(ARDUINO)
+    SD.begin();
 #endif
+
+    storage.mountMedia(&media, "");
 
     // Register built-in commands via factory
     // Factory OWNS these commands and will delete them when it's destroyed
