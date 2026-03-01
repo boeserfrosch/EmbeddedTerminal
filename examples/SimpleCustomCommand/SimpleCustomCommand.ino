@@ -25,19 +25,15 @@
 #include <interfaces/ICommand.h>
 #include <DirectoryNavigator.h>
 #include <StorageSystem.h>
-#include <interfaces/IStorage.h>
-#include <hal/ArduinoFileSystem.h>
+#include <hal/DefaultStorageMedia.h>
 
 // Platform-specific file system
-#if defined(ESP32)
-#include <SPIFFS.h>
-ArduinoFileSystem fs(SPIFFS);
-#elif defined(ARDUINO)
-#include <SD.h>
-ArduinoFileSystem fs(SD);
+#if defined(ARDUINO) && defined(ESP32)
+ArduinoSDMMCStorageMedia media;
+#elif defined(ESP_PLATFORM) || defined(ESP_32)
+ESPIDFSDMMCStorageMedia media("sdmmc", "/sdcard");
 #else
-#include <hal/NativeFileSystem.h>
-NativeFileSystem fs;
+NativeSuggestedStorageMedia media("native", ".");
 #endif
 
 using namespace EmbeddedTerminal;
@@ -57,25 +53,7 @@ public:
     }
 };
 
-class ExampleStorageMedia : public IStorageMedia
-{
-public:
-    ExampleStorageMedia(const ETString &name, IFileSystem *fs) : name_(name), fs_(fs) {}
-    const char *name() const override { return name_.c_str(); }
-    IFileSystem *fileSystem() override { return fs_; }
-    bool isAvailable() const override { return true; }
-    unsigned long long totalBytes() const override { return 0; }
-    unsigned long long usedBytes() const override { return 0; }
-    unsigned long long capacity() const override { return 0; }
-    unsigned long long freeBytes() const override { return 0; }
-
-private:
-    ETString name_;
-    IFileSystem *fs_;
-};
-
 StorageSystem storage;
-ExampleStorageMedia media("default", &fs);
 DirectoryNavigator nav(&storage);
 MyCommand myCmd;
 Terminal term(Serial);
@@ -94,9 +72,7 @@ void setup()
     Serial.println();
 
 #if defined(ESP32)
-    SPIFFS.begin(true);
-#elif defined(ARDUINO)
-    SD.begin();
+    media.begin();
 #endif
 
     storage.mountMedia(&media, "");
