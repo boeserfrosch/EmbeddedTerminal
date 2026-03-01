@@ -15,7 +15,7 @@ namespace EmbeddedTerminal
 
         ETFile open(const Path &path, const char *mode = FILE_MODE_READ, const bool create = false) override
         {
-            if (mount_)
+            if (!mount_)
                 return ETFile();
 
             File f;
@@ -49,7 +49,7 @@ namespace EmbeddedTerminal
             if (!f)
                 return ETFile();
 
-            auto filePtr = std::make_shared<ArduinoFile>(f, path.getName(), path);
+            auto filePtr = std::make_shared<ArduinoFile>(f);
             return ETFile(filePtr);
         }
 
@@ -57,7 +57,7 @@ namespace EmbeddedTerminal
 
         bool isDirectory(const Path &path) override
         {
-            if (mount_)
+            if (!mount_)
                 return false;
             File f = mount_->open(path);
             bool res = f && f.isDirectory();
@@ -67,7 +67,7 @@ namespace EmbeddedTerminal
 
         bool isEmpty(const Path &path) override
         {
-            if (mount_)
+            if (!mount_)
                 return true;
             File dir = mount_->open(path);
             if (!dir || !dir.isDirectory())
@@ -94,7 +94,7 @@ namespace EmbeddedTerminal
         ETVector<Path> list(const Path &path, const ETString &prefix = "") const override
         {
             ETVector<Path> files;
-            if (mount_)
+            if (!mount_)
                 return files;
             File dir = mount_->open(path);
             if (!dir || !dir.isDirectory())
@@ -103,8 +103,8 @@ namespace EmbeddedTerminal
             ETString name = dir.getNextFileName();
             do
             {
-                auto p = Path("./" + name);
-                if (prefix.empty() || name.startsWith(prefix))
+                Path p(name);
+                if (prefix.empty() || p.getName().startsWith(prefix))
                 {
                     files.push_back(p);
                 }
@@ -116,7 +116,7 @@ namespace EmbeddedTerminal
         }
 
     protected:
-        FS mount_;
+        FS *mount_;
     };
 
 } // namespace EmbeddedTerminal

@@ -12,22 +12,22 @@ namespace EmbeddedTerminal
     class ArduinoStream : public ITerminalStream
     {
     protected:
-        Stream &_stream;
+        Stream &stream_;
 
     public:
-        ArduinoStream(Stream &stream) : _stream(stream) {}
+        ArduinoStream(Stream &stream) : stream_(stream) {}
 
         bool available() override
         {
-            return _stream.available() > 0;
+            return stream_.available() > 0;
         }
 
         ETString readAll() override
         {
             ETString result;
-            while (_stream.available())
+            while (stream_.available())
             {
-                char c = _stream.read();
+                char c = stream_.read();
                 result += c;
             }
             return result;
@@ -35,7 +35,7 @@ namespace EmbeddedTerminal
 
         void print(const ETString &s) override
         {
-            _stream.print(s.c_str());
+            stream_.print(s.c_str());
         }
 
         void printf(const char *fmt, ...) override
@@ -45,7 +45,7 @@ namespace EmbeddedTerminal
             va_start(args, fmt);
             vsnprintf(buffer, sizeof(buffer), fmt, args);
             va_end(args);
-            _stream.print(buffer);
+            stream_.print(buffer);
         }
 
         void printTo(TerminalChannel channel, const ETString &s) override
