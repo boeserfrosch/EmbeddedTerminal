@@ -13,6 +13,7 @@
 #endif
 #include <stdexcept>
 #include <memory>
+#include <stdint.h>
 
 class ETString
 {
@@ -135,8 +136,8 @@ ETVector<ETString> split(ETString s, ETString delimiter);
 ETVector<ETString> sort(const ETVector<ETString> &input);
 ETString join(const ETVector<ETString> &elements, const ETString &delimiter);
 
+ETString toETString(int32_t src);
+ETString toETString(uint32_t src);
 ETString toETString(size_t src);
-ETString toETString(unsigned long src);
-ETString toETString(int src);
 
 #endif // ET_TYPES_H

@@ -54,7 +54,7 @@ ETString base64encode(const unsigned char *data, size_t len)
 }
 
 /// Erzeugt den Header "SIZE <fileSize>\n"
-ETString createHeader(unsigned long fileSize)
+ETString createHeader(size_t fileSize)
 {
     return "SIZE " + toETString(fileSize) + "\n";
 }
