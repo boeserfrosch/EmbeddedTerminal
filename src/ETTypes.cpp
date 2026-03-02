@@ -440,7 +440,7 @@ ETString toETString(size_t src)
 #endif
 }
 
-ETString toETString(int src)
+ETString toETString(unsigned long src)
 {
 #if defined(ARDUINO) //|| defined(ESP_PLATFORM)
     return ETString(String(src));
@@ -449,7 +449,7 @@ ETString toETString(int src)
 #endif
 }
 
-ETString toETString(unsigned long src)
+ETString toETString(int src)
 {
 #if defined(ARDUINO) //|| defined(ESP_PLATFORM)
     return ETString(String(src));

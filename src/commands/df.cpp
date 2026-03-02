@@ -30,13 +30,13 @@ ETString df::trigger(const ETString &keyword, const ETString &additional)
 
         result += media->name();
         result += "\tSize ";
-        result += toETString(static_cast<unsigned long>(sizeMb));
+        result += toETString(static_cast<size_t>(sizeMb));
         result += ".0 MB";
         result += "\tUsed ";
-        result += toETString(static_cast<unsigned long>(usedMb));
+        result += toETString(static_cast<size_t>(usedMb));
         result += ".0 MB";
         result += "\tFree ";
-        result += toETString(static_cast<unsigned long>(freeMb));
+        result += toETString(static_cast<size_t>(freeMb));
         result += ".0 MB\n";
     }
 
