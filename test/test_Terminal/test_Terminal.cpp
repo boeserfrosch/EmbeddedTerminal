@@ -564,6 +564,60 @@ void test_terminal_for_loop_supports_braced_variable(void)
     TEST_ASSERT_EQUAL_STRING("beta", collect.collected[1].c_str());
 }
 
+void test_terminal_semicolon_executes_both_commands(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    CollectArgsCommand collect;
+    term.registerCommand("collect", &collect);
+
+    stream.inputBuffer = "missing ; collect second\n";
+    term.loop();
+
+    TEST_ASSERT_EQUAL(1, collect.collected.size());
+    TEST_ASSERT_EQUAL_STRING("second", collect.collected[0].c_str());
+}
+
+void test_terminal_andand_executes_second_only_on_success(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    CollectArgsCommand collect;
+    term.registerCommand("collect", &collect);
+
+    stream.inputBuffer = "collect ok && collect yes\n";
+    term.loop();
+    TEST_ASSERT_EQUAL(2, collect.collected.size());
+    TEST_ASSERT_EQUAL_STRING("ok", collect.collected[0].c_str());
+    TEST_ASSERT_EQUAL_STRING("yes", collect.collected[1].c_str());
+
+    collect.collected.clear();
+    stream.inputBuffer = "missing && collect no\n";
+    stream.inputPos = 0;
+    term.loop();
+    TEST_ASSERT_EQUAL(0, collect.collected.size());
+}
+
+void test_terminal_oror_executes_second_only_on_failure(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    CollectArgsCommand collect;
+    term.registerCommand("collect", &collect);
+
+    stream.inputBuffer = "missing || collect recovered\n";
+    term.loop();
+    TEST_ASSERT_EQUAL(1, collect.collected.size());
+    TEST_ASSERT_EQUAL_STRING("recovered", collect.collected[0].c_str());
+
+    collect.collected.clear();
+    stream.inputBuffer = "collect good || collect no\n";
+    stream.inputPos = 0;
+    term.loop();
+    TEST_ASSERT_EQUAL(1, collect.collected.size());
+    TEST_ASSERT_EQUAL_STRING("good", collect.collected[0].c_str());
+}
+
 void process_tests()
 {
     UNITY_BEGIN();
@@ -591,6 +645,9 @@ void process_tests()
     RUN_TEST(test_terminal_redirects_output_with_gt_and_overwrite);
     RUN_TEST(test_terminal_for_loop_executes_body_for_each_value);
     RUN_TEST(test_terminal_for_loop_supports_braced_variable);
+    RUN_TEST(test_terminal_semicolon_executes_both_commands);
+    RUN_TEST(test_terminal_andand_executes_second_only_on_success);
+    RUN_TEST(test_terminal_oror_executes_second_only_on_failure);
     UNITY_END();
 }
 

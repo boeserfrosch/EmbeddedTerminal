@@ -8,45 +8,146 @@ namespace EmbeddedTerminal
     {
         static constexpr size_t TERMINAL_LEXER_TOKEN_MAX = 64;
 
-        bool appendTokenText_(ETString &arguments, const token_t &token)
+        enum class ChainCondition
         {
-            ETString tokenText;
+            Always,
+            OnSuccess,
+            OnFailure
+        };
+
+        struct ChainSegment
+        {
+            ETString text;
+            ChainCondition condition = ChainCondition::Always;
+        };
+
+        bool tokenToCommandText_(const token_t &token, ETString &out)
+        {
             switch (token.type)
             {
             case TokenType::WORD:
-                tokenText = token.text;
-                break;
-            case TokenType::PIPE:
-                tokenText = "|";
-                break;
-            case TokenType::REDIR_OUT:
-                tokenText = ">";
-                break;
-            case TokenType::REDIR_IN:
-                tokenText = "<";
-                break;
-            case TokenType::REDIR_APPEND:
-                tokenText = ">>";
-                break;
-            case TokenType::SEMI:
-                tokenText = ";";
-                break;
-            case TokenType::AND_AND:
-                tokenText = "&&";
-                break;
-            case TokenType::OR_OR:
-                tokenText = "||";
-                break;
-            default:
+                out = token.text;
                 return true;
+            case TokenType::PIPE:
+                out = "|";
+                return true;
+            case TokenType::REDIR_OUT:
+                out = ">";
+                return true;
+            case TokenType::REDIR_IN:
+                out = "<";
+                return true;
+            case TokenType::REDIR_APPEND:
+                out = ">>";
+                return true;
+            case TokenType::AND_AND:
+                out = "&&";
+                return true;
+            case TokenType::OR_OR:
+                out = "||";
+                return true;
+            default:
+                out = "";
+                return false;
+            }
+        }
+
+        void appendWithSpace_(ETString &target, const ETString &text)
+        {
+            if (text.empty())
+            {
+                return;
             }
 
-            if (!arguments.empty())
+            if (!target.empty())
             {
-                arguments += " ";
+                target += " ";
             }
-            arguments += tokenText;
-            return true;
+            target += text;
+        }
+
+        bool parseConditionalChainWithLexer_(const ETString &line, ETVector<ChainSegment> &segments, LexerError &lexerError)
+        {
+            token_t tokens[TERMINAL_LEXER_TOKEN_MAX];
+            size_t tokenCount = 0;
+            lexerError = lex(line, tokens, TERMINAL_LEXER_TOKEN_MAX, tokenCount);
+            if (lexerError != LexerError::NONE)
+            {
+                return false;
+            }
+
+            segments.clear();
+            size_t index = 0;
+            while (index < tokenCount && tokens[index].type == TokenType::NEWLINE)
+            {
+                ++index;
+            }
+
+            if (index >= tokenCount || tokens[index].type == TokenType::END_OF_FILE)
+            {
+                return false;
+            }
+
+            ChainCondition nextCondition = ChainCondition::Always;
+            ETString currentSegment;
+
+            for (; index < tokenCount; ++index)
+            {
+                const token_t &token = tokens[index];
+                if (token.type == TokenType::END_OF_FILE || token.type == TokenType::NEWLINE)
+                {
+                    break;
+                }
+
+                if (token.type == TokenType::SEMI || token.type == TokenType::AND_AND || token.type == TokenType::OR_OR)
+                {
+                    ETString trimmed = currentSegment.trim();
+                    if (trimmed.empty())
+                    {
+                        return false;
+                    }
+
+                    ChainSegment segment;
+                    segment.text = trimmed;
+                    segment.condition = nextCondition;
+                    segments.push_back(segment);
+
+                    currentSegment = "";
+                    if (token.type == TokenType::AND_AND)
+                    {
+                        nextCondition = ChainCondition::OnSuccess;
+                    }
+                    else if (token.type == TokenType::OR_OR)
+                    {
+                        nextCondition = ChainCondition::OnFailure;
+                    }
+                    else
+                    {
+                        nextCondition = ChainCondition::Always;
+                    }
+                    continue;
+                }
+
+                ETString tokenText;
+                if (!tokenToCommandText_(token, tokenText))
+                {
+                    return false;
+                }
+
+                appendWithSpace_(currentSegment, tokenText);
+            }
+
+            ETString trimmed = currentSegment.trim();
+            if (trimmed.empty())
+            {
+                return false;
+            }
+
+            ChainSegment segment;
+            segment.text = trimmed;
+            segment.condition = nextCondition;
+            segments.push_back(segment);
+            return !segments.empty();
         }
 
         bool parseCommandLineWithLexer_(const ETString &line, ETVector<ETString> &keywords, ETVector<ETString> &arguments,
@@ -147,7 +248,12 @@ namespace EmbeddedTerminal
                     continue;
                 }
 
-                appendTokenText_(currentArguments, tokens[index]);
+                ETString tokenText;
+                if (!tokenToCommandText_(tokens[index], tokenText))
+                {
+                    return false;
+                }
+                appendWithSpace_(currentArguments, tokenText);
             }
 
             if (currentKeyword.empty())
@@ -274,7 +380,12 @@ namespace EmbeddedTerminal
                     break;
                 }
 
-                appendTokenText_(body, tokens[index]);
+                ETString tokenText;
+                if (!tokenToCommandText_(tokens[index], tokenText))
+                {
+                    return false;
+                }
+                appendWithSpace_(body, tokenText);
                 ++index;
             }
 
@@ -443,27 +554,18 @@ namespace EmbeddedTerminal
             return false;
         }
 
-        if (keywords.size() == 1)
+        bool shouldRunPipeline =
+            (keywords.size() != 1) ||
+            (!redirectOutPath.empty()) ||
+            (!redirectInPath.empty());
+
+        if (shouldRunPipeline)
         {
-            if (redirectOutPath.empty())
-            {
-                if (redirectInPath.empty())
-                {
-                    call(keywords[0], arguments[0]);
-                }
-                else
-                {
-                    executePipeline_(keywords, arguments, redirectOutPath, appendRedirect, redirectInPath);
-                }
-            }
-            else
-            {
-                executePipeline_(keywords, arguments, redirectOutPath, appendRedirect, redirectInPath);
-            }
+            executePipeline_(keywords, arguments, redirectOutPath, appendRedirect, redirectInPath);
         }
         else
         {
-            executePipeline_(keywords, arguments, redirectOutPath, appendRedirect, redirectInPath);
+            call(keywords[0], arguments[0]);
         }
 
         return true;
@@ -493,30 +595,34 @@ namespace EmbeddedTerminal
         return true;
     }
 
-    void Terminal::loop()
+    void Terminal::continueActiveCommandIfNeeded_()
     {
-        if (hasActiveCommand_)
+        if (!hasActiveCommand_)
         {
-            bool shouldContinue = (activeState_ == CommandExecutionState::Running) ||
-                                  ((activeState_ == CommandExecutionState::WaitingForInput) && input_.available());
-
-            if (shouldContinue)
-            {
-                executeCommand_(activeCommand_, activeKeyword_, activeArguments_);
-            }
+            return;
         }
 
-        if (!input_.available())
-            return;
+        bool shouldContinue = (activeState_ == CommandExecutionState::Running) ||
+                              ((activeState_ == CommandExecutionState::WaitingForInput) && input_.available());
 
-        // Read input and append to buffer
+        if (shouldContinue)
+        {
+            executeCommand_(activeCommand_, activeKeyword_, activeArguments_);
+        }
+    }
+
+    bool Terminal::ingestInputAndHandleAutoCompletion_()
+    {
+        if (!input_.available())
+        {
+            return false;
+        }
+
         ETString inputLine = input_.readAll();
 
-        // Check for TAB character (0x09) for auto completion
         bool hasTab = inputLine.contains('\t');
         if (hasTab)
         {
-            // Remove the TAB from the input line (don't echo it)
             size_t tabPos = inputLine.find('\t');
             while (tabPos != ETString::npos)
             {
@@ -528,36 +634,90 @@ namespace EmbeddedTerminal
         input_.print(inputLine);
         buffer += inputLine;
 
-        // Handle auto completion after buffer is updated
         if (hasTab)
         {
             handleAutoCompletion_();
         }
 
+        return true;
+    }
+
+    void Terminal::processBufferedLine_(const ETString &line)
+    {
+        ETString cleanedLine = line.cleanupString().trim();
+        if (cleanedLine.empty())
+        {
+            return;
+        }
+
+        if (tryExecuteForLoopLine_(cleanedLine))
+        {
+            return;
+        }
+
+        executeConditionalChain_(cleanedLine);
+    }
+
+    void Terminal::executeConditionalChain_(const ETString &line)
+    {
+        ETVector<ChainSegment> segments;
+        LexerError lexerError = LexerError::NONE;
+        if (!parseConditionalChainWithLexer_(line, segments, lexerError))
+        {
+            reportLexerError_(lexerError);
+            return;
+        }
+
+        for (size_t index = 0; index < segments.size(); ++index)
+        {
+            const ChainSegment &segment = segments[index];
+            bool shouldExecute = false;
+
+            if (segment.condition == ChainCondition::Always)
+            {
+                shouldExecute = true;
+            }
+            else if (segment.condition == ChainCondition::OnSuccess)
+            {
+                shouldExecute = (lastExitCode_ == 0);
+            }
+            else
+            {
+                shouldExecute = (lastExitCode_ != 0);
+            }
+
+            if (!shouldExecute)
+            {
+                continue;
+            }
+
+            if (!parseAndExecuteLine_(segment.text))
+            {
+                break;
+            }
+        }
+    }
+
+    void Terminal::processBufferedCommands_()
+    {
         size_t delimPosition;
         while ((delimPosition = buffer.find(lineDelimiter)) != ETString::npos)
         {
-            // Extract line
             ETString line = buffer.substr(0, delimPosition);
             buffer.erase(0, delimPosition + 1);
-
-            // Remove non-printable and backspace chars
-            ETString cleanedLine = line.cleanupString().trim();
-            if (cleanedLine.empty())
-            {
-                continue;
-            }
-
-            if (tryExecuteForLoopLine_(cleanedLine))
-            {
-                continue;
-            }
-
-            if (!parseAndExecuteLine_(cleanedLine))
-            {
-                continue;
-            }
+            processBufferedLine_(line);
         }
+    }
+
+    void Terminal::loop()
+    {
+        continueActiveCommandIfNeeded_();
+        if (!ingestInputAndHandleAutoCompletion_())
+        {
+            return;
+        }
+
+        processBufferedCommands_();
     }
 
     void Terminal::registerCommand(const ETString &keyword, ICommand *observer)

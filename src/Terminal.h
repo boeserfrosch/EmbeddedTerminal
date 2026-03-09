@@ -62,6 +62,11 @@ namespace EmbeddedTerminal
         void executeCommand_(ICommand *command, const ETString &keyword, const ETString &arguments);
         void executePipeline_(const ETVector<ETString> &keywords, const ETVector<ETString> &arguments,
                               const ETString &redirectOutPath, bool appendRedirect, const ETString &redirectInPath);
+        void continueActiveCommandIfNeeded_();
+        bool ingestInputAndHandleAutoCompletion_();
+        void processBufferedCommands_();
+        void processBufferedLine_(const ETString &line);
+        void executeConditionalChain_(const ETString &line);
         bool parseAndExecuteLine_(const ETString &line);
         bool tryExecuteForLoopLine_(const ETString &line);
         void reportLexerError_(LexerError error);
