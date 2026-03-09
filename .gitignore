@@ -155,3 +155,6 @@ dependencies/
 .github/*
 !.github/workflows/
 !.github/workflows/**
+
+coverage-*.json
+coverage-*.txt
