@@ -72,6 +72,7 @@ void test_register_filesystem_commands_all(void)
     TEST_ASSERT_TRUE(commands.find("rm") != commands.end());
     TEST_ASSERT_TRUE(commands.find("rmdir") != commands.end());
     TEST_ASSERT_TRUE(commands.find("tail") != commands.end());
+    TEST_ASSERT_TRUE(commands.find("wc") != commands.end());
 }
 
 // Test selective filesystem command registration
@@ -166,6 +167,7 @@ void test_register_all_commands(void)
     TEST_ASSERT_TRUE(commands.find("ls") != commands.end());
     TEST_ASSERT_TRUE(commands.find("df") != commands.end());
     TEST_ASSERT_TRUE(commands.find("ip") != commands.end());
+    TEST_ASSERT_TRUE(commands.find("wc") != commands.end());
     TEST_ASSERT_TRUE(commands.find("help") != commands.end());
 }
 

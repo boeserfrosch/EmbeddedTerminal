@@ -189,6 +189,23 @@ namespace EmbeddedTerminal
             }
         }
 
+        if (flags & CMD_WC)
+        {
+            auto it = builtinCommands_.find(CMD_NAME_WC);
+            if (it == builtinCommands_.end())
+            {
+                cmd::wc *wcCmd = new cmd::wc(nav);
+                if (wcCmd != nullptr)
+                {
+                    builtinCommands_[CMD_NAME_WC] = wcCmd;
+                }
+            }
+            if (builtinCommands_.find(CMD_NAME_WC) != builtinCommands_.end())
+            {
+                terminal.registerCommand(CMD_NAME_WC, builtinCommands_[CMD_NAME_WC]);
+            }
+        }
+
         if (flags & CMD_TAIL)
         {
             auto it = builtinCommands_.find(CMD_NAME_TAIL);
@@ -352,6 +369,8 @@ namespace EmbeddedTerminal
             terminal.deregisterCommand(CMD_NAME_ECHO);
         if (flags & CMD_TOUCH)
             terminal.deregisterCommand(CMD_NAME_TOUCH);
+        if (flags & CMD_WC)
+            terminal.deregisterCommand(CMD_NAME_WC);
     }
 
     void BuiltinCommandFactory::deregisterDiskCommands(Terminal &terminal, uint32_t flags)

@@ -20,6 +20,7 @@
 #include "rmdir.h"
 #include "tail.h"
 #include "touch.h"
+#include "wc.h"
 #include "xxd.h"
 
 #endif // BUILTIN_COMMANDS_H
