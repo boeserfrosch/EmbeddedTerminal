@@ -50,7 +50,7 @@ namespace EmbeddedTerminal
         }
 
         bool parseCommandLineWithLexer_(const ETString &line, ETVector<ETString> &keywords, ETVector<ETString> &arguments,
-                        ETString &redirectOutPath, bool &appendRedirect, ETString &redirectInPath, LexerError &lexerError)
+                                        ETString &redirectOutPath, bool &appendRedirect, ETString &redirectInPath, LexerError &lexerError)
         {
             token_t tokens[TERMINAL_LEXER_TOKEN_MAX];
             size_t tokenCount = 0;
@@ -158,6 +158,133 @@ namespace EmbeddedTerminal
             keywords.push_back(currentKeyword);
             arguments.push_back(currentArguments);
             return !keywords.empty();
+        }
+
+        ETString replaceAll_(const ETString &input, const ETString &needle, const ETString &replacement)
+        {
+            if (needle.empty())
+            {
+                return input;
+            }
+
+            ETString result = input;
+            size_t pos = 0;
+            while ((pos = result.find(needle, pos)) != ETString::npos)
+            {
+                ETString left = result.substr(0, pos);
+                ETString right = result.substr(pos + needle.length());
+                result = left + replacement + right;
+                pos += replacement.length();
+            }
+
+            return result;
+        }
+
+        ETString substituteLoopVariable_(const ETString &input, const ETString &variableName, const ETString &value)
+        {
+            ETString result = input;
+            result = replaceAll_(result, "${" + variableName + "}", value);
+            result = replaceAll_(result, "$" + variableName, value);
+            return result;
+        }
+
+        bool parseForLoopWithLexer_(const ETString &line, ETString &loopVariable, ETVector<ETString> &loopValues,
+                                    ETString &loopBody, LexerError &lexerError)
+        {
+            token_t tokens[TERMINAL_LEXER_TOKEN_MAX];
+            size_t tokenCount = 0;
+            lexerError = lex(line, tokens, TERMINAL_LEXER_TOKEN_MAX, tokenCount);
+            if (lexerError != LexerError::NONE)
+            {
+                return false;
+            }
+
+            size_t index = 0;
+            while (index < tokenCount && tokens[index].type == TokenType::NEWLINE)
+            {
+                ++index;
+            }
+
+            if (index >= tokenCount || tokens[index].type != TokenType::WORD || tokens[index].text != "for")
+            {
+                return false;
+            }
+            ++index;
+
+            if (index >= tokenCount || tokens[index].type != TokenType::WORD)
+            {
+                return false;
+            }
+            loopVariable = tokens[index].text;
+            ++index;
+
+            if (index >= tokenCount || tokens[index].type != TokenType::WORD || tokens[index].text != "in")
+            {
+                return false;
+            }
+            ++index;
+
+            loopValues.clear();
+            while (index < tokenCount)
+            {
+                if (tokens[index].type == TokenType::SEMI)
+                {
+                    ++index;
+                    continue;
+                }
+
+                if (tokens[index].type == TokenType::WORD && tokens[index].text == "do")
+                {
+                    ++index;
+                    break;
+                }
+
+                if (tokens[index].type != TokenType::WORD)
+                {
+                    return false;
+                }
+
+                loopValues.push_back(tokens[index].text);
+                ++index;
+            }
+
+            if (loopValues.empty())
+            {
+                return false;
+            }
+
+            ETString body;
+            bool foundDone = false;
+            while (index < tokenCount)
+            {
+                if (tokens[index].type == TokenType::END_OF_FILE || tokens[index].type == TokenType::NEWLINE)
+                {
+                    break;
+                }
+
+                if (tokens[index].type == TokenType::SEMI)
+                {
+                    ++index;
+                    continue;
+                }
+
+                if (tokens[index].type == TokenType::WORD && tokens[index].text == "done")
+                {
+                    foundDone = true;
+                    break;
+                }
+
+                appendTokenText_(body, tokens[index]);
+                ++index;
+            }
+
+            if (!foundDone || body.trim().empty())
+            {
+                return false;
+            }
+
+            loopBody = body.trim();
+            return true;
         }
     }
 
@@ -280,6 +407,68 @@ namespace EmbeddedTerminal
 
     void Terminal::loop()
     {
+        auto executeParsedLine = [this](const ETString &parsedLine)
+        {
+            ETVector<ETString> keywords;
+            ETVector<ETString> arguments;
+            ETString redirectOutPath;
+            bool appendRedirect = false;
+            ETString redirectInPath;
+            LexerError lexerError = LexerError::NONE;
+            bool parsed = parseCommandLineWithLexer_(parsedLine, keywords, arguments, redirectOutPath, appendRedirect, redirectInPath, lexerError);
+
+            if (!parsed)
+            {
+                if (lexerError == LexerError::TOKEN_ARRAY_EXHAUSTED)
+                {
+                    lastExitCode_ = 2;
+                    input_.printTo(TerminalChannel::StdErr, "lexer error: token array exhausted\n");
+                }
+                else if (lexerError == LexerError::UNTERMINATED_SINGLE_QUOTE)
+                {
+                    lastExitCode_ = 2;
+                    input_.printTo(TerminalChannel::StdErr, "lexer error: unterminated single quote\n");
+                }
+                else if (lexerError == LexerError::UNTERMINATED_DOUBLE_QUOTE)
+                {
+                    lastExitCode_ = 2;
+                    input_.printTo(TerminalChannel::StdErr, "lexer error: unterminated double quote\n");
+                }
+                else
+                {
+                    lastExitCode_ = 2;
+                    input_.printTo(TerminalChannel::StdErr, "lexer error: invalid command syntax\n");
+                }
+
+                return false;
+            }
+
+            if (keywords.size() == 1)
+            {
+                if (redirectOutPath.empty())
+                {
+                    if (redirectInPath.empty())
+                    {
+                        call(keywords[0], arguments[0]);
+                    }
+                    else
+                    {
+                        executePipeline_(keywords, arguments, redirectOutPath, appendRedirect, redirectInPath);
+                    }
+                }
+                else
+                {
+                    executePipeline_(keywords, arguments, redirectOutPath, appendRedirect, redirectInPath);
+                }
+            }
+            else
+            {
+                executePipeline_(keywords, arguments, redirectOutPath, appendRedirect, redirectInPath);
+            }
+
+            return true;
+        };
+
         if (hasActiveCommand_)
         {
             bool shouldContinue = (activeState_ == CommandExecutionState::Running) ||
@@ -333,61 +522,28 @@ namespace EmbeddedTerminal
                 continue;
             }
 
-            ETVector<ETString> keywords;
-            ETVector<ETString> arguments;
-            ETString redirectOutPath;
-            bool appendRedirect = false;
-            ETString redirectInPath;
+            ETString loopVariable;
+            ETVector<ETString> loopValues;
+            ETString loopBody;
             LexerError lexerError = LexerError::NONE;
-            bool parsed = parseCommandLineWithLexer_(cleanedLine, keywords, arguments, redirectOutPath, appendRedirect, redirectInPath, lexerError);
-
-            if (!parsed)
+            bool isForLoop = parseForLoopWithLexer_(cleanedLine, loopVariable, loopValues, loopBody, lexerError);
+            if (isForLoop)
             {
-                if (lexerError == LexerError::TOKEN_ARRAY_EXHAUSTED)
+                for (size_t idx = 0; idx < loopValues.size(); ++idx)
                 {
-                    lastExitCode_ = 2;
-                    input_.printTo(TerminalChannel::StdErr, "lexer error: token array exhausted\n");
-                }
-                else if (lexerError == LexerError::UNTERMINATED_SINGLE_QUOTE)
-                {
-                    lastExitCode_ = 2;
-                    input_.printTo(TerminalChannel::StdErr, "lexer error: unterminated single quote\n");
-                }
-                else if (lexerError == LexerError::UNTERMINATED_DOUBLE_QUOTE)
-                {
-                    lastExitCode_ = 2;
-                    input_.printTo(TerminalChannel::StdErr, "lexer error: unterminated double quote\n");
-                }
-                else
-                {
-                    lastExitCode_ = 2;
-                    input_.printTo(TerminalChannel::StdErr, "lexer error: invalid command syntax\n");
+                    ETString expandedBody = substituteLoopVariable_(loopBody, loopVariable, loopValues[idx]);
+                    if (!executeParsedLine(expandedBody))
+                    {
+                        break;
+                    }
                 }
 
                 continue;
             }
 
-            if (keywords.size() == 1)
+            if (!executeParsedLine(cleanedLine))
             {
-                if (redirectOutPath.empty())
-                {
-                    if (redirectInPath.empty())
-                    {
-                        call(keywords[0], arguments[0]);
-                    }
-                    else
-                    {
-                        executePipeline_(keywords, arguments, redirectOutPath, appendRedirect, redirectInPath);
-                    }
-                }
-                else
-                {
-                    executePipeline_(keywords, arguments, redirectOutPath, appendRedirect, redirectInPath);
-                }
-            }
-            else
-            {
-                executePipeline_(keywords, arguments, redirectOutPath, appendRedirect, redirectInPath);
+                continue;
             }
         }
     }
@@ -579,7 +735,7 @@ namespace EmbeddedTerminal
                                               : static_cast<IInputChannel &>(bufferedInput);
             bool writeToFile = isLast && !redirectOutPath.empty();
             IOutputChannel &stdoutChannel = (isLast && !writeToFile) ? static_cast<IOutputChannel &>(finalOutput)
-                                                                      : static_cast<IOutputChannel &>(stageOutput);
+                                                                     : static_cast<IOutputChannel &>(stageOutput);
 
             CommandResult result = executeCommandInternal_(search->second, commandKey, arguments[index], stdinChannel, stdoutChannel, stderrChannel);
 

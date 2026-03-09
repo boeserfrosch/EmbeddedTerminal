@@ -133,6 +133,32 @@ protected:
     }
 };
 
+class CollectArgsCommand : public ICommand
+{
+public:
+    ETVector<ETString> collected;
+
+    ETString usage(const ETString &keyword) override
+    {
+        return keyword;
+    }
+
+    CommandResult execute(CommandInvocation &invocation) override
+    {
+        collected.push_back(invocation.arguments);
+        invocation.stdoutChannel.print(invocation.arguments + "\n");
+        return CommandResult::completed(0);
+    }
+
+protected:
+    ETString trigger(const ETString &keyword, const ETString &additional) override
+    {
+        (void)keyword;
+        (void)additional;
+        return "";
+    }
+};
+
 void setUp(void) {}
 void tearDown(void) {}
 
@@ -507,6 +533,37 @@ void test_terminal_redirects_output_with_gt_and_overwrite(void)
     file.close();
 }
 
+void test_terminal_for_loop_executes_body_for_each_value(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    CollectArgsCommand collect;
+    term.registerCommand("collect", &collect);
+
+    stream.inputBuffer = "for i in one two three; do collect $i; done\n";
+    term.loop();
+
+    TEST_ASSERT_EQUAL(3, collect.collected.size());
+    TEST_ASSERT_EQUAL_STRING("one", collect.collected[0].c_str());
+    TEST_ASSERT_EQUAL_STRING("two", collect.collected[1].c_str());
+    TEST_ASSERT_EQUAL_STRING("three", collect.collected[2].c_str());
+}
+
+void test_terminal_for_loop_supports_braced_variable(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    CollectArgsCommand collect;
+    term.registerCommand("collect", &collect);
+
+    stream.inputBuffer = "for item in alpha beta; do collect ${item}; done\n";
+    term.loop();
+
+    TEST_ASSERT_EQUAL(2, collect.collected.size());
+    TEST_ASSERT_EQUAL_STRING("alpha", collect.collected[0].c_str());
+    TEST_ASSERT_EQUAL_STRING("beta", collect.collected[1].c_str());
+}
+
 void process_tests()
 {
     UNITY_BEGIN();
@@ -532,6 +589,8 @@ void process_tests()
     RUN_TEST(test_terminal_redirects_input_with_lt);
     RUN_TEST(test_terminal_redirects_output_with_gtgt_append);
     RUN_TEST(test_terminal_redirects_output_with_gt_and_overwrite);
+    RUN_TEST(test_terminal_for_loop_executes_body_for_each_value);
+    RUN_TEST(test_terminal_for_loop_supports_braced_variable);
     UNITY_END();
 }
 
