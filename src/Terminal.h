@@ -16,6 +16,8 @@
 
 namespace EmbeddedTerminal
 {
+    enum class LexerError;
+
     // Forward declarations
     class DirectoryNavigator;
     class IFileSystem;
@@ -56,16 +58,19 @@ namespace EmbeddedTerminal
 
     private:
         CommandResult executeCommandInternal_(ICommand *command, const ETString &keyword, const ETString &arguments,
-                                             IInputChannel &stdinChannel, IOutputChannel &stdoutChannel, IOutputChannel &stderrChannel);
+                                              IInputChannel &stdinChannel, IOutputChannel &stdoutChannel, IOutputChannel &stderrChannel);
         void executeCommand_(ICommand *command, const ETString &keyword, const ETString &arguments);
         void executePipeline_(const ETVector<ETString> &keywords, const ETVector<ETString> &arguments,
                               const ETString &redirectOutPath, bool appendRedirect, const ETString &redirectInPath);
+        bool parseAndExecuteLine_(const ETString &line);
+        bool tryExecuteForLoopLine_(const ETString &line);
+        void reportLexerError_(LexerError error);
 
         ETMap<ETString, ICommand *> observer_;
         ITerminalStream &input_;
         IFileSystem *fileSystem_ = nullptr;
 #if defined(ARDUINO)
-    ArduinoStream *ownedStream_ = nullptr;
+        ArduinoStream *ownedStream_ = nullptr;
 #endif
 
         // Constants

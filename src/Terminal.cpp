@@ -405,56 +405,51 @@ namespace EmbeddedTerminal
         fileSystem_ = fileSystem;
     }
 
-    void Terminal::loop()
+    void Terminal::reportLexerError_(LexerError error)
     {
-        auto executeParsedLine = [this](const ETString &parsedLine)
+        lastExitCode_ = 2;
+
+        if (error == LexerError::TOKEN_ARRAY_EXHAUSTED)
         {
-            ETVector<ETString> keywords;
-            ETVector<ETString> arguments;
-            ETString redirectOutPath;
-            bool appendRedirect = false;
-            ETString redirectInPath;
-            LexerError lexerError = LexerError::NONE;
-            bool parsed = parseCommandLineWithLexer_(parsedLine, keywords, arguments, redirectOutPath, appendRedirect, redirectInPath, lexerError);
+            input_.printTo(TerminalChannel::StdErr, "lexer error: token array exhausted\n");
+        }
+        else if (error == LexerError::UNTERMINATED_SINGLE_QUOTE)
+        {
+            input_.printTo(TerminalChannel::StdErr, "lexer error: unterminated single quote\n");
+        }
+        else if (error == LexerError::UNTERMINATED_DOUBLE_QUOTE)
+        {
+            input_.printTo(TerminalChannel::StdErr, "lexer error: unterminated double quote\n");
+        }
+        else
+        {
+            input_.printTo(TerminalChannel::StdErr, "lexer error: invalid command syntax\n");
+        }
+    }
 
-            if (!parsed)
+    bool Terminal::parseAndExecuteLine_(const ETString &line)
+    {
+        ETVector<ETString> keywords;
+        ETVector<ETString> arguments;
+        ETString redirectOutPath;
+        bool appendRedirect = false;
+        ETString redirectInPath;
+        LexerError lexerError = LexerError::NONE;
+        bool parsed = parseCommandLineWithLexer_(line, keywords, arguments, redirectOutPath, appendRedirect, redirectInPath, lexerError);
+
+        if (!parsed)
+        {
+            reportLexerError_(lexerError);
+            return false;
+        }
+
+        if (keywords.size() == 1)
+        {
+            if (redirectOutPath.empty())
             {
-                if (lexerError == LexerError::TOKEN_ARRAY_EXHAUSTED)
+                if (redirectInPath.empty())
                 {
-                    lastExitCode_ = 2;
-                    input_.printTo(TerminalChannel::StdErr, "lexer error: token array exhausted\n");
-                }
-                else if (lexerError == LexerError::UNTERMINATED_SINGLE_QUOTE)
-                {
-                    lastExitCode_ = 2;
-                    input_.printTo(TerminalChannel::StdErr, "lexer error: unterminated single quote\n");
-                }
-                else if (lexerError == LexerError::UNTERMINATED_DOUBLE_QUOTE)
-                {
-                    lastExitCode_ = 2;
-                    input_.printTo(TerminalChannel::StdErr, "lexer error: unterminated double quote\n");
-                }
-                else
-                {
-                    lastExitCode_ = 2;
-                    input_.printTo(TerminalChannel::StdErr, "lexer error: invalid command syntax\n");
-                }
-
-                return false;
-            }
-
-            if (keywords.size() == 1)
-            {
-                if (redirectOutPath.empty())
-                {
-                    if (redirectInPath.empty())
-                    {
-                        call(keywords[0], arguments[0]);
-                    }
-                    else
-                    {
-                        executePipeline_(keywords, arguments, redirectOutPath, appendRedirect, redirectInPath);
-                    }
+                    call(keywords[0], arguments[0]);
                 }
                 else
                 {
@@ -465,10 +460,41 @@ namespace EmbeddedTerminal
             {
                 executePipeline_(keywords, arguments, redirectOutPath, appendRedirect, redirectInPath);
             }
+        }
+        else
+        {
+            executePipeline_(keywords, arguments, redirectOutPath, appendRedirect, redirectInPath);
+        }
 
-            return true;
-        };
+        return true;
+    }
 
+    bool Terminal::tryExecuteForLoopLine_(const ETString &line)
+    {
+        ETString loopVariable;
+        ETVector<ETString> loopValues;
+        ETString loopBody;
+        LexerError lexerError = LexerError::NONE;
+        bool isForLoop = parseForLoopWithLexer_(line, loopVariable, loopValues, loopBody, lexerError);
+        if (!isForLoop)
+        {
+            return false;
+        }
+
+        for (size_t idx = 0; idx < loopValues.size(); ++idx)
+        {
+            ETString expandedBody = substituteLoopVariable_(loopBody, loopVariable, loopValues[idx]);
+            if (!parseAndExecuteLine_(expandedBody))
+            {
+                break;
+            }
+        }
+
+        return true;
+    }
+
+    void Terminal::loop()
+    {
         if (hasActiveCommand_)
         {
             bool shouldContinue = (activeState_ == CommandExecutionState::Running) ||
@@ -522,26 +548,12 @@ namespace EmbeddedTerminal
                 continue;
             }
 
-            ETString loopVariable;
-            ETVector<ETString> loopValues;
-            ETString loopBody;
-            LexerError lexerError = LexerError::NONE;
-            bool isForLoop = parseForLoopWithLexer_(cleanedLine, loopVariable, loopValues, loopBody, lexerError);
-            if (isForLoop)
+            if (tryExecuteForLoopLine_(cleanedLine))
             {
-                for (size_t idx = 0; idx < loopValues.size(); ++idx)
-                {
-                    ETString expandedBody = substituteLoopVariable_(loopBody, loopVariable, loopValues[idx]);
-                    if (!executeParsedLine(expandedBody))
-                    {
-                        break;
-                    }
-                }
-
                 continue;
             }
 
-            if (!executeParsedLine(cleanedLine))
+            if (!parseAndExecuteLine_(cleanedLine))
             {
                 continue;
             }
