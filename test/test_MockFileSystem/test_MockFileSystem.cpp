@@ -147,12 +147,12 @@ void test_open_file_multiple_times()
     TEST_ASSERT_FALSE(nonfile3.isOpen());
     file1.close();
 
-    // After closing, should be able to open for write again
+    // After closing, should be able to open for write again (write mode truncates)
     auto file3 = fs->open("/multi.txt", FILE_MODE_WRITE, false);
     TEST_ASSERT_TRUE(file3.isOpen());
     file3.write("X", 1);
-    TEST_ASSERT_EQUAL(5, file3.size());
-    TEST_ASSERT_EQUAL_STRING("dataX", file3.readAll().c_str());
+    TEST_ASSERT_EQUAL(1, file3.size());
+    TEST_ASSERT_EQUAL_STRING("X", file3.readAll().c_str());
 }
 void test_multiple_read_handles()
 {

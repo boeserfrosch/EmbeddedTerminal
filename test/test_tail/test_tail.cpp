@@ -169,7 +169,7 @@ void test_tail_streaming_execution_edge_cases(void)
     tail.execute(invocation);
 
     // Simulate file growing between invocations
-    auto file = storage->open("/file.txt", "w", false);
+    auto file = storage->open("/file.txt", "a", false);
     file.writeAll("new line13\nnew line14\n");
     file.close();
 
