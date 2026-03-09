@@ -189,6 +189,117 @@ void test_xxd_execute_navigates_on_next_key(void)
     TEST_ASSERT_TRUE(stream.stdoutBuffer.find("00000010") != ETString::npos);
 }
 
+void test_xxd_execute_navigates_on_previous_key(void)
+{
+    ETString content = "";
+    for (int i = 0; i < 40; i++)
+    {
+        content += "0123456789";
+    }
+    storage->open("/big_prev.bin", "w", true).writeAll(content.c_str());
+
+    EmbeddedTerminal::cmd::xxd xxd(*dir);
+    MockStream stream;
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+    BufferedInputChannel stdinChannel;
+    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+
+    CommandInvocation invocation{"xxd", "big_prev.bin", context, stdinChannel, stdoutChannel, stderrChannel};
+    xxd.execute(invocation);
+
+    stdinChannel.buffer = "n";
+    xxd.execute(invocation);
+
+    stream.stdoutBuffer = "";
+    stdinChannel.buffer = "p";
+    CommandResult result = xxd.execute(invocation);
+    TEST_ASSERT_EQUAL(0, result.exitCode);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("00000000") != ETString::npos);
+}
+
+void test_xxd_execute_navigates_with_go_begin_and_end(void)
+{
+    ETString content = "";
+    for (int i = 0; i < 120; i++)
+    {
+        content += "ABCDEFGH";
+    }
+    storage->open("/big_go.bin", "w", true).writeAll(content.c_str());
+
+    EmbeddedTerminal::cmd::xxd xxd(*dir);
+    MockStream stream;
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+    BufferedInputChannel stdinChannel;
+    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+
+    CommandInvocation invocation{"xxd", "big_go.bin", context, stdinChannel, stdoutChannel, stderrChannel};
+    xxd.execute(invocation);
+
+    stream.stdoutBuffer = "";
+    stdinChannel.buffer = "G";
+    xxd.execute(invocation);
+    TEST_ASSERT_TRUE(vars.find("xxd__pos") != vars.end());
+    TEST_ASSERT_TRUE(std::stoull(vars["xxd__pos"].c_str()) > 0);
+
+    stream.stdoutBuffer = "";
+    stdinChannel.buffer = "g";
+    CommandResult result = xxd.execute(invocation);
+    TEST_ASSERT_EQUAL(0, result.exitCode);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("00000000") != ETString::npos);
+}
+
+void test_xxd_execute_navigates_to_hex_offset(void)
+{
+    ETString content = "";
+    for (int i = 0; i < 80; i++)
+    {
+        content += "0123456789";
+    }
+    storage->open("/big_offset.bin", "w", true).writeAll(content.c_str());
+
+    EmbeddedTerminal::cmd::xxd xxd(*dir);
+    MockStream stream;
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+    BufferedInputChannel stdinChannel;
+    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+
+    CommandInvocation invocation{"xxd", "big_offset.bin", context, stdinChannel, stdoutChannel, stderrChannel};
+    xxd.execute(invocation);
+
+    stream.stdoutBuffer = "";
+    stdinChannel.buffer = "o20";
+    CommandResult result = xxd.execute(invocation);
+    TEST_ASSERT_EQUAL(0, result.exitCode);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("00000020") != ETString::npos);
+}
+
+void test_xxd_execute_quit_key_completes(void)
+{
+    storage->open("/quit.bin", "w", true).writeAll("0123456789ABCDEF");
+    EmbeddedTerminal::cmd::xxd xxd(*dir);
+
+    MockStream stream;
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+    BufferedInputChannel stdinChannel;
+    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+
+    CommandInvocation invocation{"xxd", "quit.bin", context, stdinChannel, stdoutChannel, stderrChannel};
+    xxd.execute(invocation);
+
+    stdinChannel.buffer = "q";
+    CommandResult result = xxd.execute(invocation);
+    TEST_ASSERT_EQUAL(CommandExecutionState::Completed, result.state);
+    TEST_ASSERT_EQUAL(0, result.exitCode);
+}
+
 int process_tests()
 {
     UNITY_BEGIN();
@@ -201,6 +312,10 @@ int process_tests()
     RUN_TEST(test_xxd_execute_writes_stdout);
     RUN_TEST(test_xxd_execute_missing_file_writes_stderr);
     RUN_TEST(test_xxd_execute_navigates_on_next_key);
+    RUN_TEST(test_xxd_execute_navigates_on_previous_key);
+    RUN_TEST(test_xxd_execute_navigates_with_go_begin_and_end);
+    RUN_TEST(test_xxd_execute_navigates_to_hex_offset);
+    RUN_TEST(test_xxd_execute_quit_key_completes);
     UNITY_END();
     return 0;
 }

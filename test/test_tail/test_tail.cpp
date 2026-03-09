@@ -237,6 +237,88 @@ void test_tail_lines_option(void)
     TEST_ASSERT_MESSAGE(stream.stdoutBuffer.find("line7") == ETString::npos, "Expected not to find line7 in output");
 }
 
+void test_tail_lines_long_option(void)
+{
+    storage->open("/file.txt", "w", true).writeAll("line1\nline2\nline3\nline4\nline5\nline6\n");
+
+    EmptyInputChannel stdinChannel;
+    MockStream stream;
+    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+
+    cmd::tail tail(*dir);
+    CommandInvocation invocation({"tail", "--lines 3 file.txt", context, stdinChannel, stdoutChannel, stderrChannel});
+
+    tail.execute(invocation);
+    tail.execute(invocation);
+    auto result = tail.execute(invocation);
+
+    TEST_ASSERT_MESSAGE(result.state == CommandExecutionState::Completed, "Expected command to complete when using --lines option");
+    TEST_ASSERT_MESSAGE(stream.stdoutBuffer.find("line6") != ETString::npos, "Expected to find last lines in output");
+    TEST_ASSERT_MESSAGE(stream.stdoutBuffer.find("line1") == ETString::npos, "Expected not to find first line in output");
+}
+
+void test_tail_invalid_line_count_option(void)
+{
+    EmptyInputChannel stdinChannel;
+    MockStream stream;
+    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+
+    cmd::tail tail(*dir);
+    CommandInvocation invocation({"tail", "-n 0 file.txt", context, stdinChannel, stdoutChannel, stderrChannel});
+    auto result = tail.execute(invocation);
+
+    TEST_ASSERT_MESSAGE(result.state == CommandExecutionState::Completed, "Expected invalid line count to complete with error");
+    TEST_ASSERT_TRUE(result.exitCode != 0);
+    TEST_ASSERT_MESSAGE(stream.stderrBuffer.find("Invalid number of lines") != ETString::npos, "Expected invalid line-count error");
+}
+
+void test_tail_invalid_option_returns_error(void)
+{
+    EmptyInputChannel stdinChannel;
+    MockStream stream;
+    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+
+    cmd::tail tail(*dir);
+    CommandInvocation invocation({"tail", "-z file.txt", context, stdinChannel, stdoutChannel, stderrChannel});
+    auto result = tail.execute(invocation);
+
+    TEST_ASSERT_MESSAGE(result.state == CommandExecutionState::Completed, "Expected invalid option to complete with error");
+    TEST_ASSERT_TRUE(result.exitCode != 0);
+    TEST_ASSERT_MESSAGE(!stream.stderrBuffer.empty(), "Expected error output for invalid option path");
+}
+
+void test_tail_empty_file_streaming_returns_read_error(void)
+{
+    storage->open("/empty.txt", "w", true).writeAll("");
+
+    EmptyInputChannel stdinChannel;
+    MockStream stream;
+    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+
+    cmd::tail tail(*dir);
+    CommandInvocation invocation({"tail", "empty.txt", context, stdinChannel, stdoutChannel, stderrChannel});
+
+    tail.execute(invocation);
+    tail.execute(invocation);
+    auto result = tail.execute(invocation);
+
+    TEST_ASSERT_MESSAGE(result.state == CommandExecutionState::Completed, "Expected empty file tail to fail and complete");
+    TEST_ASSERT_EQUAL(EmbeddedTerminal::cmd::errorCodes::TAIL_CMD_ERROR_FAILED_TO_READ, result.exitCode);
+    TEST_ASSERT_MESSAGE(stream.stderrBuffer.find("Failed to read from file") != ETString::npos, "Expected failed-read error message");
+}
+
 void process_tests()
 {
     UNITY_BEGIN();
@@ -252,6 +334,10 @@ void process_tests()
     RUN_TEST(test_tail_streaming_execution_edge_cases);
     RUN_TEST(test_tail_streaming_execution_multiple_invocations);
     RUN_TEST(test_tail_lines_option);
+    RUN_TEST(test_tail_lines_long_option);
+    RUN_TEST(test_tail_invalid_line_count_option);
+    RUN_TEST(test_tail_invalid_option_returns_error);
+    RUN_TEST(test_tail_empty_file_streaming_returns_read_error);
     UNITY_END();
 }
 
