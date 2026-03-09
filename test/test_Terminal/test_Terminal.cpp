@@ -11,6 +11,7 @@
 #include "../src/ETTypes.h"
 #include "../Mocks/MockStream.h"
 #include "../Mocks/MockCommand.h"
+#include "../Mocks/native/MockFileSystem.h"
 #include <unity.h>
 
 using namespace EmbeddedTerminal;
@@ -424,6 +425,27 @@ void test_terminal_parses_pipe_in_arguments(void)
     TEST_ASSERT_TRUE(stream.stdoutBuffer.find("HELLO PIPE") != ETString::npos);
 }
 
+void test_terminal_redirects_output_with_gt(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    MockFileSystem fs;
+    term.setFileSystem(&fs);
+
+    EmitCommand emit;
+    term.registerCommand("emit", &emit);
+
+    stream.inputBuffer = "emit > /out.txt\n";
+    term.loop();
+
+    TEST_ASSERT_TRUE(fs.exists("/out.txt"));
+    ETFile file = fs.open("/out.txt", FILE_MODE_READ, false);
+    TEST_ASSERT_TRUE(file.isOpen());
+    TEST_ASSERT_EQUAL_STRING("hello pipe", file.readAll().c_str());
+    file.close();
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("hello pipe") == ETString::npos);
+}
+
 void process_tests()
 {
     UNITY_BEGIN();
@@ -445,6 +467,7 @@ void process_tests()
     RUN_TEST(test_terminal_uses_lexer_for_quoted_arguments);
     RUN_TEST(test_terminal_reports_lexer_error_for_unterminated_quote);
     RUN_TEST(test_terminal_parses_pipe_in_arguments);
+    RUN_TEST(test_terminal_redirects_output_with_gt);
     UNITY_END();
 }
 

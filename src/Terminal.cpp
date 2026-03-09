@@ -49,7 +49,8 @@ namespace EmbeddedTerminal
             return true;
         }
 
-        bool parseCommandLineWithLexer_(const ETString &line, ETVector<ETString> &keywords, ETVector<ETString> &arguments, LexerError &lexerError)
+        bool parseCommandLineWithLexer_(const ETString &line, ETVector<ETString> &keywords, ETVector<ETString> &arguments,
+                        ETString &redirectOutPath, bool &appendRedirect, LexerError &lexerError)
         {
             token_t tokens[TERMINAL_LEXER_TOKEN_MAX];
             size_t tokenCount = 0;
@@ -61,6 +62,8 @@ namespace EmbeddedTerminal
 
             keywords.clear();
             arguments.clear();
+            redirectOutPath = "";
+            appendRedirect = false;
 
             size_t index = 0;
             while (index < tokenCount && (tokens[index].type == TokenType::NEWLINE))
@@ -95,6 +98,34 @@ namespace EmbeddedTerminal
                     currentKeyword = "";
                     currentArguments = "";
                     continue;
+                }
+
+                if (tokens[index].type == TokenType::REDIR_OUT || tokens[index].type == TokenType::REDIR_APPEND)
+                {
+                    if (currentKeyword.empty())
+                    {
+                        return false;
+                    }
+
+                    appendRedirect = (tokens[index].type == TokenType::REDIR_APPEND);
+                    ++index;
+                    if (index >= tokenCount || tokens[index].type != TokenType::WORD)
+                    {
+                        return false;
+                    }
+
+                    redirectOutPath = tokens[index].text;
+
+                    ++index;
+                    while (index < tokenCount)
+                    {
+                        if (tokens[index].type != TokenType::END_OF_FILE && tokens[index].type != TokenType::NEWLINE)
+                        {
+                            return false;
+                        }
+                        ++index;
+                    }
+                    break;
                 }
 
                 if (currentKeyword.empty())
@@ -234,6 +265,11 @@ namespace EmbeddedTerminal
         // Terminal does NOT own commands - caller is responsible for cleanup
     }
 
+    void Terminal::setFileSystem(IFileSystem *fileSystem)
+    {
+        fileSystem_ = fileSystem;
+    }
+
     void Terminal::loop()
     {
         if (hasActiveCommand_)
@@ -291,8 +327,10 @@ namespace EmbeddedTerminal
 
             ETVector<ETString> keywords;
             ETVector<ETString> arguments;
+            ETString redirectOutPath;
+            bool appendRedirect = false;
             LexerError lexerError = LexerError::NONE;
-            bool parsed = parseCommandLineWithLexer_(cleanedLine, keywords, arguments, lexerError);
+            bool parsed = parseCommandLineWithLexer_(cleanedLine, keywords, arguments, redirectOutPath, appendRedirect, lexerError);
 
             if (!parsed)
             {
@@ -322,11 +360,18 @@ namespace EmbeddedTerminal
 
             if (keywords.size() == 1)
             {
-                call(keywords[0], arguments[0]);
+                if (redirectOutPath.empty())
+                {
+                    call(keywords[0], arguments[0]);
+                }
+                else
+                {
+                    executePipeline_(keywords, arguments, redirectOutPath, appendRedirect);
+                }
             }
             else
             {
-                executePipeline_(keywords, arguments);
+                executePipeline_(keywords, arguments, redirectOutPath, appendRedirect);
             }
         }
     }
@@ -452,7 +497,7 @@ namespace EmbeddedTerminal
         activeState_ = result.state;
     }
 
-    void Terminal::executePipeline_(const ETVector<ETString> &keywords, const ETVector<ETString> &arguments)
+    void Terminal::executePipeline_(const ETVector<ETString> &keywords, const ETVector<ETString> &arguments, const ETString &redirectOutPath, bool appendRedirect)
     {
         if (keywords.empty() || (keywords.size() != arguments.size()))
         {
@@ -490,8 +535,9 @@ namespace EmbeddedTerminal
 
             IInputChannel &stdinChannel = (index == 0) ? static_cast<IInputChannel &>(streamInput)
                                                        : static_cast<IInputChannel &>(bufferedInput);
-            IOutputChannel &stdoutChannel = isLast ? static_cast<IOutputChannel &>(finalOutput)
-                                                   : static_cast<IOutputChannel &>(stageOutput);
+            bool writeToFile = isLast && !redirectOutPath.empty();
+            IOutputChannel &stdoutChannel = (isLast && !writeToFile) ? static_cast<IOutputChannel &>(finalOutput)
+                                                                      : static_cast<IOutputChannel &>(stageOutput);
 
             CommandResult result = executeCommandInternal_(search->second, commandKey, arguments[index], stdinChannel, stdoutChannel, stderrChannel);
 
@@ -505,6 +551,34 @@ namespace EmbeddedTerminal
             if (!isLast)
             {
                 pipedStdout = stageOutput.buffer();
+            }
+            else if (writeToFile)
+            {
+                if (fileSystem_ == nullptr)
+                {
+                    lastExitCode_ = 2;
+                    input_.printTo(TerminalChannel::StdErr, "redirection error: filesystem not configured\n");
+                    return;
+                }
+
+                const char *mode = appendRedirect ? FILE_MODE_APPEND : FILE_MODE_WRITE;
+                ETFile file = fileSystem_->open(redirectOutPath, mode, true);
+                if (!file.isOpen())
+                {
+                    lastExitCode_ = 2;
+                    input_.printTo(TerminalChannel::StdErr, "redirection error: failed to open target\n");
+                    return;
+                }
+
+                if (!file.writeAll(stageOutput.buffer()))
+                {
+                    file.close();
+                    lastExitCode_ = 2;
+                    input_.printTo(TerminalChannel::StdErr, "redirection error: failed to write target\n");
+                    return;
+                }
+
+                file.close();
             }
         }
     }

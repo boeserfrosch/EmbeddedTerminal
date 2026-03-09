@@ -6,6 +6,7 @@
 #include "interfaces/ICommand.h"
 #include "interfaces/ICommandRuntime.h"
 #include "interfaces/IAutoCompleter.h"
+#include "interfaces/IFileSystem.h"
 #include "BuiltinCommandFlags.h"
 
 #if defined(ARDUINO)
@@ -40,6 +41,7 @@ namespace EmbeddedTerminal
         // Caller is responsible for deleting command objects.
         void registerCommand(const ETString &keyword, ICommand *observer);
         void deregisterCommand(const ETString &keyword);
+        void setFileSystem(IFileSystem *fileSystem);
 
         void loop();
         const ETMap<ETString, ICommand *> &getCommands() const;
@@ -56,10 +58,12 @@ namespace EmbeddedTerminal
         CommandResult executeCommandInternal_(ICommand *command, const ETString &keyword, const ETString &arguments,
                                              IInputChannel &stdinChannel, IOutputChannel &stdoutChannel, IOutputChannel &stderrChannel);
         void executeCommand_(ICommand *command, const ETString &keyword, const ETString &arguments);
-        void executePipeline_(const ETVector<ETString> &keywords, const ETVector<ETString> &arguments);
+        void executePipeline_(const ETVector<ETString> &keywords, const ETVector<ETString> &arguments,
+                      const ETString &redirectOutPath, bool appendRedirect);
 
         ETMap<ETString, ICommand *> observer_;
         ITerminalStream &input_;
+        IFileSystem *fileSystem_ = nullptr;
 #if defined(ARDUINO)
     ArduinoStream *ownedStream_ = nullptr;
 #endif
