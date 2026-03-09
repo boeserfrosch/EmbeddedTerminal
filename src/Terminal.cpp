@@ -52,7 +52,7 @@ namespace EmbeddedTerminal
     }
 
 #if defined(ARDUINO)
-    Terminal::Terminal(Stream &stream) : ownedStream_(new ArduinoStream(stream)), input_(ownedStream_)
+    Terminal::Terminal(Stream &stream) : input_(*(ownedStream_ = new ArduinoStream(stream)))
     {
         buffer.reserve(BUFFER_RESERVE_SIZE);
     }

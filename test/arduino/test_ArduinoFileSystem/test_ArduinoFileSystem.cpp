@@ -115,7 +115,7 @@ void test_isEmpty_returns_true(void)
     TEST_ASSERT_FALSE(fileSystem->isEmpty("/someDir"));
 }
 
-int main()
+static int runAllTests()
 {
     UNITY_BEGIN();
     RUN_TEST(test_open_and_write_read_file);
@@ -131,3 +131,20 @@ int main()
     RUN_TEST(test_isEmpty_returns_true);
     return UNITY_END();
 }
+
+#if defined(ARDUINO)
+void setup()
+{
+    delay(2000);
+    runAllTests();
+}
+
+void loop()
+{
+}
+#else
+int main()
+{
+    return runAllTests();
+}
+#endif

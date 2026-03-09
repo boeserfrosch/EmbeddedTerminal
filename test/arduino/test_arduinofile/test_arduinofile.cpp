@@ -113,7 +113,29 @@ int process_tests_arduino_file()
     return UNITY_END();
 }
 
+#if defined(ARDUINO)
+
+void setup()
+{
+    Serial.begin(115200);
+    while (!Serial)
+        ;
+    process_tests_arduino_file();
+}
+void loop() {}
+
+#elif (defined(ESP_PLATFORM) || defined(ESP32)) && not defined(ARDUINO)
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+extern "C" void app_main()
+{
+    vTaskDelay(pdMS_TO_TICKS(4000));
+    process_tests_arduino_file();
+}
+
+#else
 int main()
 {
     return process_tests_arduino_file();
 }
+#endif

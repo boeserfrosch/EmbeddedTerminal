@@ -432,15 +432,6 @@ ETString join(const ETVector<ETString> &elements, const ETString &delimiter)
     return result;
 }
 
-ETString toETString(uint32_t src)
-{
-#if defined(ARDUINO) //|| defined(ESP_PLATFORM)
-    return ETString(String(src));
-#else
-    return ETString(std::to_string(src));
-#endif
-}
-
 ETString toETString(int32_t src)
 {
 #if defined(ARDUINO) //|| defined(ESP_PLATFORM)

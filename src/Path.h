@@ -136,12 +136,12 @@ namespace EmbeddedTerminal
         {
             if (isAbsolute_ != other.isAbsolute_)
                 return isAbsolute_ < other.isAbsolute_; // Absolute paths are considered "less" than relative paths
-            return ETString(*this) < ETString(other);
+            return asString_() < other.asString_();
         }
 
         bool operator!=(const Path &other) const
         {
-            return isAbsolute_ != other.isAbsolute_ || ETString(*this) != ETString(other);
+            return isAbsolute_ != other.isAbsolute_ || asString_() != other.asString_();
         }
 
         bool operator!=(const char *other) const

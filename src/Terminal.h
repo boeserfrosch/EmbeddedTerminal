@@ -56,7 +56,7 @@ namespace EmbeddedTerminal
         ETMap<ETString, ICommand *> observer_;
         ITerminalStream &input_;
 #if defined(ARDUINO)
-        ArduinoStream ownedStream_;
+    ArduinoStream *ownedStream_ = nullptr;
 #endif
 
         // Constants

@@ -22,7 +22,7 @@ namespace EmbeddedTerminal
             {
                 currentDir_ = Path::root();
             }
-            if (currentDir_.isRoot() || ETString(currentDir_) == "/")
+            if (currentDir_.isRoot() || currentDir_ == "/")
             {
                 currentDir_ = Path::root();
             }

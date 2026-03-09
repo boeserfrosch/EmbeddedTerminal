@@ -15,11 +15,14 @@ namespace EmbeddedTerminalMock
     {
         bool isDirectory = false;
         std::string content;
+
+        MockFSEntry() = default;
+        MockFSEntry(bool isDir, const std::string &content) : isDirectory(isDir), content(content) {}
     };
 
     struct MockFSState
     {
-        std::map<std::string, MockFSEntry> entries{{"/", {true, ""}}};
+        std::map<std::string, MockFSEntry> entries{{"/", EmbeddedTerminalMock::MockFSEntry(true, "")}};
     };
 
     inline std::string normalizePath(const std::string &input)
@@ -270,7 +273,7 @@ public:
 
         if (openMode == "w")
         {
-            state_->entries[normalized] = {false, ""};
+            state_->entries[normalized] = EmbeddedTerminalMock::MockFSEntry(false, "");
             return File(state_, normalized, false, true, true);
         }
 

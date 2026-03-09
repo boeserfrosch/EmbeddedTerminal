@@ -24,7 +24,7 @@ namespace EmbeddedTerminal
                 return ETString(content.c_str()) + "\n";
             }
             unsigned char buffer[512];
-            size_t bytesRead = file.read(buffer, 512);
+            file.read(buffer, 512);
             file.close();
 
             ETString chunk = buffer;

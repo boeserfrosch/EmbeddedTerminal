@@ -18,7 +18,7 @@ protected:
 
 public:
     MockStorageMedia(const ETString &name, bool available = true, unsigned long long total = 1024 * 1024, unsigned long long used = 0, unsigned long long capacity = 1024 * 1024, unsigned long long free = 1024 * 1024, IFileSystem *fs = nullptr)
-        : mediaName_(name), available_(available), total_(total), used_(used), capacity_(capacity), free_(free), fs_(fs) {}
+        : fs_(fs), mediaName_(name), available_(available), total_(total), used_(used), free_(free), capacity_(capacity) {}
     const char *name() const override { return mediaName_.c_str(); }
     IFileSystem *fileSystem() override { return fs_; }
     bool isAvailable() const override { return available_; }

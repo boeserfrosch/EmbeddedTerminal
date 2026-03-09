@@ -72,7 +72,7 @@ namespace EmbeddedTerminal
             bool isPartialAbsolute = !partial.empty() && (partial[0] == '/');
             for (const auto &s : suggestions)
             {
-                ETString suggestionStr = ETString(s) + (navigator_.isDirectory(s) ? "/" : "");
+                ETString suggestionStr = ETString(s.c_str()) + (navigator_.isDirectory(s) ? "/" : "");
                 if (!isPartialAbsolute && suggestionStr.length() > 0 && suggestionStr[0] == '/')
                 {
                     suggestionStr = suggestionStr.substr(1);
@@ -112,7 +112,7 @@ namespace EmbeddedTerminal
                 if (navigator_.isDirectory(entry))
                 {
                     Path suggestionPath = absoluteSearchDir + entry;
-                    stringSuggestions.push_back(ETString(suggestionPath) + "/");
+                    stringSuggestions.push_back(ETString(suggestionPath.c_str()) + "/");
                 }
             }
 

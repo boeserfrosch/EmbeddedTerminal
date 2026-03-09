@@ -1,7 +1,9 @@
 #include <unity.h>
 
 #include "hal/common/StorageMediaAdapter.h"
+#if !defined(ESP_PLATFORM) && !defined(ESP32) && !defined(ARDUINO)
 #include "hal/native/NativeSuggestedStorageMedia.h"
+#endif
 #include "StorageSystem.h"
 #include "../Mocks/native/MockFileSystem.h"
 
@@ -18,10 +20,10 @@ void test_storage_media_adapter_properties(void)
     TEST_ASSERT_EQUAL_STRING("mock", media.name());
     TEST_ASSERT_EQUAL_PTR(&fs, media.fileSystem());
     TEST_ASSERT_TRUE(media.isAvailable());
-    TEST_ASSERT_EQUAL_UINT64(1024, media.totalBytes());
-    TEST_ASSERT_EQUAL_UINT64(128, media.usedBytes());
-    TEST_ASSERT_EQUAL_UINT64(1024, media.capacity());
-    TEST_ASSERT_EQUAL_UINT64(896, media.freeBytes());
+    TEST_ASSERT_EQUAL(1024, media.totalBytes());
+    TEST_ASSERT_EQUAL(128, media.usedBytes());
+    TEST_ASSERT_EQUAL(1024, media.capacity());
+    TEST_ASSERT_EQUAL(896, media.freeBytes());
 }
 
 void test_storage_media_adapter_setters(void)
@@ -36,13 +38,13 @@ void test_storage_media_adapter_setters(void)
     media.setFreeBytes(3840);
 
     TEST_ASSERT_FALSE(media.isAvailable());
-    TEST_ASSERT_EQUAL_UINT64(2048, media.totalBytes());
-    TEST_ASSERT_EQUAL_UINT64(256, media.usedBytes());
-    TEST_ASSERT_EQUAL_UINT64(4096, media.capacity());
-    TEST_ASSERT_EQUAL_UINT64(3840, media.freeBytes());
+    TEST_ASSERT_EQUAL(2048, media.totalBytes());
+    TEST_ASSERT_EQUAL(256, media.usedBytes());
+    TEST_ASSERT_EQUAL(4096, media.capacity());
+    TEST_ASSERT_EQUAL(3840, media.freeBytes());
 }
 
-#if defined(__cplusplus) && __cplusplus >= 201703L
+#if !defined(ESP_PLATFORM) && !defined(ESP32) && !defined(ARDUINO) && defined(__cplusplus) && __cplusplus >= 201703L
 void test_native_suggested_storage_media_reports_space(void)
 {
     NativeSuggestedStorageMedia media("native-test", ".");
@@ -75,7 +77,7 @@ int process_tests()
     UNITY_BEGIN();
     RUN_TEST(test_storage_media_adapter_properties);
     RUN_TEST(test_storage_media_adapter_setters);
-#if defined(__cplusplus) && __cplusplus >= 201703L
+#if !defined(ESP_PLATFORM) && !defined(ESP32) && !defined(ARDUINO) && defined(__cplusplus) && __cplusplus >= 201703L
     RUN_TEST(test_native_suggested_storage_media_reports_space);
     RUN_TEST(test_native_suggested_storage_media_mounts_in_storage_system);
 #endif
@@ -83,8 +85,11 @@ int process_tests()
 }
 
 #if (defined(ESP_PLATFORM) || defined(ESP32)) && !defined(ARDUINO)
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 extern "C" void app_main()
 {
+    vTaskDelay(pdMS_TO_TICKS(4000));
     process_tests();
 }
 #elif defined(ARDUINO)

@@ -17,7 +17,7 @@ void test_path_construction()
     Path p2("a/b/c.txt");
     TEST_ASSERT_FALSE(p2.isAbsolute());
     TEST_ASSERT_EQUAL_STRING("c.txt", p2.getName().c_str());
-    TEST_ASSERT_EQUAL_STRING("a/b", ETString(p2.getBasePath()).c_str());
+    TEST_ASSERT_EQUAL_STRING("a/b", p2.getBasePath().c_str());
 
     Path p3("");
     TEST_ASSERT_TRUE(p3.isAbsolute());
@@ -27,12 +27,12 @@ void test_path_construction()
     TEST_ASSERT_FALSE(p4.isAbsolute());
     TEST_ASSERT_EQUAL_STRING("..", p4.getName().c_str());
     TEST_ASSERT_TRUE(p4.getBasePath().isEmpty());
-    TEST_ASSERT_EQUAL_STRING("..", ETString(p4).c_str());
+    TEST_ASSERT_EQUAL_STRING("..", p4.c_str());
 
     Path p5("/a/b/./c/../d");
     TEST_ASSERT_TRUE(p5.isAbsolute());
     TEST_ASSERT_EQUAL_STRING("d", p5.getName().c_str());
-    TEST_ASSERT_EQUAL_STRING("/a/b/d", ETString(p5).c_str()); // Original path should remain unchanged
+    TEST_ASSERT_EQUAL_STRING("/a/b/d", p5.c_str()); // Original path should remain unchanged
 
     // Explicit root path
     Path p6("/");
@@ -40,7 +40,7 @@ void test_path_construction()
     TEST_ASSERT_TRUE(p6.isEmpty()); // Root is not considered empty in terms of being a valid path, but it has no name
     TEST_ASSERT_EQUAL_STRING("", p6.getName().c_str());
     TEST_ASSERT_TRUE(p6.getBasePath().isEmpty());
-    TEST_ASSERT_EQUAL_STRING("/", ETString(p6).c_str());
+    TEST_ASSERT_EQUAL_STRING("/", p6.c_str());
 }
 
 void test_path_operator_plus()
@@ -48,29 +48,29 @@ void test_path_operator_plus()
     Path p1("/a/b");
     Path p2("c/d.txt");
     Path p3 = p1 + p2;
-    TEST_ASSERT_EQUAL_STRING("/a/b/c/d.txt", ETString(p3).c_str());
+    TEST_ASSERT_EQUAL_STRING("/a/b/c/d.txt", p3.c_str());
 
     Path p4 = p1 + "e.txt";
-    TEST_ASSERT_EQUAL_STRING("/a/b/e.txt", ETString(p4).c_str());
+    TEST_ASSERT_EQUAL_STRING("/a/b/e.txt", p4.c_str());
 }
 
 void test_path_operator_plus_equals()
 {
     Path p1("/a");
     p1 += "b";
-    TEST_ASSERT_EQUAL_STRING("/a/b", ETString(p1).c_str());
+    TEST_ASSERT_EQUAL_STRING("/a/b", p1.c_str());
 
     p1 += Path("c");
-    TEST_ASSERT_EQUAL_STRING("/a/b/c", ETString(p1).c_str());
+    TEST_ASSERT_EQUAL_STRING("/a/b/c", p1.c_str());
 }
 
 void test_path_normalize()
 {
     Path p1("/a/b/./c/../d");
-    TEST_ASSERT_EQUAL_STRING("/a/b/d", ETString(p1).c_str());
+    TEST_ASSERT_EQUAL_STRING("/a/b/d", p1.c_str());
 
     Path p2("a/./b/../c");
-    TEST_ASSERT_EQUAL_STRING("a/c", ETString(p2).c_str());
+    TEST_ASSERT_EQUAL_STRING("a/c", p2.c_str());
 }
 
 void test_path_isChildOf_and_isParentOf()
@@ -116,11 +116,11 @@ void test_path_relativeTo()
     Path parent("/a/b");
     Path child("/a/b/c/d.txt");
     Path rel = child.relativeTo(parent);
-    TEST_ASSERT_EQUAL_STRING("c/d.txt", ETString(rel).c_str());
+    TEST_ASSERT_EQUAL_STRING("c/d.txt", rel.c_str());
 
     Path unrelated("/x/y/z.txt");
     Path rel2 = unrelated.relativeTo(parent);
-    TEST_ASSERT_EQUAL_STRING("/x/y/z.txt", ETString(rel2).c_str());
+    TEST_ASSERT_EQUAL_STRING("/x/y/z.txt", rel2.c_str());
 }
 
 void test_path_c_str_and_conversion()
@@ -135,7 +135,7 @@ void test_path_c_str_and_conversion()
 void test_path_backslash_conversion()
 {
     Path p("a\\b\\c.txt");
-    TEST_ASSERT_EQUAL_STRING("a/b/c.txt", ETString(p).c_str());
+    TEST_ASSERT_EQUAL_STRING("a/b/c.txt", p.c_str());
 }
 
 void test_path_empty_and_root()
@@ -143,12 +143,12 @@ void test_path_empty_and_root()
     Path empty("");
     TEST_ASSERT_TRUE(empty.isAbsolute());
     TEST_ASSERT_TRUE(empty.isEmpty());
-    TEST_ASSERT_EQUAL_STRING("/", ETString(empty).c_str());
+    TEST_ASSERT_EQUAL_STRING("/", empty.c_str());
 
     Path root("/");
     TEST_ASSERT_TRUE(root.isAbsolute());
     TEST_ASSERT_TRUE(root.isEmpty()); // Root is considered empty in terms of path parts
-    TEST_ASSERT_EQUAL_STRING("/", ETString(root).c_str());
+    TEST_ASSERT_EQUAL_STRING("/", root.c_str());
 }
 
 void process_tests()
@@ -169,6 +169,8 @@ void process_tests()
 }
 
 #if (defined(ESP_PLATFORM) || defined(ESP32)) && not defined(ARDUINO)
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 extern "C" void app_main()
 {
     vTaskDelay(pdMS_TO_TICKS(4000));

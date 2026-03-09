@@ -236,6 +236,8 @@ int process_tests_cat()
 }
 
 #if (defined(ESP_PLATFORM) || defined(ESP32)) && not defined(ARDUINO)
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 extern "C" void app_main()
 {
     vTaskDelay(pdMS_TO_TICKS(4000));

@@ -2,6 +2,7 @@
 #define ET_STORAGE_SYSTEM_H
 
 #include "interfaces/IStorage.h"
+#include <cstring>
 
 namespace EmbeddedTerminal
 {

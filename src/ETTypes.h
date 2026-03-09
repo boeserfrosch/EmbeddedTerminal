@@ -137,7 +137,6 @@ ETVector<ETString> sort(const ETVector<ETString> &input);
 ETString join(const ETVector<ETString> &elements, const ETString &delimiter);
 
 ETString toETString(int32_t src);
-ETString toETString(uint32_t src);
 ETString toETString(size_t src);
 
 #endif // ET_TYPES_H
