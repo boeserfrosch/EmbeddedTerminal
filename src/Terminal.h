@@ -9,6 +9,7 @@
 #include "interfaces/IFileSystem.h"
 #include "BuiltinCommandFlags.h"
 #include "Lexer.h"
+#include "TerminalAst.h"
 
 #if defined(ARDUINO)
 #include <Arduino.h>
@@ -65,57 +66,7 @@ namespace EmbeddedTerminal
         bool ingestInputAndHandleAutoCompletion_();
         void processBufferedCommands_();
         void processBufferedLine_(const ETString &line);
-
-        enum class ChainCondition_
-        {
-            Always,
-            OnSuccess,
-            OnFailure
-        };
-
-        struct ParsedCommand_
-        {
-            ETVector<ETString> keywords;
-            ETVector<ETString> arguments;
-            ETString redirectOutPath;
-            bool appendRedirect = false;
-            ETString redirectInPath;
-        };
-
-        struct ParsedChainSegment_
-        {
-            ParsedCommand_ command;
-            ChainCondition_ condition = ChainCondition_::Always;
-        };
-
-        struct ParsedChain_
-        {
-            ETVector<ParsedChainSegment_> segments;
-        };
-
-        struct ParsedForLoop_
-        {
-            ETString variable;
-            ETVector<ETString> values;
-            ParsedChain_ body;
-        };
-
-        struct ParsedAst_
-        {
-            bool isForLoop = false;
-            ParsedChain_ chain;
-            ParsedForLoop_ forLoop;
-        };
-
-        bool parseCommandTokens_(const ETVector<token_t> &tokens, size_t start, size_t end, ParsedCommand_ &out);
-        bool parseChainTokens_(const ETVector<token_t> &tokens, size_t start, size_t end, ParsedChain_ &out);
-        bool parseForLoopTokens_(const ETVector<token_t> &tokens, size_t start, size_t end, ParsedForLoop_ &out);
-        bool parseAstFromTokens_(const ETVector<token_t> &tokens, ParsedAst_ &out);
-
-        void executeParsedCommand_(const ParsedCommand_ &command);
-        void executeParsedChain_(const ParsedChain_ &chain);
-        void executeParsedForLoop_(const ParsedForLoop_ &loop);
-        void executeAst_(const ParsedAst_ &ast);
+        void executeParsedCommand_(const ParsedCommand &command);
 
         void reportLexerError_(LexerError error);
 

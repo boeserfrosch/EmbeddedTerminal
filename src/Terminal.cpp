@@ -1,58 +1,13 @@
 #include "Terminal.h"
 #include "Lexer.h"
+#include "TerminalParser.h"
+#include "TerminalExecutor.h"
 #include <algorithm>
 
 namespace EmbeddedTerminal
 {
     namespace
     {
-        static constexpr size_t TERMINAL_LEXER_TOKEN_MAX = 64;
-
-        bool tokenToCommandText_(const token_t &token, ETString &out)
-        {
-            switch (token.type)
-            {
-            case TokenType::WORD:
-                out = token.text;
-                return true;
-            case TokenType::PIPE:
-                out = "|";
-                return true;
-            case TokenType::REDIR_OUT:
-                out = ">";
-                return true;
-            case TokenType::REDIR_IN:
-                out = "<";
-                return true;
-            case TokenType::REDIR_APPEND:
-                out = ">>";
-                return true;
-            case TokenType::AND_AND:
-                out = "&&";
-                return true;
-            case TokenType::OR_OR:
-                out = "||";
-                return true;
-            default:
-                out = "";
-                return false;
-            }
-        }
-
-        void appendWithSpace_(ETString &target, const ETString &text)
-        {
-            if (text.empty())
-            {
-                return;
-            }
-
-            if (!target.empty())
-            {
-                target += " ";
-            }
-            target += text;
-        }
-
         ETString replaceAll_(const ETString &input, const ETString &needle, const ETString &replacement)
         {
             if (needle.empty())
@@ -222,307 +177,7 @@ namespace EmbeddedTerminal
         }
     }
 
-    bool Terminal::parseCommandTokens_(const ETVector<token_t> &tokens, size_t start, size_t end, ParsedCommand_ &out)
-    {
-        if (start > end || end >= tokens.size())
-        {
-            return false;
-        }
-
-        out.keywords.clear();
-        out.arguments.clear();
-        out.redirectOutPath = "";
-        out.appendRedirect = false;
-        out.redirectInPath = "";
-
-        ETString currentKeyword;
-        ETString currentArguments;
-
-        for (size_t index = start; index <= end; ++index)
-        {
-            const token_t &token = tokens[index];
-
-            if (token.type == TokenType::PIPE)
-            {
-                if (currentKeyword.empty())
-                {
-                    return false;
-                }
-
-                out.keywords.push_back(currentKeyword);
-                out.arguments.push_back(currentArguments);
-                currentKeyword = "";
-                currentArguments = "";
-                continue;
-            }
-
-            if (token.type == TokenType::REDIR_OUT || token.type == TokenType::REDIR_APPEND)
-            {
-                if (currentKeyword.empty())
-                {
-                    return false;
-                }
-
-                out.appendRedirect = (token.type == TokenType::REDIR_APPEND);
-                ++index;
-                if (index > end || tokens[index].type != TokenType::WORD)
-                {
-                    return false;
-                }
-
-                out.redirectOutPath = tokens[index].text;
-                continue;
-            }
-
-            if (token.type == TokenType::REDIR_IN)
-            {
-                if (currentKeyword.empty())
-                {
-                    return false;
-                }
-
-                ++index;
-                if (index > end || tokens[index].type != TokenType::WORD)
-                {
-                    return false;
-                }
-
-                out.redirectInPath = tokens[index].text;
-                continue;
-            }
-
-            if (currentKeyword.empty())
-            {
-                if (token.type != TokenType::WORD)
-                {
-                    return false;
-                }
-
-                currentKeyword = token.text;
-                continue;
-            }
-
-            ETString tokenText;
-            if (!tokenToCommandText_(token, tokenText))
-            {
-                return false;
-            }
-            appendWithSpace_(currentArguments, tokenText);
-        }
-
-        if (currentKeyword.empty())
-        {
-            return false;
-        }
-
-        out.keywords.push_back(currentKeyword);
-        out.arguments.push_back(currentArguments);
-        return !out.keywords.empty();
-    }
-
-    bool Terminal::parseChainTokens_(const ETVector<token_t> &tokens, size_t start, size_t end, ParsedChain_ &out)
-    {
-        if (start > end || end >= tokens.size())
-        {
-            return false;
-        }
-
-        out.segments.clear();
-        ChainCondition_ nextCondition = ChainCondition_::Always;
-        size_t segmentStart = start;
-
-        for (size_t index = start; index <= end; ++index)
-        {
-            TokenType type = tokens[index].type;
-            if (type != TokenType::SEMI && type != TokenType::AND_AND && type != TokenType::OR_OR)
-            {
-                continue;
-            }
-
-            if (index == segmentStart)
-            {
-                return false;
-            }
-
-            ParsedChainSegment_ segment;
-            segment.condition = nextCondition;
-            if (!parseCommandTokens_(tokens, segmentStart, index - 1, segment.command))
-            {
-                return false;
-            }
-            out.segments.push_back(segment);
-
-            if (type == TokenType::AND_AND)
-            {
-                nextCondition = ChainCondition_::OnSuccess;
-            }
-            else if (type == TokenType::OR_OR)
-            {
-                nextCondition = ChainCondition_::OnFailure;
-            }
-            else
-            {
-                nextCondition = ChainCondition_::Always;
-            }
-
-            segmentStart = index + 1;
-        }
-
-        if (segmentStart > end)
-        {
-            return false;
-        }
-
-        ParsedChainSegment_ lastSegment;
-        lastSegment.condition = nextCondition;
-        if (!parseCommandTokens_(tokens, segmentStart, end, lastSegment.command))
-        {
-            return false;
-        }
-        out.segments.push_back(lastSegment);
-
-        return !out.segments.empty();
-    }
-
-    bool Terminal::parseForLoopTokens_(const ETVector<token_t> &tokens, size_t start, size_t end, ParsedForLoop_ &out)
-    {
-        if (start > end || end >= tokens.size())
-        {
-            return false;
-        }
-
-        size_t index = start;
-        if (tokens[index].type != TokenType::WORD || tokens[index].text != "for")
-        {
-            return false;
-        }
-        ++index;
-
-        if (index > end || tokens[index].type != TokenType::WORD)
-        {
-            return false;
-        }
-        out.variable = tokens[index].text;
-        ++index;
-
-        if (index > end || tokens[index].type != TokenType::WORD || tokens[index].text != "in")
-        {
-            return false;
-        }
-        ++index;
-
-        out.values.clear();
-        while (index <= end)
-        {
-            if (tokens[index].type == TokenType::SEMI)
-            {
-                ++index;
-                continue;
-            }
-
-            if (tokens[index].type == TokenType::WORD && tokens[index].text == "do")
-            {
-                ++index;
-                break;
-            }
-
-            if (tokens[index].type != TokenType::WORD)
-            {
-                return false;
-            }
-
-            out.values.push_back(tokens[index].text);
-            ++index;
-        }
-
-        if (out.values.empty() || index > end)
-        {
-            return false;
-        }
-
-        size_t doneIndex = end + 1;
-        for (size_t bodyIndex = index; bodyIndex <= end; ++bodyIndex)
-        {
-            if (tokens[bodyIndex].type == TokenType::WORD && tokens[bodyIndex].text == "done")
-            {
-                doneIndex = bodyIndex;
-                break;
-            }
-        }
-
-        if (doneIndex == end + 1)
-        {
-            return false;
-        }
-
-        size_t bodyEnd = doneIndex - 1;
-        while (bodyEnd >= index && tokens[bodyEnd].type == TokenType::SEMI)
-        {
-            if (bodyEnd == 0)
-            {
-                break;
-            }
-            --bodyEnd;
-        }
-
-        if (bodyEnd < index)
-        {
-            return false;
-        }
-
-        for (size_t tail = doneIndex + 1; tail <= end; ++tail)
-        {
-            if (tokens[tail].type != TokenType::SEMI)
-            {
-                return false;
-            }
-        }
-
-        return parseChainTokens_(tokens, index, bodyEnd, out.body);
-    }
-
-    bool Terminal::parseAstFromTokens_(const ETVector<token_t> &tokens, ParsedAst_ &out)
-    {
-        if (tokens.empty())
-        {
-            return false;
-        }
-
-        size_t start = 0;
-        while (start < tokens.size() && tokens[start].type == TokenType::NEWLINE)
-        {
-            ++start;
-        }
-
-        if (start >= tokens.size() || tokens[start].type == TokenType::END_OF_FILE)
-        {
-            return false;
-        }
-
-        size_t end = start;
-        while (end < tokens.size() && tokens[end].type != TokenType::END_OF_FILE && tokens[end].type != TokenType::NEWLINE)
-        {
-            ++end;
-        }
-
-        if (end == start)
-        {
-            return false;
-        }
-        --end;
-
-        out = ParsedAst_{};
-        if (tokens[start].type == TokenType::WORD && tokens[start].text == "for")
-        {
-            out.isForLoop = true;
-            return parseForLoopTokens_(tokens, start, end, out.forLoop);
-        }
-
-        out.isForLoop = false;
-        return parseChainTokens_(tokens, start, end, out.chain);
-    }
-
-    void Terminal::executeParsedCommand_(const ParsedCommand_ &command)
+    void Terminal::executeParsedCommand_(const ParsedCommand &command)
     {
         bool shouldRunPipeline =
             (command.keywords.size() != 1) ||
@@ -537,74 +192,6 @@ namespace EmbeddedTerminal
         {
             call(command.keywords[0], command.arguments[0]);
         }
-    }
-
-    void Terminal::executeParsedChain_(const ParsedChain_ &chain)
-    {
-        for (size_t index = 0; index < chain.segments.size(); ++index)
-        {
-            const ParsedChainSegment_ &segment = chain.segments[index];
-            bool shouldExecute = false;
-
-            if (segment.condition == ChainCondition_::Always)
-            {
-                shouldExecute = true;
-            }
-            else if (segment.condition == ChainCondition_::OnSuccess)
-            {
-                shouldExecute = (lastExitCode_ == 0);
-            }
-            else
-            {
-                shouldExecute = (lastExitCode_ != 0);
-            }
-
-            if (!shouldExecute)
-            {
-                continue;
-            }
-
-            executeParsedCommand_(segment.command);
-        }
-    }
-
-    void Terminal::executeParsedForLoop_(const ParsedForLoop_ &loop)
-    {
-        for (size_t valueIndex = 0; valueIndex < loop.values.size(); ++valueIndex)
-        {
-            ParsedChain_ expanded = loop.body;
-            const ETString &value = loop.values[valueIndex];
-
-            for (size_t segIndex = 0; segIndex < expanded.segments.size(); ++segIndex)
-            {
-                ParsedCommand_ &command = expanded.segments[segIndex].command;
-
-                for (size_t i = 0; i < command.keywords.size(); ++i)
-                {
-                    command.keywords[i] = substituteLoopVariable_(command.keywords[i], loop.variable, value);
-                }
-                for (size_t i = 0; i < command.arguments.size(); ++i)
-                {
-                    command.arguments[i] = substituteLoopVariable_(command.arguments[i], loop.variable, value);
-                }
-
-                command.redirectOutPath = substituteLoopVariable_(command.redirectOutPath, loop.variable, value);
-                command.redirectInPath = substituteLoopVariable_(command.redirectInPath, loop.variable, value);
-            }
-
-            executeParsedChain_(expanded);
-        }
-    }
-
-    void Terminal::executeAst_(const ParsedAst_ &ast)
-    {
-        if (ast.isForLoop)
-        {
-            executeParsedForLoop_(ast.forLoop);
-            return;
-        }
-
-        executeParsedChain_(ast.chain);
     }
 
     void Terminal::continueActiveCommandIfNeeded_()
@@ -662,30 +249,38 @@ namespace EmbeddedTerminal
             return;
         }
 
-        token_t tokensArray[TERMINAL_LEXER_TOKEN_MAX];
-        size_t tokenCount = 0;
-        LexerError lexerError = lex(cleanedLine, tokensArray, TERMINAL_LEXER_TOKEN_MAX, tokenCount);
-        if (lexerError != LexerError::NONE)
+        TerminalParser parser;
+
+        ETVector<token_t> tokens;
+        LexerError lexerError = LexerError::NONE;
+        if (!parser.tokenizeLine(cleanedLine, tokens, lexerError))
         {
             reportLexerError_(lexerError);
             return;
         }
 
-        ETVector<token_t> tokens;
-        tokens.reserve(tokenCount);
-        for (size_t i = 0; i < tokenCount; ++i)
-        {
-            tokens.push_back(tokensArray[i]);
-        }
-
-        ParsedAst_ ast;
-        if (!parseAstFromTokens_(tokens, ast))
+        ParsedAst ast;
+        if (!parser.parseTokens(tokens, ast))
         {
             reportLexerError_(LexerError::NONE);
             return;
         }
 
-        executeAst_(ast);
+        TerminalExecutor executor(
+            [this](const ParsedCommand &command)
+            {
+                executeParsedCommand_(command);
+            },
+            [this]()
+            {
+                return lastExitCode_;
+            },
+            [](const ETString &input, const ETString &variableName, const ETString &value)
+            {
+                return substituteLoopVariable_(input, variableName, value);
+            });
+
+        executor.execute(ast);
     }
 
     void Terminal::processBufferedCommands_()
