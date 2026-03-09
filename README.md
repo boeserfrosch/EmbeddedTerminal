@@ -650,7 +650,6 @@ EmbeddedTerminal/
 │       ├── native/               # Native test/development adapters
 │       └── common/               # Shared storage media adapters
 ├── test/                        # Unit tests
-├── unity-app/                   # ESP-IDF unity test app
 ├── examples/                    # Example sketches
 └── library.json                 # PlatformIO metadata
 ```
