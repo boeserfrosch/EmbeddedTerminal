@@ -50,7 +50,7 @@ namespace EmbeddedTerminal
         }
 
         bool parseCommandLineWithLexer_(const ETString &line, ETVector<ETString> &keywords, ETVector<ETString> &arguments,
-                        ETString &redirectOutPath, bool &appendRedirect, LexerError &lexerError)
+                        ETString &redirectOutPath, bool &appendRedirect, ETString &redirectInPath, LexerError &lexerError)
         {
             token_t tokens[TERMINAL_LEXER_TOKEN_MAX];
             size_t tokenCount = 0;
@@ -64,6 +64,7 @@ namespace EmbeddedTerminal
             arguments.clear();
             redirectOutPath = "";
             appendRedirect = false;
+            redirectInPath = "";
 
             size_t index = 0;
             while (index < tokenCount && (tokens[index].type == TokenType::NEWLINE))
@@ -115,17 +116,24 @@ namespace EmbeddedTerminal
                     }
 
                     redirectOutPath = tokens[index].text;
+                    continue;
+                }
+
+                if (tokens[index].type == TokenType::REDIR_IN)
+                {
+                    if (currentKeyword.empty())
+                    {
+                        return false;
+                    }
 
                     ++index;
-                    while (index < tokenCount)
+                    if (index >= tokenCount || tokens[index].type != TokenType::WORD)
                     {
-                        if (tokens[index].type != TokenType::END_OF_FILE && tokens[index].type != TokenType::NEWLINE)
-                        {
-                            return false;
-                        }
-                        ++index;
+                        return false;
                     }
-                    break;
+
+                    redirectInPath = tokens[index].text;
+                    continue;
                 }
 
                 if (currentKeyword.empty())
@@ -329,8 +337,9 @@ namespace EmbeddedTerminal
             ETVector<ETString> arguments;
             ETString redirectOutPath;
             bool appendRedirect = false;
+            ETString redirectInPath;
             LexerError lexerError = LexerError::NONE;
-            bool parsed = parseCommandLineWithLexer_(cleanedLine, keywords, arguments, redirectOutPath, appendRedirect, lexerError);
+            bool parsed = parseCommandLineWithLexer_(cleanedLine, keywords, arguments, redirectOutPath, appendRedirect, redirectInPath, lexerError);
 
             if (!parsed)
             {
@@ -362,16 +371,23 @@ namespace EmbeddedTerminal
             {
                 if (redirectOutPath.empty())
                 {
-                    call(keywords[0], arguments[0]);
+                    if (redirectInPath.empty())
+                    {
+                        call(keywords[0], arguments[0]);
+                    }
+                    else
+                    {
+                        executePipeline_(keywords, arguments, redirectOutPath, appendRedirect, redirectInPath);
+                    }
                 }
                 else
                 {
-                    executePipeline_(keywords, arguments, redirectOutPath, appendRedirect);
+                    executePipeline_(keywords, arguments, redirectOutPath, appendRedirect, redirectInPath);
                 }
             }
             else
             {
-                executePipeline_(keywords, arguments, redirectOutPath, appendRedirect);
+                executePipeline_(keywords, arguments, redirectOutPath, appendRedirect, redirectInPath);
             }
         }
     }
@@ -497,7 +513,8 @@ namespace EmbeddedTerminal
         activeState_ = result.state;
     }
 
-    void Terminal::executePipeline_(const ETVector<ETString> &keywords, const ETVector<ETString> &arguments, const ETString &redirectOutPath, bool appendRedirect)
+    void Terminal::executePipeline_(const ETVector<ETString> &keywords, const ETVector<ETString> &arguments,
+                                    const ETString &redirectOutPath, bool appendRedirect, const ETString &redirectInPath)
     {
         if (keywords.empty() || (keywords.size() != arguments.size()))
         {
@@ -509,6 +526,28 @@ namespace EmbeddedTerminal
         StreamInputChannel streamInput(input_);
         StreamOutputChannel stderrChannel(input_, TerminalChannel::StdErr);
         ETString pipedStdout;
+        ETString redirectedInputContent;
+
+        if (!redirectInPath.empty())
+        {
+            if (fileSystem_ == nullptr)
+            {
+                lastExitCode_ = 2;
+                input_.printTo(TerminalChannel::StdErr, "redirection error: filesystem not configured\n");
+                return;
+            }
+
+            ETFile inputFile = fileSystem_->open(redirectInPath, FILE_MODE_READ, false);
+            if (!inputFile.isOpen())
+            {
+                lastExitCode_ = 2;
+                input_.printTo(TerminalChannel::StdErr, "redirection error: failed to open input\n");
+                return;
+            }
+
+            redirectedInputContent = inputFile.readAll();
+            inputFile.close();
+        }
 
         hasActiveCommand_ = false;
         activeCommand_ = nullptr;
@@ -530,11 +569,14 @@ namespace EmbeddedTerminal
 
             bool isLast = (index + 1 == keywords.size());
             BufferedInputChannel bufferedInput(pipedStdout);
+            BufferedInputChannel redirectedInput(redirectedInputContent);
             BufferedOutputChannel stageOutput;
             StreamOutputChannel finalOutput(input_, TerminalChannel::StdOut);
 
-            IInputChannel &stdinChannel = (index == 0) ? static_cast<IInputChannel &>(streamInput)
-                                                       : static_cast<IInputChannel &>(bufferedInput);
+            IInputChannel &stdinChannel = (index == 0)
+                                              ? (redirectInPath.empty() ? static_cast<IInputChannel &>(streamInput)
+                                                                        : static_cast<IInputChannel &>(redirectedInput))
+                                              : static_cast<IInputChannel &>(bufferedInput);
             bool writeToFile = isLast && !redirectOutPath.empty();
             IOutputChannel &stdoutChannel = (isLast && !writeToFile) ? static_cast<IOutputChannel &>(finalOutput)
                                                                       : static_cast<IOutputChannel &>(stageOutput);

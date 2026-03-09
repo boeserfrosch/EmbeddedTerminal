@@ -446,6 +446,67 @@ void test_terminal_redirects_output_with_gt(void)
     TEST_ASSERT_TRUE(stream.stdoutBuffer.find("hello pipe") == ETString::npos);
 }
 
+void test_terminal_redirects_input_with_lt(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    MockFileSystem fs;
+    term.setFileSystem(&fs);
+
+    ETFile inFile = fs.open("/in.txt", FILE_MODE_WRITE, true);
+    TEST_ASSERT_TRUE(inFile.isOpen());
+    TEST_ASSERT_TRUE(inFile.writeAll("hello pipe"));
+    inFile.close();
+
+    UpperFromStdinCommand upper;
+    term.registerCommand("upper", &upper);
+
+    stream.inputBuffer = "upper < /in.txt\n";
+    term.loop();
+
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("HELLO PIPE") != ETString::npos);
+}
+
+void test_terminal_redirects_output_with_gtgt_append(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    MockFileSystem fs;
+    term.setFileSystem(&fs);
+
+    EmitCommand emit;
+    term.registerCommand("emit", &emit);
+
+    stream.inputBuffer = "emit >> /append.txt\nemit >> /append.txt\n";
+    term.loop();
+
+    TEST_ASSERT_TRUE(fs.exists("/append.txt"));
+    ETFile file = fs.open("/append.txt", FILE_MODE_READ, false);
+    TEST_ASSERT_TRUE(file.isOpen());
+    TEST_ASSERT_EQUAL_STRING("hello pipehello pipe", file.readAll().c_str());
+    file.close();
+}
+
+void test_terminal_redirects_output_with_gt_and_overwrite(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    MockFileSystem fs;
+    term.setFileSystem(&fs);
+
+    EmitCommand emit;
+    term.registerCommand("emit", &emit);
+
+    stream.inputBuffer = "emit > /overwrite.txt\nemit > /overwrite.txt\n";
+    term.loop();
+
+    TEST_ASSERT_TRUE(fs.exists("/overwrite.txt"));
+    ETFile file = fs.open("/overwrite.txt", FILE_MODE_READ, false);
+    TEST_ASSERT_TRUE(file.isOpen());
+    TEST_ASSERT_EQUAL_STRING("hello pipe", file.readAll().c_str());
+    file.close();
+}
+
 void process_tests()
 {
     UNITY_BEGIN();
@@ -468,6 +529,9 @@ void process_tests()
     RUN_TEST(test_terminal_reports_lexer_error_for_unterminated_quote);
     RUN_TEST(test_terminal_parses_pipe_in_arguments);
     RUN_TEST(test_terminal_redirects_output_with_gt);
+    RUN_TEST(test_terminal_redirects_input_with_lt);
+    RUN_TEST(test_terminal_redirects_output_with_gtgt_append);
+    RUN_TEST(test_terminal_redirects_output_with_gt_and_overwrite);
     UNITY_END();
 }
 

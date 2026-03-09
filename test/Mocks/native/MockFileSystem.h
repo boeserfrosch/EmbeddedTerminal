@@ -155,6 +155,12 @@ namespace EmbeddedTerminal
             if (writeMode)
             {
                 it->second->openWriteHandle = true;
+                // Clear content when opening in write mode (not append)
+                const ETString modeString = mode ? ETString(mode) : ETString(FILE_MODE_READ);
+                if (modeString == FILE_MODE_WRITE)
+                {
+                    *it->second->content = "";
+                }
             }
             else
             {
