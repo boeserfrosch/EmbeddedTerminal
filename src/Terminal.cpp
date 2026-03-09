@@ -1,8 +1,127 @@
 #include "Terminal.h"
+#include "Lexer.h"
 #include <algorithm>
 
 namespace EmbeddedTerminal
 {
+    namespace
+    {
+        static constexpr size_t TERMINAL_LEXER_TOKEN_MAX = 64;
+
+        bool appendTokenText_(ETString &arguments, const token_t &token)
+        {
+            ETString tokenText;
+            switch (token.type)
+            {
+            case TokenType::WORD:
+                tokenText = token.text;
+                break;
+            case TokenType::PIPE:
+                tokenText = "|";
+                break;
+            case TokenType::REDIR_OUT:
+                tokenText = ">";
+                break;
+            case TokenType::REDIR_IN:
+                tokenText = "<";
+                break;
+            case TokenType::REDIR_APPEND:
+                tokenText = ">>";
+                break;
+            case TokenType::SEMI:
+                tokenText = ";";
+                break;
+            case TokenType::AND_AND:
+                tokenText = "&&";
+                break;
+            case TokenType::OR_OR:
+                tokenText = "||";
+                break;
+            default:
+                return true;
+            }
+
+            if (!arguments.empty())
+            {
+                arguments += " ";
+            }
+            arguments += tokenText;
+            return true;
+        }
+
+        bool parseCommandLineWithLexer_(const ETString &line, ETVector<ETString> &keywords, ETVector<ETString> &arguments, LexerError &lexerError)
+        {
+            token_t tokens[TERMINAL_LEXER_TOKEN_MAX];
+            size_t tokenCount = 0;
+            lexerError = lex(line, tokens, TERMINAL_LEXER_TOKEN_MAX, tokenCount);
+            if (lexerError != LexerError::NONE)
+            {
+                return false;
+            }
+
+            keywords.clear();
+            arguments.clear();
+
+            size_t index = 0;
+            while (index < tokenCount && (tokens[index].type == TokenType::NEWLINE))
+            {
+                ++index;
+            }
+
+            if (index >= tokenCount || tokens[index].type == TokenType::END_OF_FILE)
+            {
+                return false;
+            }
+
+            ETString currentKeyword;
+            ETString currentArguments;
+
+            for (; index < tokenCount; ++index)
+            {
+                if (tokens[index].type == TokenType::END_OF_FILE || tokens[index].type == TokenType::NEWLINE)
+                {
+                    break;
+                }
+
+                if (tokens[index].type == TokenType::PIPE)
+                {
+                    if (currentKeyword.empty())
+                    {
+                        return false;
+                    }
+
+                    keywords.push_back(currentKeyword);
+                    arguments.push_back(currentArguments);
+                    currentKeyword = "";
+                    currentArguments = "";
+                    continue;
+                }
+
+                if (currentKeyword.empty())
+                {
+                    if (tokens[index].type != TokenType::WORD)
+                    {
+                        return false;
+                    }
+
+                    currentKeyword = tokens[index].text;
+                    continue;
+                }
+
+                appendTokenText_(currentArguments, tokens[index]);
+            }
+
+            if (currentKeyword.empty())
+            {
+                return false;
+            }
+
+            keywords.push_back(currentKeyword);
+            arguments.push_back(currentArguments);
+            return !keywords.empty();
+        }
+    }
+
     class StreamInputChannel : public IInputChannel
     {
     public:
@@ -42,6 +161,51 @@ namespace EmbeddedTerminal
         TerminalChannel channel_;
     };
 
+    class BufferedInputChannel : public IInputChannel
+    {
+    public:
+        explicit BufferedInputChannel(const ETString &buffer) : buffer_(buffer), consumed_(false)
+        {
+        }
+
+        bool available() override
+        {
+            return !consumed_ && !buffer_.empty();
+        }
+
+        ETString readAll() override
+        {
+            if (consumed_)
+            {
+                return "";
+            }
+
+            consumed_ = true;
+            return buffer_;
+        }
+
+    private:
+        ETString buffer_;
+        bool consumed_;
+    };
+
+    class BufferedOutputChannel : public IOutputChannel
+    {
+    public:
+        void print(const ETString &s) override
+        {
+            buffer_ += s;
+        }
+
+        const ETString &buffer() const
+        {
+            return buffer_;
+        }
+
+    private:
+        ETString buffer_;
+    };
+
     Terminal::Terminal(ITerminalStream &input) : input_(input)
 #if defined(ARDUINO)
                                                  ,
@@ -72,6 +236,17 @@ namespace EmbeddedTerminal
 
     void Terminal::loop()
     {
+        if (hasActiveCommand_)
+        {
+            bool shouldContinue = (activeState_ == CommandExecutionState::Running) ||
+                                  ((activeState_ == CommandExecutionState::WaitingForInput) && input_.available());
+
+            if (shouldContinue)
+            {
+                executeCommand_(activeCommand_, activeKeyword_, activeArguments_);
+            }
+        }
+
         if (!input_.available())
             return;
 
@@ -108,21 +283,50 @@ namespace EmbeddedTerminal
             buffer.erase(0, delimPosition + 1);
 
             // Remove non-printable and backspace chars
-            ETString cleanedLine = line.cleanupString();
-
-            cleanedLine.trim();
-            if (cleanedLine.contains(' '))
+            ETString cleanedLine = line.cleanupString().trim();
+            if (cleanedLine.empty())
             {
+                continue;
+            }
 
-                // Split into keyword and residual
-                size_t spacePos = cleanedLine.find(' ');
-                ETString keyword = cleanedLine.substr(0, spacePos);
-                ETString residual = cleanedLine.substr(spacePos + 1);
-                call(keyword, residual);
+            ETVector<ETString> keywords;
+            ETVector<ETString> arguments;
+            LexerError lexerError = LexerError::NONE;
+            bool parsed = parseCommandLineWithLexer_(cleanedLine, keywords, arguments, lexerError);
+
+            if (!parsed)
+            {
+                if (lexerError == LexerError::TOKEN_ARRAY_EXHAUSTED)
+                {
+                    lastExitCode_ = 2;
+                    input_.printTo(TerminalChannel::StdErr, "lexer error: token array exhausted\n");
+                }
+                else if (lexerError == LexerError::UNTERMINATED_SINGLE_QUOTE)
+                {
+                    lastExitCode_ = 2;
+                    input_.printTo(TerminalChannel::StdErr, "lexer error: unterminated single quote\n");
+                }
+                else if (lexerError == LexerError::UNTERMINATED_DOUBLE_QUOTE)
+                {
+                    lastExitCode_ = 2;
+                    input_.printTo(TerminalChannel::StdErr, "lexer error: unterminated double quote\n");
+                }
+                else
+                {
+                    lastExitCode_ = 2;
+                    input_.printTo(TerminalChannel::StdErr, "lexer error: invalid command syntax\n");
+                }
+
+                continue;
+            }
+
+            if (keywords.size() == 1)
+            {
+                call(keywords[0], arguments[0]);
             }
             else
             {
-                call(cleanedLine, "");
+                executePipeline_(keywords, arguments);
             }
         }
     }
@@ -173,14 +377,7 @@ namespace EmbeddedTerminal
         auto search = observer_.find(trimmedKeyword);
         if (search != observer_.end())
         {
-            StreamInputChannel stdinChannel(input_);
-            StreamOutputChannel stdoutChannel(input_, TerminalChannel::StdOut);
-            StreamOutputChannel stderrChannel(input_, TerminalChannel::StdErr);
-
-            CommandContext context(sessionVariables_, lastExitCode_, true);
-            CommandInvocation invocation{trimmedKeyword, additional, context, stdinChannel, stdoutChannel, stderrChannel};
-            CommandResult result = search->second->execute(invocation);
-            lastExitCode_ = result.exitCode;
+            executeCommand_(search->second, trimmedKeyword, additional);
         }
         else
         {
@@ -208,6 +405,108 @@ namespace EmbeddedTerminal
             return buffer.substr(lastSpacePos + 1);
         }
         return buffer;
+    }
+
+    CommandResult Terminal::executeCommandInternal_(ICommand *command, const ETString &keyword, const ETString &arguments,
+                                                    IInputChannel &stdinChannel, IOutputChannel &stdoutChannel, IOutputChannel &stderrChannel)
+    {
+        if (command == nullptr)
+        {
+            return CommandResult::completed(127);
+        }
+
+        CommandContext context(sessionVariables_, lastExitCode_, true);
+        CommandInvocation invocation{keyword, arguments, context, stdinChannel, stdoutChannel, stderrChannel};
+        CommandResult result = command->execute(invocation);
+        lastExitCode_ = result.exitCode;
+        return result;
+    }
+
+    void Terminal::executeCommand_(ICommand *command, const ETString &keyword, const ETString &arguments)
+    {
+        if (command == nullptr)
+        {
+            return;
+        }
+
+        StreamInputChannel stdinChannel(input_);
+        StreamOutputChannel stdoutChannel(input_, TerminalChannel::StdOut);
+        StreamOutputChannel stderrChannel(input_, TerminalChannel::StdErr);
+
+        CommandResult result = executeCommandInternal_(command, keyword, arguments, stdinChannel, stdoutChannel, stderrChannel);
+
+        if (result.state == CommandExecutionState::Completed)
+        {
+            hasActiveCommand_ = false;
+            activeCommand_ = nullptr;
+            activeKeyword_ = "";
+            activeArguments_ = "";
+            activeState_ = CommandExecutionState::Completed;
+            return;
+        }
+
+        hasActiveCommand_ = true;
+        activeCommand_ = command;
+        activeKeyword_ = keyword;
+        activeArguments_ = arguments;
+        activeState_ = result.state;
+    }
+
+    void Terminal::executePipeline_(const ETVector<ETString> &keywords, const ETVector<ETString> &arguments)
+    {
+        if (keywords.empty() || (keywords.size() != arguments.size()))
+        {
+            lastExitCode_ = 2;
+            input_.printTo(TerminalChannel::StdErr, "pipeline error: invalid pipeline\n");
+            return;
+        }
+
+        StreamInputChannel streamInput(input_);
+        StreamOutputChannel stderrChannel(input_, TerminalChannel::StdErr);
+        ETString pipedStdout;
+
+        hasActiveCommand_ = false;
+        activeCommand_ = nullptr;
+        activeKeyword_ = "";
+        activeArguments_ = "";
+        activeState_ = CommandExecutionState::Completed;
+
+        for (size_t index = 0; index < keywords.size(); ++index)
+        {
+            ETString commandKey = keywords[index];
+            commandKey.trim();
+            auto search = observer_.find(commandKey);
+            if (search == observer_.end())
+            {
+                lastExitCode_ = 127;
+                input_.printfTo(TerminalChannel::StdErr, "%s is unknown!\n", commandKey.c_str());
+                return;
+            }
+
+            bool isLast = (index + 1 == keywords.size());
+            BufferedInputChannel bufferedInput(pipedStdout);
+            BufferedOutputChannel stageOutput;
+            StreamOutputChannel finalOutput(input_, TerminalChannel::StdOut);
+
+            IInputChannel &stdinChannel = (index == 0) ? static_cast<IInputChannel &>(streamInput)
+                                                       : static_cast<IInputChannel &>(bufferedInput);
+            IOutputChannel &stdoutChannel = isLast ? static_cast<IOutputChannel &>(finalOutput)
+                                                   : static_cast<IOutputChannel &>(stageOutput);
+
+            CommandResult result = executeCommandInternal_(search->second, commandKey, arguments[index], stdinChannel, stdoutChannel, stderrChannel);
+
+            if (result.state != CommandExecutionState::Completed)
+            {
+                lastExitCode_ = 2;
+                input_.printTo(TerminalChannel::StdErr, "pipeline error: async command not supported\n");
+                return;
+            }
+
+            if (!isLast)
+            {
+                pipedStdout = stageOutput.buffer();
+            }
+        }
     }
 
     void Terminal::handleAutoCompletion_()

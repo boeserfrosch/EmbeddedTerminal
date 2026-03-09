@@ -15,6 +15,123 @@
 
 using namespace EmbeddedTerminal;
 
+class RunningTwiceCommand : public ICommand
+{
+public:
+    int executionCount = 0;
+
+    ETString usage(const ETString &keyword) override
+    {
+        return keyword;
+    }
+
+    CommandResult execute(CommandInvocation &invocation) override
+    {
+        executionCount++;
+        if (executionCount == 1)
+        {
+            invocation.stdoutChannel.print("phase1");
+            return CommandResult::running(0);
+        }
+
+        invocation.stdoutChannel.print("phase2");
+        return CommandResult::completed(0);
+    }
+
+protected:
+    ETString trigger(const ETString &keyword, const ETString &additional) override
+    {
+        (void)keyword;
+        (void)additional;
+        return "";
+    }
+};
+
+class WaitForInputCommand : public ICommand
+{
+public:
+    int executionCount = 0;
+
+    ETString usage(const ETString &keyword) override
+    {
+        return keyword;
+    }
+
+    CommandResult execute(CommandInvocation &invocation) override
+    {
+        executionCount++;
+        if (executionCount == 1)
+        {
+            return CommandResult::waitingForInput(0);
+        }
+
+        invocation.stdoutChannel.print("resumed");
+        return CommandResult::completed(0);
+    }
+
+protected:
+    ETString trigger(const ETString &keyword, const ETString &additional) override
+    {
+        (void)keyword;
+        (void)additional;
+        return "";
+    }
+};
+
+class EmitCommand : public ICommand
+{
+public:
+    ETString usage(const ETString &keyword) override
+    {
+        return keyword;
+    }
+
+    CommandResult execute(CommandInvocation &invocation) override
+    {
+        invocation.stdoutChannel.print("hello pipe");
+        return CommandResult::completed(0);
+    }
+
+protected:
+    ETString trigger(const ETString &keyword, const ETString &additional) override
+    {
+        (void)keyword;
+        (void)additional;
+        return "";
+    }
+};
+
+class UpperFromStdinCommand : public ICommand
+{
+public:
+    ETString usage(const ETString &keyword) override
+    {
+        return keyword;
+    }
+
+    CommandResult execute(CommandInvocation &invocation) override
+    {
+        ETString text = invocation.stdinChannel.readAll();
+        for (size_t i = 0; i < text.length(); ++i)
+        {
+            if (text[i] >= 'a' && text[i] <= 'z')
+            {
+                text[i] = static_cast<char>(text[i] - ('a' - 'A'));
+            }
+        }
+        invocation.stdoutChannel.print(text);
+        return CommandResult::completed(0);
+    }
+
+protected:
+    ETString trigger(const ETString &keyword, const ETString &additional) override
+    {
+        (void)keyword;
+        (void)additional;
+        return "";
+    }
+};
+
 void setUp(void) {}
 void tearDown(void) {}
 
@@ -221,6 +338,92 @@ void test_terminal_case_sensitivity(void)
     TEST_ASSERT_EQUAL_STRING("", cmd.lastKeyword.c_str());
 }
 
+void test_terminal_continues_running_command_without_newline(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    RunningTwiceCommand cmd;
+    term.registerCommand("run", &cmd);
+
+    stream.inputBuffer = "run\n";
+    term.loop();
+    TEST_ASSERT_EQUAL(1, cmd.executionCount);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("phase1") != ETString::npos);
+
+    stream.inputBuffer = "";
+    stream.inputPos = 0;
+    term.loop();
+    TEST_ASSERT_EQUAL(2, cmd.executionCount);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("phase2") != ETString::npos);
+}
+
+void test_terminal_waiting_command_needs_input_to_resume(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    WaitForInputCommand cmd;
+    term.registerCommand("wait", &cmd);
+
+    stream.inputBuffer = "wait\n";
+    term.loop();
+    TEST_ASSERT_EQUAL(1, cmd.executionCount);
+
+    stream.inputBuffer = "";
+    stream.inputPos = 0;
+    term.loop();
+    TEST_ASSERT_EQUAL(1, cmd.executionCount);
+
+    stream.inputBuffer = "x";
+    stream.inputPos = 0;
+    term.loop();
+    TEST_ASSERT_EQUAL(2, cmd.executionCount);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("resumed") != ETString::npos);
+}
+
+void test_terminal_uses_lexer_for_quoted_arguments(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    MockCommand cmd;
+    term.registerCommand("test", &cmd);
+
+    stream.inputBuffer = "test \"hello world\"\n";
+    term.loop();
+
+    TEST_ASSERT_EQUAL_STRING("test", cmd.lastKeyword.c_str());
+    TEST_ASSERT_EQUAL_STRING("hello world", cmd.lastAdditional.c_str());
+}
+
+void test_terminal_reports_lexer_error_for_unterminated_quote(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    MockCommand cmd;
+    term.registerCommand("test", &cmd);
+
+    stream.inputBuffer = "test \"unterminated\n";
+    term.loop();
+
+    TEST_ASSERT_EQUAL(2, term.getLastExitCode());
+    TEST_ASSERT_TRUE(stream.stderrBuffer.find("lexer error") != ETString::npos);
+    TEST_ASSERT_EQUAL_STRING("", cmd.lastKeyword.c_str());
+}
+
+void test_terminal_parses_pipe_in_arguments(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    EmitCommand emit;
+    UpperFromStdinCommand upper;
+    term.registerCommand("emit", &emit);
+    term.registerCommand("upper", &upper);
+
+    stream.inputBuffer = "emit | upper\n";
+    term.loop();
+
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("HELLO PIPE") != ETString::npos);
+}
+
 void process_tests()
 {
     UNITY_BEGIN();
@@ -237,6 +440,11 @@ void process_tests()
     RUN_TEST(test_terminal_long_command);
     RUN_TEST(test_terminal_sequential_commands);
     RUN_TEST(test_terminal_case_sensitivity);
+    RUN_TEST(test_terminal_continues_running_command_without_newline);
+    RUN_TEST(test_terminal_waiting_command_needs_input_to_resume);
+    RUN_TEST(test_terminal_uses_lexer_for_quoted_arguments);
+    RUN_TEST(test_terminal_reports_lexer_error_for_unterminated_quote);
+    RUN_TEST(test_terminal_parses_pipe_in_arguments);
     UNITY_END();
 }
 

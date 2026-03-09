@@ -53,6 +53,11 @@ namespace EmbeddedTerminal
         void call(const ETString &keyword, const ETString &additional);
 
     private:
+        CommandResult executeCommandInternal_(ICommand *command, const ETString &keyword, const ETString &arguments,
+                                             IInputChannel &stdinChannel, IOutputChannel &stdoutChannel, IOutputChannel &stderrChannel);
+        void executeCommand_(ICommand *command, const ETString &keyword, const ETString &arguments);
+        void executePipeline_(const ETVector<ETString> &keywords, const ETVector<ETString> &arguments);
+
         ETMap<ETString, ICommand *> observer_;
         ITerminalStream &input_;
 #if defined(ARDUINO)
@@ -66,6 +71,12 @@ namespace EmbeddedTerminal
         ETString lineDelimiter = "\n";
         int lastExitCode_ = 0;
         ETMap<ETString, ETString> sessionVariables_;
+
+        bool hasActiveCommand_ = false;
+        ICommand *activeCommand_ = nullptr;
+        ETString activeKeyword_;
+        ETString activeArguments_;
+        CommandExecutionState activeState_ = CommandExecutionState::Completed;
 
         // Auto completion helper
         void handleAutoCompletion_();
