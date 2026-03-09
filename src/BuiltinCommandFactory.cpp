@@ -155,6 +155,40 @@ namespace EmbeddedTerminal
             }
         }
 
+        if (flags & CMD_ECHO)
+        {
+            auto it = builtinCommands_.find(CMD_NAME_ECHO);
+            if (it == builtinCommands_.end())
+            {
+                cmd::echo *echoCmd = new cmd::echo();
+                if (echoCmd != nullptr)
+                {
+                    builtinCommands_[CMD_NAME_ECHO] = echoCmd;
+                }
+            }
+            if (builtinCommands_.find(CMD_NAME_ECHO) != builtinCommands_.end())
+            {
+                terminal.registerCommand(CMD_NAME_ECHO, builtinCommands_[CMD_NAME_ECHO]);
+            }
+        }
+
+        if (flags & CMD_TOUCH)
+        {
+            auto it = builtinCommands_.find(CMD_NAME_TOUCH);
+            if (it == builtinCommands_.end())
+            {
+                cmd::touch *touchCmd = new cmd::touch(nav);
+                if (touchCmd != nullptr)
+                {
+                    builtinCommands_[CMD_NAME_TOUCH] = touchCmd;
+                }
+            }
+            if (builtinCommands_.find(CMD_NAME_TOUCH) != builtinCommands_.end())
+            {
+                terminal.registerCommand(CMD_NAME_TOUCH, builtinCommands_[CMD_NAME_TOUCH]);
+            }
+        }
+
         if (flags & CMD_TAIL)
         {
             auto it = builtinCommands_.find(CMD_NAME_TAIL);
@@ -314,6 +348,10 @@ namespace EmbeddedTerminal
             terminal.deregisterCommand(CMD_NAME_TAIL);
         if (flags & CMD_XXD)
             terminal.deregisterCommand(CMD_NAME_XXD);
+        if (flags & CMD_ECHO)
+            terminal.deregisterCommand(CMD_NAME_ECHO);
+        if (flags & CMD_TOUCH)
+            terminal.deregisterCommand(CMD_NAME_TOUCH);
     }
 
     void BuiltinCommandFactory::deregisterDiskCommands(Terminal &terminal, uint32_t flags)

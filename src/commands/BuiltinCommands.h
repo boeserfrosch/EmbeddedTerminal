@@ -9,6 +9,7 @@
 #include "df.h"
 #include "download.h"
 #include "gpio.h"
+#include "echo.h"
 #include "help.h"
 #include "ip.h"
 #include "ls.h"
@@ -18,6 +19,7 @@
 #include "rm.h"
 #include "rmdir.h"
 #include "tail.h"
+#include "touch.h"
 #include "xxd.h"
 
 #endif // BUILTIN_COMMANDS_H
