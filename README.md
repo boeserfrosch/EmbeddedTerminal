@@ -12,7 +12,7 @@ The Readme is partially generated using AI but was proven to be inaccurate in so
 - ✅ **Command System**: Register and execute custom commands with keyword-based parsing
 - ✅ **Command Runtime v2 (Preview)**: Stream-oriented command execution path with exit-code support
 - ✅ **Storage System Abstraction**: Unified mountable storage model via `IStorageSystem` + `IStorageMedia`
-- ✅ **Built-in Commands**: cat, cd, ls, mkdir, rm, rmdir, df, tail, help, ip, download
+- ✅ **Built-in Commands**: cat, cd, ls, mkdir, rm, rmdir, pwd, xxd, df, tail, help, ip, ping, download
 - ✅ **Network System**: Supports single or multiple interfaces through `INetworkSystem`
 - ✅ **Cross-Platform String Handling**: Custom `ETString` class works across all platforms
 - ✅ **Directory Navigation**: Full path traversal and manipulation
@@ -84,8 +84,11 @@ void setup() {
     SD.begin();
     storage.mountMedia(&media, "");
     
-    // Register all built-in commands using factory
-    factory.registerAllCommands(term, nav, nullptr);
+    // Register filesystem + disk + help commands
+    // (registerAllCommands requires a valid INetworkSystem)
+    factory.registerFilesystemCommands(term, nav);
+    factory.registerDiskCommands(term, nav);
+    factory.registerHelpCommand(term);
     
     Serial.println("Terminal ready! Type 'help' for available commands.");
     Serial.print("> ");
@@ -306,10 +309,9 @@ To add auto completion to your custom command, override `getSuggestions(...)` fr
 ```cpp
 #include <Terminal.h>
 #include <interfaces/ICommand.h>
-#include <interfaces/IAutoCompleter.h>
 #include <DefaultAutoCompleters.h>
 
-class MyAutocompleteCommand : public ICommand, public IAutoCompleter {
+class MyAutocompleteCommand : public ICommand {
 public:
     MyAutocompleteCommand(DirectoryNavigator &nav) : nav_(nav) {}
     
@@ -355,7 +357,7 @@ term.registerCommand("myautocmd", &myCmd);
 You can use these in your own commands:
 
 ```cpp
-class MyCommand : public ICommand, public IAutoCompleter {
+class MyCommand : public ICommand {
     DirectoryNavigator &nav_;
     
     ETVector<ETString> getSuggestions(const ETString &partial) override {
@@ -365,6 +367,8 @@ class MyCommand : public ICommand, public IAutoCompleter {
     }
 };
 ```
+
+> `ICommand` already inherits auto-completion support via `IAutoCompleter`.
 
 ## Supported Platforms
 
@@ -390,8 +394,11 @@ class MyCommand : public ICommand, public IAutoCompleter {
 | `rmdir` | Remove directory | `rmdir folder` |
 | `df` | Show disk usage | `df` |
 | `tail` | Show end of file | `tail file.txt` |
+| `pwd` | Show current directory | `pwd` |
+| `xxd` | Hex dump file contents | `xxd firmware.bin` |
 | `ip` | Show network interfaces | `ip`, `ip eth0` |
-| `download` | Download file via network | `download url` |
+| `ping` | Ping host through network system | `ping 8.8.8.8` |
+| `download` | Stream file content over terminal protocol | `download /log.txt` |
 
 ## API Reference
 
@@ -406,11 +413,16 @@ public:
     void registerAllCommands(Terminal &term, DirectoryNavigator &nav, INetworkSystem &net);
     
     // Register command categories
-    void registerFilesystemCommands(Terminal &term, DirectoryNavigator &nav);
-    void registerFilesystemCommands(Terminal &term, DirectoryNavigator &nav, uint16_t flags);
-    void registerDiskCommands(Terminal &term, DirectoryNavigator &nav);
-    void registerNetworkCommands(Terminal &term, INetworkSystem &net);
+    void registerFilesystemCommands(Terminal &term, DirectoryNavigator &nav, uint32_t flags = CMD_FILESYSTEM_ALL);
+    void registerDiskCommands(Terminal &term, DirectoryNavigator &nav, uint32_t flags = CMD_DISK_ALL);
+    void registerNetworkCommands(Terminal &term, INetworkSystem &net, uint32_t flags = CMD_NETWORK_ALL);
     void registerHelpCommand(Terminal &term);
+
+    // Deregister command categories
+    void deregisterFilesystemCommands(Terminal &term, uint32_t flags = CMD_FILESYSTEM_ALL);
+    void deregisterDiskCommands(Terminal &term, uint32_t flags = CMD_DISK_ALL);
+    void deregisterNetworkCommands(Terminal &term, uint32_t flags = CMD_NETWORK_ALL);
+    void deregisterHelpCommand(Terminal &term);
     
     // Deregister all commands
     void deregisterAllCommands(Terminal &term);
@@ -430,8 +442,11 @@ public:
 - `CMD_RM` - Remove file
 - `CMD_RMDIR` - Remove directory
 - `CMD_TAIL` - Display end of file
+- `CMD_PWD` - Print current working directory
+- `CMD_XXD` - Hex dump file content
 - `CMD_DF` - Show disk usage
 - `CMD_IP` - Show network interfaces
+- `CMD_PING` - Ping host using network system
 - `CMD_HELP` - Display help
 
 ### Terminal
@@ -454,6 +469,9 @@ public:
     
     // Get registered commands
     const ETMap<ETString, ICommand *>& getCommands() const;
+
+    // Last command exit code (127 for unknown command)
+    int getLastExitCode() const;
 };
 ```
 
@@ -551,10 +569,15 @@ factory.registerNetworkCommands(term, networkSystem);
 ```cpp
 class ICommand {
 public:
+    virtual ETString usage(const ETString &keyword) = 0;
+    virtual CommandResult execute(CommandInvocation &invocation);
+
+protected:
     virtual ETString trigger(const ETString &keyword, const ETString &additional) = 0;
-    virtual ETString usage(const ETString &keyword) const = 0;
 };
 ```
+
+`execute()` is the preferred runtime-v2 path. Existing commands can still implement `trigger()` and rely on the default adapter.
 
 ### ETString Class
 
@@ -597,29 +620,37 @@ public:
 ```text
 EmbeddedTerminal/
 ├── src/
-│   ├── Terminal.h/cpp           # Main terminal engine
-│   ├── ETTypes.h/cpp            # Cross-platform types
-│   ├── DirectoryNavigator.h    # Directory navigation
-│   ├── ETFile.h                 # File wrapper
-│   ├── commands/                # Built-in commands
+│   ├── Terminal.h/cpp            # Main terminal engine
+│   ├── BuiltinCommandFactory.h/cpp
+│   ├── BuiltinCommandFlags.h
+│   ├── StorageSystem.h
+│   ├── DirectoryNavigator.h      # Path-aware navigation on IStorageSystem
+│   ├── ETTypes.h/cpp             # Cross-platform types (ETString, ETVector, ETMap)
+│   ├── OptionParser.h/cpp
+│   ├── DefaultAutoCompleters.h
+│   ├── commands/                 # Built-in command implementations
 │   │   ├── cat.h/cpp
-│   │   ├── cd.h/cpp
-│   │   ├── ls.h/cpp
-│   │   ├── help.h/cpp
+│   │   ├── download.h/cpp
+│   │   ├── ip.h/cpp
+│   │   ├── ping.h/cpp
+│   │   ├── pwd.h/cpp
+│   │   ├── xxd.h/cpp
 │   │   └── ...
-│   ├── interfaces/              # Abstract interfaces
+│   ├── interfaces/               # Public interfaces and runtime abstractions
 │   │   ├── ICommand.h
-│   │   ├── IFile.h
-│   │   ├── IFileSystem.h
-│   │   ├── IStorage.h
-│   │   ├── IDirectoryNavigator.h
+│   │   ├── ICommandRuntime.h
 │   │   ├── ITerminalStream.h
+│   │   ├── IStorage.h
+│   │   ├── IFileSystem.h
+│   │   ├── IDirectoryNavigator.h
 │   │   └── INetworkInterface.h
-│   └── hal/                     # Hardware abstraction
-│       ├── NativeFileSystem.h
-│       ├── ArduinoFileSystem.h
-│       └── ESPIDFFileSystem.h
+│   └── hal/
+│       ├── arduino/              # Arduino streams/filesystem/media wrappers
+│       ├── espidf/               # ESP-IDF filesystem/network/media wrappers
+│       ├── native/               # Native test/development adapters
+│       └── common/               # Shared storage media adapters
 ├── test/                        # Unit tests
+├── unity-app/                   # ESP-IDF unity test app
 ├── examples/                    # Example sketches
 └── library.json                 # PlatformIO metadata
 ```
@@ -648,7 +679,7 @@ Mock implementations are provided for testing custom commands without hardware.
 ```cpp
 class MyFileSystem : public IFileSystem {
 public:
-    bool exists(const char *path) override {
+    bool exists(const Path &path) override {
         // Your implementation
     }
     // Implement all pure virtual methods
@@ -664,14 +695,12 @@ public:
 
 class MyNetwork : public INetworkInterface {
 public:
-    ETVector<NetworkInfo> getAll() override {
-        ETVector<NetworkInfo> interfaces;
-        NetworkInfo eth0;
-        eth0.name = "eth0";
-        eth0.ip = "192.168.1.100";
-        eth0.mac = "AA:BB:CC:DD:EE:FF";
-        interfaces.push_back(eth0);
-        return interfaces;
+    NetworkInfo info() const override {
+        return NetworkInfo("eth0", "192.168.1.100", "AA:BB:CC:DD:EE:FF", "255.255.255.0", "192.168.1.1", true);
+    }
+
+    ETString ping(const ETString &target) override {
+        return "Ping " + target + ": reachable";
     }
 };
 ```

@@ -114,13 +114,25 @@ class MockNetworkInterface : public INetworkInterface {
     }
 };
 
-// In commands/ping.cpp - Clean, platform-agnostic
-ETString ping::trigger(const ETString &keyword, const ETString &additional) {
-    return _net.ping(target);  // Delegate to interface
+// In commands/ping.cpp - Clean, platform-agnostic (runtime v2 path)
+CommandResult ping::execute(CommandInvocation &invocation) {
+    ETString target = invocation.arguments.trim();
+    invocation.stdoutChannel.print(_net.ping(target));
+    return CommandResult::completed(0);
 }
 ```
 
 See the actual implementation in `src/commands/ping.cpp` and `src/interfaces/INetworkInterface.h` for a production example.
+
+### Command Runtime (v2)
+
+For new commands, prefer implementing `ICommand::execute(CommandInvocation&)`.
+
+- `execute()` gives you channel-based IO (`stdin`, `stdout`, `stderr`)
+- it returns a `CommandResult` (`completed`, `running`, `waitingForInput`)
+- it supports stateful commands through `invocation.context.variables`
+
+Legacy `trigger(keyword, additional)` remains supported through the default adapter in `ICommand` for backwards compatibility.
 
 ### String Handling Example
 
@@ -149,10 +161,10 @@ std::string processInput(const std::string &input) {
 
 EmbeddedTerminal supports TAB-based auto completion. To add auto completion to your custom command:
 
-1. **Inherit from both `ICommand` and `IAutoCompleter`**:
+1. **Inherit from `ICommand`** (`ICommand` already includes auto-completion support):
 
    ```cpp
-   class MyCommand : public ICommand, public IAutoCompleter {
+    class MyCommand : public ICommand {
        // ...
    };
    ```
