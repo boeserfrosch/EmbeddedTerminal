@@ -1,7 +1,7 @@
 #ifndef TERMINAL_PARSER_H
 #define TERMINAL_PARSER_H
 
-#include "Lexer.h"
+#include "TerminalTokenizer.h"
 #include "TerminalAst.h"
 
 namespace EmbeddedTerminal
@@ -9,7 +9,6 @@ namespace EmbeddedTerminal
     class TerminalParser
     {
     public:
-        bool tokenizeLine(const ETString &line, ETVector<token_t> &tokens, LexerError &lexerError) const;
         bool parseTokens(const ETVector<token_t> &tokens, ParsedAst &ast) const;
 
     private:
@@ -19,8 +18,6 @@ namespace EmbeddedTerminal
 
         bool tokenToCommandText_(const token_t &token, ETString &out) const;
         void appendWithSpace_(ETString &target, const ETString &text) const;
-
-        static constexpr size_t TOKEN_CAPACITY = 64;
     };
 }
 

@@ -47,26 +47,6 @@ namespace EmbeddedTerminal
         target += text;
     }
 
-    bool TerminalParser::tokenizeLine(const ETString &line, ETVector<token_t> &tokens, LexerError &lexerError) const
-    {
-        token_t tokenArray[TOKEN_CAPACITY];
-        size_t tokenCount = 0;
-        lexerError = lex(line, tokenArray, TOKEN_CAPACITY, tokenCount);
-        if (lexerError != LexerError::NONE)
-        {
-            return false;
-        }
-
-        tokens.clear();
-        tokens.reserve(tokenCount);
-        for (size_t i = 0; i < tokenCount; ++i)
-        {
-            tokens.push_back(tokenArray[i]);
-        }
-
-        return true;
-    }
-
     bool TerminalParser::parseCommandTokens_(const ETVector<token_t> &tokens, size_t start, size_t end, ParsedCommand &out) const
     {
         if (start > end || end >= tokens.size())

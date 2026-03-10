@@ -8,7 +8,7 @@
 #include "interfaces/IAutoCompleter.h"
 #include "interfaces/IFileSystem.h"
 #include "BuiltinCommandFlags.h"
-#include "Lexer.h"
+#include "TerminalTokenizer.h"
 #include "TerminalAst.h"
 
 #if defined(ARDUINO)

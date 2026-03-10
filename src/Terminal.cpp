@@ -1,7 +1,7 @@
 #include "Terminal.h"
-#include "Lexer.h"
 #include "TerminalParser.h"
 #include "TerminalExecutor.h"
+#include "TerminalTokenizer.h"
 #include <algorithm>
 
 namespace EmbeddedTerminal
@@ -249,11 +249,12 @@ namespace EmbeddedTerminal
             return;
         }
 
+        TerminalTokenizer tokenizer;
         TerminalParser parser;
 
         ETVector<token_t> tokens;
         LexerError lexerError = LexerError::NONE;
-        if (!parser.tokenizeLine(cleanedLine, tokens, lexerError))
+        if (!tokenizer.tokenizeLine(cleanedLine, tokens, lexerError))
         {
             reportLexerError_(lexerError);
             return;
