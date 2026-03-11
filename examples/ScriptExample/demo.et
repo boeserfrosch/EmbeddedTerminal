@@ -1,0 +1,7 @@
+echo "demo start"
+
+for i in 1 2 3; do echo blink-$i; gpio write 20 1; delay 100; gpio write 20 0; delay 100; done
+
+if gpio read 11; then echo fault; elif gpio read 10; then echo button; else echo idle; fi
+
+echo "demo end"

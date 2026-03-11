@@ -18,6 +18,9 @@ namespace EmbeddedTerminal
     public:
         virtual ~ICommand() = default;
         virtual ETString usage(const ETString &keyword) = 0;
+        virtual void onInterrupt()
+        {
+        }
 
         /**
          * @brief Executes the command with the given arguments.

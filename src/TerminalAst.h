@@ -39,11 +39,39 @@ namespace EmbeddedTerminal
         ParsedChain body;
     };
 
+    struct ParsedWhileLoop
+    {
+        bool hasLiteralCondition = false;
+        bool literalCondition = false;
+        ParsedChain condition;
+        ParsedChain body;
+    };
+
+    struct ParsedIfBlock
+    {
+        ParsedChain condition;
+        ParsedChain thenBody;
+        ETVector<ParsedChain> elifConditions;
+        ETVector<ParsedChain> elifBodies;
+        bool hasElse = false;
+        ParsedChain elseBody;
+    };
+
+    struct ParsedFunctionDef
+    {
+        ETString name;
+        ParsedChain body;
+    };
+
     struct ParsedAst
     {
         bool isForLoop = false;
+        bool isWhileLoop = false;
+        bool isIfBlock = false;
         ParsedChain chain;
         ParsedForLoop forLoop;
+        ParsedWhileLoop whileLoop;
+        ParsedIfBlock ifBlock;
     };
 }
 

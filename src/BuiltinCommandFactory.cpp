@@ -336,6 +336,24 @@ namespace EmbeddedTerminal
         }
     }
 
+    void BuiltinCommandFactory::registerScriptCommand(Terminal &terminal)
+    {
+        auto it = builtinCommands_.find(CMD_NAME_SCRIPT);
+        if (it == builtinCommands_.end())
+        {
+            cmd::script *scriptCmd = new cmd::script(terminal);
+            if (scriptCmd != nullptr)
+            {
+                builtinCommands_[CMD_NAME_SCRIPT] = scriptCmd;
+            }
+        }
+
+        if (builtinCommands_.find(CMD_NAME_SCRIPT) != builtinCommands_.end())
+        {
+            terminal.registerCommand(CMD_NAME_SCRIPT, builtinCommands_[CMD_NAME_SCRIPT]);
+        }
+    }
+
     void BuiltinCommandFactory::registerAllCommands(Terminal &terminal, DirectoryNavigator &nav,
                                                     INetworkSystem &net)
     {
@@ -343,6 +361,7 @@ namespace EmbeddedTerminal
         registerDiskCommands(terminal, nav, CMD_DISK_ALL);
         registerNetworkCommands(terminal, net, CMD_NETWORK_ALL);
         registerHelpCommand(terminal);
+        registerScriptCommand(terminal);
     }
 
     void BuiltinCommandFactory::deregisterFilesystemCommands(Terminal &terminal, uint32_t flags)
@@ -398,6 +417,11 @@ namespace EmbeddedTerminal
         terminal.deregisterCommand(CMD_NAME_HELP);
     }
 
+    void BuiltinCommandFactory::deregisterScriptCommand(Terminal &terminal)
+    {
+        terminal.deregisterCommand(CMD_NAME_SCRIPT);
+    }
+
     void BuiltinCommandFactory::deregisterAllCommands(Terminal &terminal)
     {
         deregisterFilesystemCommands(terminal, CMD_FILESYSTEM_ALL);
@@ -405,6 +429,7 @@ namespace EmbeddedTerminal
         deregisterNetworkCommands(terminal, CMD_NETWORK_ALL);
         deregisterGpioCommands(terminal, CMD_GPIO_ALL);
         deregisterHelpCommand(terminal);
+        deregisterScriptCommand(terminal);
     }
 
 } // namespace EmbeddedTerminal

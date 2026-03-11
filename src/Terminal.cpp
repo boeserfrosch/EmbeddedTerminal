@@ -1,43 +1,19 @@
 #include "Terminal.h"
 #include "TerminalParser.h"
-#include "TerminalExecutor.h"
 #include "TerminalTokenizer.h"
 #include <algorithm>
 
+#if defined(ARDUINO)
+#include <Arduino.h>
+#elif defined(ESP_PLATFORM) || defined(ESP_32)
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#else
+#include <chrono>
+#endif
+
 namespace EmbeddedTerminal
 {
-    namespace
-    {
-        ETString replaceAll_(const ETString &input, const ETString &needle, const ETString &replacement)
-        {
-            if (needle.empty())
-            {
-                return input;
-            }
-
-            ETString result = input;
-            size_t pos = 0;
-            while ((pos = result.find(needle, pos)) != ETString::npos)
-            {
-                ETString left = result.substr(0, pos);
-                ETString right = result.substr(pos + needle.length());
-                result = left + replacement + right;
-                pos += replacement.length();
-            }
-
-            return result;
-        }
-
-        ETString substituteLoopVariable_(const ETString &input, const ETString &variableName, const ETString &value)
-        {
-            ETString result = input;
-            result = replaceAll_(result, "${" + variableName + "}", value);
-            result = replaceAll_(result, "$" + variableName, value);
-            return result;
-        }
-
-    }
-
     class StreamInputChannel : public IInputChannel
     {
     public:
@@ -217,7 +193,25 @@ namespace EmbeddedTerminal
             return false;
         }
 
-        ETString inputLine = input_.readAll();
+        ETString rawInputLine = input_.readAll();
+        ETString inputLine;
+        bool hasCtrlC = false;
+        for (size_t i = 0; i < rawInputLine.length(); ++i)
+        {
+            if (rawInputLine[i] == 0x03)
+            {
+                hasCtrlC = true;
+                continue;
+            }
+
+            inputLine += rawInputLine[i];
+        }
+
+        if (hasCtrlC)
+        {
+            interruptActiveExecution_();
+            input_.printTo(TerminalChannel::StdErr, "^C\n");
+        }
 
         bool hasTab = inputLine.contains('\t');
         if (hasTab)
@@ -241,11 +235,38 @@ namespace EmbeddedTerminal
         return true;
     }
 
+    void Terminal::interruptActiveExecution_()
+    {
+        if (hasActiveCommand_ && activeCommand_ != nullptr)
+        {
+            activeCommand_->onInterrupt();
+        }
+
+        hasActiveCommand_ = false;
+        activeCommand_ = nullptr;
+        activeKeyword_ = "";
+        activeArguments_ = "";
+        activeState_ = CommandExecutionState::Completed;
+        lastExitCode_ = 130;
+    }
+
     void Terminal::processBufferedLine_(const ETString &line)
     {
         ETString cleanedLine = line.cleanupString().trim();
         if (cleanedLine.empty())
         {
+            return;
+        }
+
+        if (cleanedLine == "script")
+        {
+            call("script", "");
+            return;
+        }
+
+        if (cleanedLine.startsWith("script "))
+        {
+            call("script", cleanedLine.substr(7));
             return;
         }
 
@@ -267,21 +288,14 @@ namespace EmbeddedTerminal
             return;
         }
 
-        TerminalExecutor executor(
-            [this](const ParsedCommand &command)
-            {
-                executeParsedCommand_(command);
-            },
-            [this]()
-            {
-                return lastExitCode_;
-            },
-            [](const ETString &input, const ETString &variableName, const ETString &value)
-            {
-                return substituteLoopVariable_(input, variableName, value);
-            });
+        if (ast.isForLoop || ast.isWhileLoop || ast.chain.segments.size() != 1)
+        {
+            lastExitCode_ = 2;
+            input_.printTo(TerminalChannel::StdErr, "script syntax detected: use script <...>\n");
+            return;
+        }
 
-        executor.execute(ast);
+        executeParsedCommand_(ast.chain.segments[0].command);
     }
 
     void Terminal::processBufferedCommands_()
@@ -298,12 +312,27 @@ namespace EmbeddedTerminal
     void Terminal::loop()
     {
         continueActiveCommandIfNeeded_();
-        if (!ingestInputAndHandleAutoCompletion_())
+
+        bool ingested = ingestInputAndHandleAutoCompletion_();
+        if (!ingested)
         {
+            processBufferedCommands_();
             return;
         }
 
         processBufferedCommands_();
+    }
+
+    uint64_t Terminal::nowMs_() const
+    {
+#if defined(ARDUINO)
+        return static_cast<uint64_t>(millis());
+#elif defined(ESP_PLATFORM) || defined(ESP_32)
+        return static_cast<uint64_t>(xTaskGetTickCount()) * static_cast<uint64_t>(portTICK_PERIOD_MS);
+#else
+        auto now = std::chrono::steady_clock::now().time_since_epoch();
+        return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(now).count());
+#endif
     }
 
     void Terminal::registerCommand(const ETString &keyword, ICommand *observer)
@@ -366,6 +395,16 @@ namespace EmbeddedTerminal
         return lastExitCode_;
     }
 
+    IFileSystem *Terminal::getFileSystem() const
+    {
+        return fileSystem_;
+    }
+
+    uint64_t Terminal::currentTimeMs() const
+    {
+        return nowMs_();
+    }
+
     const ETString &Terminal::getBuffer() const
     {
         return buffer;
@@ -425,6 +464,51 @@ namespace EmbeddedTerminal
         activeKeyword_ = keyword;
         activeArguments_ = arguments;
         activeState_ = result.state;
+    }
+
+    CommandResult Terminal::resumeCommandForScript(ICommand *command, const ETString &keyword, const ETString &arguments)
+    {
+        if (command == nullptr)
+        {
+            return CommandResult::completed(127);
+        }
+
+        StreamInputChannel stdinChannel(input_);
+        StreamOutputChannel stdoutChannel(input_, TerminalChannel::StdOut);
+        StreamOutputChannel stderrChannel(input_, TerminalChannel::StdErr);
+        return executeCommandInternal_(command, keyword, arguments, stdinChannel, stdoutChannel, stderrChannel);
+    }
+
+    CommandResult Terminal::executeParsedCommandForScript(const ParsedCommand &command)
+    {
+        bool shouldRunPipeline =
+            (command.keywords.size() != 1) ||
+            (!command.redirectOutPath.empty()) ||
+            (!command.redirectInPath.empty());
+
+        if (shouldRunPipeline)
+        {
+            executePipeline_(command.keywords, command.arguments, command.redirectOutPath, command.appendRedirect, command.redirectInPath);
+            return CommandResult::completed(lastExitCode_);
+        }
+
+        ETString trimmedKeyword = command.keywords[0];
+        trimmedKeyword.trim();
+        if (trimmedKeyword.empty())
+        {
+            lastExitCode_ = 127;
+            return CommandResult::completed(127);
+        }
+
+        auto search = observer_.find(trimmedKeyword);
+        if (search == observer_.end())
+        {
+            lastExitCode_ = 127;
+            input_.printfTo(TerminalChannel::StdErr, "%s is unknown!\n", trimmedKeyword.c_str());
+            return CommandResult::completed(127);
+        }
+
+        return resumeCommandForScript(search->second, trimmedKeyword, command.arguments[0]);
     }
 
     void Terminal::executePipeline_(const ETVector<ETString> &keywords, const ETVector<ETString> &arguments,

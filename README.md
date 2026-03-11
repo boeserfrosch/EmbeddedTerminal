@@ -12,7 +12,7 @@ The Readme is partially generated using AI but was proven to be inaccurate in so
 - ✅ **Command System**: Register and execute custom commands with keyword-based parsing
 - ✅ **Command Runtime v2 (Preview)**: Stream-oriented command execution path with exit-code support
 - ✅ **Storage System Abstraction**: Unified mountable storage model via `IStorageSystem` + `IStorageMedia`
-- ✅ **Built-in Commands**: cat, cd, ls, mkdir, rm, rmdir, pwd, xxd, df, tail, help, ip, ping, download, gpio
+- ✅ **Built-in Commands**: cat, cd, ls, mkdir, rm, rmdir, pwd, xxd, df, tail, help, script, ip, ping, download, gpio
 - ✅ **GPIO Control**: Secure, policy-driven GPIO access with compile-time password protection
 - ✅ **Network System**: Supports single or multiple interfaces through `INetworkSystem`
 - ✅ **Cross-Platform String Handling**: Custom `ETString` class works across all platforms
@@ -402,6 +402,39 @@ class MyCommand : public ICommand {
 | `download` | Stream file content over terminal protocol | `download /log.txt` |
 | `gpio` | Control GPIO pins with security policies | `gpio read 2`, `gpio mode 5 output` |
 | `gpio` | Control GPIO pins with security policies | `gpio read 2`, `gpio mode 5 output` |
+
+### Script Command Syntax
+
+Use the `script` command to run inline scripts or script files.
+
+```txt
+script collect one; collect two
+script -f /scripts/demo.et
+```
+
+Supported control flow (bash-style):
+
+```txt
+# for-loop
+for i in 1 2 3; do echo $i; done
+
+# while-loop
+while true; do gpio read 10; delay 50; done
+
+# if / elif / else
+if gpio read 11; then echo fault; elif gpio read 10; then echo button; else echo idle; fi
+```
+
+Notes:
+
+- Terminators are `done` for loops and `fi` for `if` blocks.
+- `delay <ms>` is cooperative and non-blocking for the terminal loop.
+- Conditions are command chains; branch selection uses exit code (`0` = true, non-zero = false).
+
+> **See also:**
+>
+> - [examples/ScriptExample/demo.et](examples/ScriptExample/demo.et) — runnable example script
+> - [examples/ScriptExample/README.md](examples/ScriptExample/README.md) — how to run it
 
 ### GPIO Commands (Secure Hardware Control)
 

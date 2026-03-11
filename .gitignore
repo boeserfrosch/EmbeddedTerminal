@@ -158,3 +158,6 @@ dependencies/
 
 coverage-*.json
 coverage-*.txt
+
+# Examples artifacts
+main.cpp

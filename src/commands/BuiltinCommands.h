@@ -18,6 +18,7 @@
 #include "pwd.h"
 #include "rm.h"
 #include "rmdir.h"
+#include "script.h"
 #include "tail.h"
 #include "touch.h"
 #include "wc.h"

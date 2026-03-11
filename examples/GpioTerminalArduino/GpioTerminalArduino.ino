@@ -127,10 +127,12 @@ void setup()
 
     // Register help command
     factory.registerHelpCommand(term);
+    factory.registerScriptCommand(term);
 
     // Show usage instructions
     Serial.println("Terminal ready! Available commands:");
     Serial.println("  help         - List all commands");
+    Serial.println("  script ...   - Run scripting expressions and script files");
 #if ET_GPIO_ENABLE
     Serial.println("  gpio list    - Show board pins and policy status");
     Serial.println("  gpio policy  - Show security policy");

@@ -48,6 +48,10 @@ namespace EmbeddedTerminal
         void loop();
         const ETMap<ETString, ICommand *> &getCommands() const;
         int getLastExitCode() const;
+        IFileSystem *getFileSystem() const;
+        uint64_t currentTimeMs() const;
+        CommandResult executeParsedCommandForScript(const ParsedCommand &command);
+        CommandResult resumeCommandForScript(ICommand *command, const ETString &keyword, const ETString &arguments);
 
         // Auto completion support
         const ETString &getBuffer() const;
@@ -67,6 +71,8 @@ namespace EmbeddedTerminal
         void processBufferedCommands_();
         void processBufferedLine_(const ETString &line);
         void executeParsedCommand_(const ParsedCommand &command);
+        void interruptActiveExecution_();
+        uint64_t nowMs_() const;
 
         void reportLexerError_(LexerError error);
 

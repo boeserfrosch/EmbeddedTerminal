@@ -1,0 +1,5 @@
+echo "SCRIPT2 STARTUP"
+for i in 1 2 3 4 5 6 do gpio write 20 1; delay 100; gpio write 20 0; delay 100; done
+
+echo "SCRIPT2 SCHEDULER"
+while true; do watchdog kick; gpio read 10; gpio read 11; gpio write 20 1; gpio write 20 0; delay 50; done

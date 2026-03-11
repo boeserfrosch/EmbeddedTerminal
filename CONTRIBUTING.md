@@ -252,7 +252,7 @@ pio test -e native
 pio test -e esp32s3_espressif
 
 # Test specific test suite
-pio test -e native -f test_core/test_ETTypes
+pio test -e native -f core/test_ETTypes
 ```
 
 ## Documentation

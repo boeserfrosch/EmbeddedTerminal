@@ -22,6 +22,7 @@ namespace EmbeddedTerminal
     constexpr const char *CMD_NAME_TOUCH = "touch";
     constexpr const char *CMD_NAME_WC = "wc";
     constexpr const char *CMD_NAME_HELP = "help";
+    constexpr const char *CMD_NAME_SCRIPT = "script";
     constexpr const char *CMD_NAME_XXD = "xxd";
     constexpr const char *CMD_NAME_GPIO = "gpio";
 
@@ -47,13 +48,14 @@ namespace EmbeddedTerminal
     const BuiltinCommand CMD_ECHO = 1 << 15;
     const BuiltinCommand CMD_TOUCH = 1 << 16;
     const BuiltinCommand CMD_WC = 1 << 17;
+    const BuiltinCommand CMD_SCRIPT = 1 << 18;
 
     // Convenience flags
     const BuiltinCommand CMD_FILESYSTEM_ALL = CMD_CAT | CMD_CD | CMD_DOWNLOAD | CMD_LS | CMD_MKDIR | CMD_RM | CMD_RMDIR | CMD_TAIL | CMD_PWD | CMD_XXD | CMD_TOUCH | CMD_ECHO | CMD_WC;
     const BuiltinCommand CMD_DISK_ALL = CMD_DF;
     const BuiltinCommand CMD_NETWORK_ALL = CMD_IP | CMD_PING;
     const BuiltinCommand CMD_GPIO_ALL = CMD_GPIO;
-    const BuiltinCommand CMD_ALL = CMD_FILESYSTEM_ALL | CMD_DISK_ALL | CMD_NETWORK_ALL | CMD_HELP | CMD_GPIO_ALL;
+    const BuiltinCommand CMD_ALL = CMD_FILESYSTEM_ALL | CMD_DISK_ALL | CMD_NETWORK_ALL | CMD_HELP | CMD_SCRIPT | CMD_GPIO_ALL;
 }
 
 #endif // BUILTIN_COMMAND_FLAGS_H

@@ -84,6 +84,13 @@ namespace EmbeddedTerminal
         void registerHelpCommand(Terminal &terminal);
 
         /**
+         * Register script command
+         *
+         * @param terminal Terminal instance to register command with
+         */
+        void registerScriptCommand(Terminal &terminal);
+
+        /**
          * Convenience method to register all built-in commands
          *
          * @param terminal Terminal instance to register commands with
@@ -136,6 +143,13 @@ namespace EmbeddedTerminal
          * @param terminal Terminal instance to deregister command from
          */
         void deregisterHelpCommand(Terminal &terminal);
+
+        /**
+         * Deregister script command from terminal
+         *
+         * @param terminal Terminal instance to deregister command from
+         */
+        void deregisterScriptCommand(Terminal &terminal);
 
         /**
          * Deregister all built-in commands from terminal

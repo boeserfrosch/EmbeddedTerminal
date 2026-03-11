@@ -1,0 +1,13 @@
+echo "SCRIPT1 STARTUP"
+for i in 1 2 3 4 5 do gpio write 20 1; delay 200; gpio write 20 0; delay 200; done
+
+echo "SCRIPT1 WAIT BUTTON"
+while gpio read 10; do delay 20; done
+
+echo "SCRIPT1 RUN"
+gpio write 21 1
+for i in 1 2 3 4 5 6 7 8 9 10 do gpio read 11; delay 100; done
+gpio write 21 0
+
+echo "SCRIPT1 ERROR_PATTERN"
+while true; do gpio write 20 1; delay 100; gpio write 20 0; delay 100; gpio write 20 1; delay 100; gpio write 20 0; delay 700; done

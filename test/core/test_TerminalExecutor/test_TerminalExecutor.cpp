@@ -25,8 +25,10 @@ void test_executor_runs_simple_chain(void)
         {
             executed.push_back(command);
         },
-        [&exitCode]() { return exitCode; },
-        [](const ETString &input, const ETString &, const ETString &) { return input; });
+        [&exitCode]()
+        { return exitCode; },
+        [](const ETString &input, const ETString &, const ETString &)
+        { return input; });
 
     ParsedAst ast;
     ast.isForLoop = false;
@@ -53,8 +55,10 @@ void test_executor_respects_andand(void)
             executed.push_back(command);
             exitCode = (command.keywords[0] == "ok") ? 0 : 1;
         },
-        [&exitCode]() { return exitCode; },
-        [](const ETString &input, const ETString &, const ETString &) { return input; });
+        [&exitCode]()
+        { return exitCode; },
+        [](const ETString &input, const ETString &, const ETString &)
+        { return input; });
 
     ParsedAst ast;
     ParsedChainSegment first;
@@ -87,8 +91,10 @@ void test_executor_respects_oror(void)
             executed.push_back(command);
             exitCode = 1;
         },
-        [&exitCode]() { return exitCode; },
-        [](const ETString &input, const ETString &, const ETString &) { return input; });
+        [&exitCode]()
+        { return exitCode; },
+        [](const ETString &input, const ETString &, const ETString &)
+        { return input; });
 
     ParsedAst ast;
     ParsedChainSegment seg;
@@ -113,7 +119,8 @@ void test_executor_expands_for_loop_values(void)
         {
             executed.push_back(command);
         },
-        [&exitCode]() { return exitCode; },
+        [&exitCode]()
+        { return exitCode; },
         [](const ETString &input, const ETString &name, const ETString &value)
         {
             ETString result = input;
@@ -146,6 +153,106 @@ void test_executor_expands_for_loop_values(void)
     TEST_ASSERT_EQUAL_STRING("b", executed[1].arguments[0].c_str());
 }
 
+void test_executor_runs_delay_keyword_with_argument(void)
+{
+    ETVector<ParsedCommand> executed;
+    ETVector<uint32_t> delays;
+    int exitCode = 0;
+
+    TerminalExecutor executor(
+        [&executed](const ParsedCommand &command)
+        {
+            executed.push_back(command);
+        },
+        [&exitCode]()
+        { return exitCode; },
+        [](const ETString &input, const ETString &, const ETString &)
+        { return input; },
+        [&delays](uint32_t milliseconds)
+        {
+            delays.push_back(milliseconds);
+        });
+
+    ParsedAst ast;
+    ParsedChainSegment segment;
+    segment.command.keywords.push_back("delay");
+    segment.command.arguments.push_back("250");
+    ast.chain.segments.push_back(segment);
+
+    executor.execute(ast);
+
+    TEST_ASSERT_EQUAL(0, executed.size());
+    TEST_ASSERT_EQUAL(1, delays.size());
+    TEST_ASSERT_EQUAL(250, delays[0]);
+}
+
+void test_executor_delay_function_style_is_dispatched_as_command(void)
+{
+    ETVector<ParsedCommand> executed;
+    ETVector<uint32_t> delays;
+    int exitCode = 0;
+
+    TerminalExecutor executor(
+        [&executed](const ParsedCommand &command)
+        {
+            executed.push_back(command);
+        },
+        [&exitCode]()
+        { return exitCode; },
+        [](const ETString &input, const ETString &, const ETString &)
+        { return input; },
+        [&delays](uint32_t milliseconds)
+        {
+            delays.push_back(milliseconds);
+        });
+
+    ParsedAst ast;
+    ParsedChainSegment segment;
+    segment.command.keywords.push_back("delay(foo)");
+    segment.command.arguments.push_back("");
+    ast.chain.segments.push_back(segment);
+
+    executor.execute(ast);
+
+    TEST_ASSERT_EQUAL(1, executed.size());
+    TEST_ASSERT_EQUAL(0, delays.size());
+    TEST_ASSERT_EQUAL_STRING("delay(foo)", executed[0].keywords[0].c_str());
+}
+
+void test_executor_pause_keyword_is_dispatched_as_command(void)
+{
+    ETVector<ParsedCommand> executed;
+    ETVector<uint32_t> delays;
+    int exitCode = 0;
+
+    TerminalExecutor executor(
+        [&executed](const ParsedCommand &command)
+        {
+            executed.push_back(command);
+        },
+        [&exitCode]()
+        { return exitCode; },
+        [](const ETString &input, const ETString &, const ETString &)
+        { return input; },
+        [&delays](uint32_t milliseconds)
+        {
+            delays.push_back(milliseconds);
+        });
+
+    ParsedAst ast;
+    ParsedChainSegment segment;
+    segment.command.keywords.push_back("pause");
+    segment.command.arguments.push_back("250");
+    ast.chain.segments.push_back(segment);
+
+    executor.execute(ast);
+
+    TEST_ASSERT_EQUAL(1, executed.size());
+    TEST_ASSERT_EQUAL(0, delays.size());
+    TEST_ASSERT_EQUAL_STRING("pause", executed[0].keywords[0].c_str());
+    TEST_ASSERT_EQUAL_STRING("250", executed[0].arguments[0].c_str());
+}
+
 void process_tests()
 {
     UNITY_BEGIN();
@@ -153,6 +260,9 @@ void process_tests()
     RUN_TEST(test_executor_respects_andand);
     RUN_TEST(test_executor_respects_oror);
     RUN_TEST(test_executor_expands_for_loop_values);
+    RUN_TEST(test_executor_runs_delay_keyword_with_argument);
+    RUN_TEST(test_executor_delay_function_style_is_dispatched_as_command);
+    RUN_TEST(test_executor_pause_keyword_is_dispatched_as_command);
     UNITY_END();
 }
 
