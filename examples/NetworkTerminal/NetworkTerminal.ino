@@ -49,8 +49,8 @@
 const char *ssid = "SSID";
 const char *password = "password";
 
-ArduinoFileSystem fileSystem(SPIFFS);
-ESPNetworkInterface networkInterface;
+EmbeddedTerminal::ArduinoFileSystem fileSystem(SPIFFS);
+EmbeddedTerminal::ESPNetworkInterface networkInterface;
 #else
 #error "This example is designed for ESP32 only"
 #endif

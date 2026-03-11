@@ -29,11 +29,11 @@
 
 // Platform-specific file system
 #if defined(ARDUINO) && defined(ESP32)
-ArduinoSDMMCStorageMedia media;
+EmbeddedTerminal::ArduinoSDMMCStorageMedia media;
 #elif defined(ESP_PLATFORM) || defined(ESP_32)
-ESPIDFSDMMCStorageMedia media("sdmmc", "/sdcard");
+EmbeddedTerminal::ESPIDFSDMMCStorageMedia media("sdmmc", "/sdcard");
 #else
-NativeSuggestedStorageMedia media("native", ".");
+EmbeddedTerminal::NativeSuggestedStorageMedia media("native", ".");
 #endif
 
 using namespace EmbeddedTerminal;

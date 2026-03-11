@@ -66,12 +66,12 @@ public:
 
     ETString result = "System uptime: ";
     if (days > 0)
-      result += toETString(days) + "d ";
+      result += toETString(static_cast<size_t>(days)) + "d ";
     if (hours > 0)
-      result += toETString(hours) + "h ";
+      result += toETString(static_cast<size_t>(hours)) + "h ";
     if (minutes > 0)
-      result += toETString(minutes) + "m ";
-    result += toETString(seconds) + "s";
+      result += toETString(static_cast<size_t>(minutes)) + "m ";
+    result += toETString(static_cast<size_t>(seconds)) + "s";
 
     return result;
   }

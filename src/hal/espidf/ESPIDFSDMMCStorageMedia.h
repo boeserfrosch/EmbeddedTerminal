@@ -1,6 +1,6 @@
 #pragma once
 
-#if defined(ESP_PLATFORM) || defined(ESP32) || defined(ESP_32)
+#if defined(ESP_PLATFORM) && !defined(ARDUINO)
 
 #include "interfaces/IStorage.h"
 #include "hal/espidf/ESPIDFFileSystem.h"

@@ -36,13 +36,13 @@
 // Platform-specific file system
 #if defined(ESP32)
 #include <SPIFFS.h>
-ArduinoFileSystem fileSystem(SPIFFS);
+EmbeddedTerminal::ArduinoFileSystem fileSystem(SPIFFS);
 #elif defined(ARDUINO)
 #include <SD.h>
-ArduinoFileSystem fileSystem(SD);
+EmbeddedTerminal::ArduinoFileSystem fileSystem(SD);
 #else
 #include <hal/native/NativeFileSystem.h>
-NativeFileSystem fileSystem;
+EmbeddedTerminal::NativeFileSystem fileSystem;
 #endif
 
 using namespace EmbeddedTerminal;

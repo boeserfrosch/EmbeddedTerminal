@@ -13,7 +13,11 @@ namespace EmbeddedTerminal
                 return false;
             }
 
-            tokens[tokenCount++] = {type, text, singleQuoted, doubleQuoted};
+            token_t &token = tokens[tokenCount++];
+            token.type = type;
+            token.text = text;
+            token.singleQuoted = singleQuoted;
+            token.doubleQuoted = doubleQuoted;
             return true;
         }
 

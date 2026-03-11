@@ -44,16 +44,16 @@
 #include <SPIFFS.h>
 #include <hal/arduino/ArduinoFileSystem.h>
 #include <hal/espidf/ESPNetworkInterface.h>
-ArduinoFileSystem fileSystem(SPIFFS);
-ESPNetworkInterface networkInterface;
+EmbeddedTerminal::ArduinoFileSystem fileSystem(SPIFFS);
+EmbeddedTerminal::ESPNetworkInterface networkInterface;
 #elif defined(ARDUINO)
 #include <hal/arduino/ArduinoFileSystem.h>
 #include <SD.h>
-ArduinoFileSystem fileSystem(SD);
+EmbeddedTerminal::ArduinoFileSystem fileSystem(SD);
 // Note: Network interface not available on basic Arduino
 #else
 #include <hal/native/NativeFileSystem.h>
-NativeFileSystem fileSystem;
+EmbeddedTerminal::NativeFileSystem fileSystem;
 #endif
 
 using namespace EmbeddedTerminal;

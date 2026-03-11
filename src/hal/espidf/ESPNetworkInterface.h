@@ -54,17 +54,8 @@ namespace EmbeddedTerminal
                 }
             }
 
-            int avgTime = WiFi.ping(ip);
-
-            if (avgTime <= 0)
-            {
-                return "Host " + target + " is not reachable\n";
-            }
-
-            ETString result = target + " is reachable:\n";
-            result += "  Average time: " + ETString(avgTime) + " ms\n";
-
-            return result;
+            (void)ip;
+            return "Ping not implemented for Arduino WiFi backend\n";
 #else
             return "Ping not yet implemented for pure ESP-IDF framework\n";
 #endif

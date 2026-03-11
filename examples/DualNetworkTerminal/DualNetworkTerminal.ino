@@ -32,11 +32,11 @@
 #if defined(ESP32)
 #include <SPIFFS.h>
 #include <hal/arduino/ArduinoFileSystem.h>
-ArduinoFileSystem fileSystem(SPIFFS);
+EmbeddedTerminal::ArduinoFileSystem fileSystem(SPIFFS);
 #else
 #include <hal/arduino/ArduinoFileSystem.h>
 #include <SD.h>
-ArduinoFileSystem fileSystem(SD);
+EmbeddedTerminal::ArduinoFileSystem fileSystem(SD);
 #endif
 
 using namespace EmbeddedTerminal;
