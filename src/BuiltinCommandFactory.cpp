@@ -246,6 +246,27 @@ namespace EmbeddedTerminal
         }
     }
 
+    void BuiltinCommandFactory::registerGpioCommands(Terminal &terminal, IGpioInterface &gpio, IGpioPolicy &policy,
+                                                     IGpioAuth *auth, uint32_t flags)
+    {
+        if (flags & CMD_GPIO)
+        {
+            auto it = builtinCommands_.find(CMD_NAME_GPIO);
+            if (it == builtinCommands_.end())
+            {
+                cmd::gpio *gpioCmd = new cmd::gpio(gpio, policy, auth);
+                if (gpioCmd != nullptr)
+                {
+                    builtinCommands_[CMD_NAME_GPIO] = gpioCmd;
+                }
+            }
+            if (builtinCommands_.find(CMD_NAME_GPIO) != builtinCommands_.end())
+            {
+                terminal.registerCommand(CMD_NAME_GPIO, builtinCommands_[CMD_NAME_GPIO]);
+            }
+        }
+    }
+
     void BuiltinCommandFactory::registerHelpCommand(Terminal &terminal)
     {
         auto it = builtinCommands_.find(CMD_NAME_HELP);
@@ -309,6 +330,12 @@ namespace EmbeddedTerminal
             terminal.deregisterCommand(CMD_NAME_PING);
     }
 
+    void BuiltinCommandFactory::deregisterGpioCommands(Terminal &terminal, uint32_t flags)
+    {
+        if (flags & CMD_GPIO)
+            terminal.deregisterCommand(CMD_NAME_GPIO);
+    }
+
     void BuiltinCommandFactory::deregisterHelpCommand(Terminal &terminal)
     {
         terminal.deregisterCommand(CMD_NAME_HELP);
@@ -319,6 +346,7 @@ namespace EmbeddedTerminal
         deregisterFilesystemCommands(terminal, CMD_FILESYSTEM_ALL);
         deregisterDiskCommands(terminal, CMD_DISK_ALL);
         deregisterNetworkCommands(terminal, CMD_NETWORK_ALL);
+        deregisterGpioCommands(terminal, CMD_GPIO_ALL);
         deregisterHelpCommand(terminal);
     }
 

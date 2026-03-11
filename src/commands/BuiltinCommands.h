@@ -8,6 +8,7 @@
 #include "cd.h"
 #include "df.h"
 #include "download.h"
+#include "gpio.h"
 #include "help.h"
 #include "ip.h"
 #include "ls.h"

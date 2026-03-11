@@ -20,6 +20,7 @@ namespace EmbeddedTerminal
     constexpr const char *CMD_NAME_PWD = "pwd";
     constexpr const char *CMD_NAME_HELP = "help";
     constexpr const char *CMD_NAME_XXD = "xxd";
+    constexpr const char *CMD_NAME_GPIO = "gpio";
 
     // Built-in command flags for selective registration
     typedef uint32_t BuiltinCommand;
@@ -39,12 +40,14 @@ namespace EmbeddedTerminal
     const BuiltinCommand CMD_PWD = 1 << 11;
     const BuiltinCommand CMD_HELP = 1 << 12;
     const BuiltinCommand CMD_XXD = 1 << 13;
+    const BuiltinCommand CMD_GPIO = 1 << 14;
 
     // Convenience flags
     const BuiltinCommand CMD_FILESYSTEM_ALL = CMD_CAT | CMD_CD | CMD_DOWNLOAD | CMD_LS | CMD_MKDIR | CMD_RM | CMD_RMDIR | CMD_TAIL | CMD_PWD | CMD_XXD;
     const BuiltinCommand CMD_DISK_ALL = CMD_DF;
     const BuiltinCommand CMD_NETWORK_ALL = CMD_IP | CMD_PING;
-    const BuiltinCommand CMD_ALL = CMD_FILESYSTEM_ALL | CMD_DISK_ALL | CMD_NETWORK_ALL | CMD_HELP;
+    const BuiltinCommand CMD_GPIO_ALL = CMD_GPIO;
+    const BuiltinCommand CMD_ALL = CMD_FILESYSTEM_ALL | CMD_DISK_ALL | CMD_NETWORK_ALL | CMD_HELP | CMD_GPIO_ALL;
 }
 
 #endif // BUILTIN_COMMAND_FLAGS_H

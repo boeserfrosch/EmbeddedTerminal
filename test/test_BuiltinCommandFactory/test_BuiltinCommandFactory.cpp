@@ -17,6 +17,8 @@
 #include "../Mocks/MockNetworkSystem.h"
 #include "StorageSystem.h"
 #include "../Mocks/native/MockStorageMedia.h"
+#include "../Mocks/MockGpioInterface.h"
+#include "../Mocks/MockGpioPolicy.h"
 
 using namespace EmbeddedTerminal;
 
@@ -117,6 +119,20 @@ void test_register_network_commands(void)
     auto commands = term.getCommands();
     TEST_ASSERT_TRUE(commands.find("ip") != commands.end());
     // Note: download is a filesystem command, not network
+}
+
+void test_register_gpio_commands(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    MockGpioInterface gpio;
+    MockGpioPolicy policy;
+    BuiltinCommandFactory factory;
+
+    factory.registerGpioCommands(term, gpio, policy, nullptr, CMD_GPIO_ALL);
+
+    auto commands = term.getCommands();
+    TEST_ASSERT_TRUE(commands.find("gpio") != commands.end());
 }
 
 // Test registerHelpCommand
@@ -272,6 +288,7 @@ void process_tests()
     RUN_TEST(test_register_filesystem_commands_selective);
     RUN_TEST(test_register_disk_commands);
     RUN_TEST(test_register_network_commands);
+    RUN_TEST(test_register_gpio_commands);
     RUN_TEST(test_register_help_command);
     RUN_TEST(test_register_all_commands);
     RUN_TEST(test_deregister_filesystem_commands);

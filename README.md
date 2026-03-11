@@ -12,7 +12,8 @@ The Readme is partially generated using AI but was proven to be inaccurate in so
 - ✅ **Command System**: Register and execute custom commands with keyword-based parsing
 - ✅ **Command Runtime v2 (Preview)**: Stream-oriented command execution path with exit-code support
 - ✅ **Storage System Abstraction**: Unified mountable storage model via `IStorageSystem` + `IStorageMedia`
-- ✅ **Built-in Commands**: cat, cd, ls, mkdir, rm, rmdir, pwd, xxd, df, tail, help, ip, ping, download
+- ✅ **Built-in Commands**: cat, cd, ls, mkdir, rm, rmdir, pwd, xxd, df, tail, help, ip, ping, download, gpio
+- ✅ **GPIO Control**: Secure, policy-driven GPIO access with compile-time password protection
 - ✅ **Network System**: Supports single or multiple interfaces through `INetworkSystem`
 - ✅ **Cross-Platform String Handling**: Custom `ETString` class works across all platforms
 - ✅ **Directory Navigation**: Full path traversal and manipulation
@@ -399,6 +400,169 @@ class MyCommand : public ICommand {
 | `ip` | Show network interfaces | `ip`, `ip eth0` |
 | `ping` | Ping host through network system | `ping 8.8.8.8` |
 | `download` | Stream file content over terminal protocol | `download /log.txt` |
+| `gpio` | Control GPIO pins with security policies | `gpio read 2`, `gpio mode 5 output` |
+| `gpio` | Control GPIO pins with security policies | `gpio read 2`, `gpio mode 5 output` |
+
+### GPIO Commands (Secure Hardware Control)
+
+The `gpio` command family provides secure, policy-driven access to GPIO pins with compile-time configuration for board-specific protection.
+
+**Key Features:**
+
+- **Board Pin Discovery + Policy Gate**: Detect board pins and apply compile-time policy restrictions
+- **Password Protection**: Optional admin authentication using FNV-1a hash (no plaintext storage)
+- **Forced Exclusions**: Immutable pin restrictions that cannot be overridden
+- **Per-Operation Flags**: Control read/write/mode/exclude/include separately for each pin
+- **Cross-Platform**: Works on ESP32 (Arduino & ESP-IDF), with mock support for testing
+
+#### Subcommands
+
+| Subcommand | Description | Example |
+| ---------- | ----------- | ------- |
+| `gpio list` | Show board pins and current policy status | `gpio list` |
+| `gpio policy` | Show current policy configuration | `gpio policy` |
+| `gpio read <pin>` | Read digital value from pin | `gpio read 2`, `gpio read GPIO5` |
+| `gpio write <pin> <0\|1>` | Write digital value to pin | `gpio write 2 1`, `gpio write GPIO5 0` |
+| `gpio mode <pin> <mode>` | Set pin mode | `gpio mode 2 output`, `gpio mode 5 input_pullup` |
+| `gpio deny <pin> [ops]` | Deny selected operations for one or more pins | `gpio deny 2`, `gpio deny 5 r,w` |
+| `gpio allow <pin> [ops]` | Allow selected operations for one or more pins | `gpio allow 2`, `gpio allow 5 r,w` |
+| `gpio excluded` | List all excluded pins | `gpio excluded` |
+| `gpio auth <password>` | Authenticate for protected operations | `gpio auth mypassword` |
+
+**Supported Pin Modes:**
+
+- `input` - Input without pull resistors
+- `output` - Output mode
+- `input_pullup` - Input with pull-up resistor
+- `input_pulldown` - Input with pull-down resistor (platform-dependent)
+
+**Operation Flags** (for `gpio deny` / `gpio allow`):
+
+- `r` - Deny read operations
+- `w` - Deny write operations  
+- `m` - Deny mode changes
+- `e` - Deny further exclusions (protected)
+- `i` - Deny include (cannot be removed)
+
+#### Configuration (PlatformIO)
+
+Configure GPIO security in your `platformio.ini`:
+
+```ini
+[env:esp32]
+platform = espressif32
+board = esp32-s3-devkitc-1
+
+build_flags = 
+    ; Enable GPIO command
+    -DET_GPIO_ENABLE=1
+    
+    ; Allowed pins (CSV list, optional)
+    -DET_GPIO_ALLOWED_PINS=\"GPIO2,4,5,12,13,14,15\"
+    
+    ; Forced exclusions (immutable, CSV format: "pin:flags")
+    -DET_GPIO_FORCED_EXCLUSIONS=\"GPIO0:r,w,m,e,i;GPIO45:r,w,m,i;GPIO46:r,w,m,i\"
+    
+    ; Policy: 0=allow (default), 1=deny
+    -DET_GPIO_DEFAULT_POLICY=1
+    
+    ; Admin password hash (FNV-1a 32-bit hex)
+    ; Generate: echo -n "yourpassword" | md5sum (then use FNV-1a)
+    -DET_GPIO_ADMIN_HASH=\"0x1a2b3c4d\"
+```
+
+**Generating Password Hash:**
+
+```cpp
+// In a test sketch, use the static helper:
+#include <hal/common/CompileTimeGpioAuth.h>
+
+void setup() {
+    Serial.begin(115200);
+    ETString hash = CompileTimeGpioAuth::hashPasswordHex("yourpassword");
+    Serial.println("Hash: " + hash);
+}
+```
+
+#### Usage in Code
+
+**Using DefaultGpioSupport (Recommended):**
+
+```cpp
+#include <Terminal.h>
+#include <BuiltinCommandFactory.h>
+#include <hal/common/DefaultGpioSupport.h>
+
+Terminal term(Serial);
+BuiltinCommandFactory factory;
+
+void setup() {
+    Serial.begin(115200);
+    
+    // DefaultGpioSupport reads ET_GPIO_* compile-time macros
+    DefaultGpioSupport gpioSupport;
+    if (gpioSupport.available() && gpioSupport.gpio() != nullptr) {
+        factory.registerGpioCommands(term, 
+                                      *gpioSupport.gpio(),
+                                      gpioSupport.policy(),
+                                      gpioSupport.auth());
+    }
+    
+    Serial.println("GPIO terminal ready!");
+}
+
+void loop() {
+    term.loop();
+}
+```
+
+**Custom Implementation:**
+
+```cpp
+#include <hal/arduino/ArduinoGpioInterface.h>
+#include <hal/common/ConfigurableGpioPolicy.h>
+#include <hal/common/CompileTimeGpioAuth.h>
+
+ArduinoGpioInterface gpioHal;
+
+ETVector<ETString> allowed = {"GPIO2", "GPIO4", "GPIO5"};
+ETVector<GpioExclusionRule> forced = {
+    {"GPIO0", true, true, true, true, true}  // Deny all ops
+};
+ConfigurableGpioPolicy policy(allowed, forced, true);  // Default deny
+
+CompileTimeGpioAuth auth("0x1a2b3c4d");
+
+factory.registerGpioCommands(term, gpioHal, policy, auth);
+```
+
+#### Security Model
+
+1. **Board Pins + Policy**: Board pins are always listed; policy decides which operations are allowed
+2. **Forced Exclusions**: Pins with `i` flag cannot be included, even by admin
+3. **Protected Exclusions**: Pins with `e` flag require authentication to modify exclusions
+4. **Session Auth**: `gpio auth` authenticates for the current session only
+5. **No Plaintext**: Passwords are verified against compile-time FNV-1a hash
+
+**Example Security Configuration:**
+
+```ini
+; Bootloader pins - completely locked
+-DET_GPIO_FORCED_EXCLUSIONS=\"GPIO0:r,w,m,e,i;GPIO45:r,w,m,e,i;GPIO46:r,w,m,e,i\"
+
+; Working pins - accessible
+-DET_GPIO_ALLOWED_PINS=\"GPIO2,4,5,12,13,14,15\"
+
+; If ET_GPIO_ALLOWED_PINS is empty/unset, all detected board pins are policy-addressable
+
+; Critical peripheral pins - admin only
+; (These would be in forced exclusions with 'e' flag requiring auth to modify)
+```
+
+> **See also:**
+>
+> - [examples/GpioTerminalArduino/](examples/GpioTerminalArduino/) - Arduino framework example
+> - [examples/GpioTerminalESPIDF/](examples/GpioTerminalESPIDF/) - ESP-IDF framework example
 
 ## API Reference
 
@@ -416,12 +580,14 @@ public:
     void registerFilesystemCommands(Terminal &term, DirectoryNavigator &nav, uint32_t flags = CMD_FILESYSTEM_ALL);
     void registerDiskCommands(Terminal &term, DirectoryNavigator &nav, uint32_t flags = CMD_DISK_ALL);
     void registerNetworkCommands(Terminal &term, INetworkSystem &net, uint32_t flags = CMD_NETWORK_ALL);
+    void registerGpioCommands(Terminal &term, IGpioInterface &gpio, IGpioPolicy &policy, IGpioAuth &auth, uint32_t flags = CMD_GPIO_ALL);
     void registerHelpCommand(Terminal &term);
 
     // Deregister command categories
     void deregisterFilesystemCommands(Terminal &term, uint32_t flags = CMD_FILESYSTEM_ALL);
     void deregisterDiskCommands(Terminal &term, uint32_t flags = CMD_DISK_ALL);
     void deregisterNetworkCommands(Terminal &term, uint32_t flags = CMD_NETWORK_ALL);
+    void deregisterGpioCommands(Terminal &term, uint32_t flags = CMD_GPIO_ALL);
     void deregisterHelpCommand(Terminal &term);
     
     // Deregister all commands
@@ -448,6 +614,7 @@ public:
 - `CMD_IP` - Show network interfaces
 - `CMD_PING` - Ping host using network system
 - `CMD_HELP` - Display help
+- `CMD_GPIO` - GPIO control commands (requires IGpioInterface, IGpioPolicy, IGpioAuth)
 
 ### Terminal
 
@@ -631,6 +798,7 @@ EmbeddedTerminal/
 │   ├── commands/                 # Built-in command implementations
 │   │   ├── cat.h/cpp
 │   │   ├── download.h/cpp
+│   │   ├── gpio.h/cpp
 │   │   ├── ip.h/cpp
 │   │   ├── ping.h/cpp
 │   │   ├── pwd.h/cpp
@@ -643,12 +811,15 @@ EmbeddedTerminal/
 │   │   ├── IStorage.h
 │   │   ├── IFileSystem.h
 │   │   ├── IDirectoryNavigator.h
-│   │   └── INetworkInterface.h
+│   │   ├── INetworkInterface.h
+│   │   ├── IGpioInterface.h
+│   │   ├── IGpioPolicy.h
+│   │   └── IGpioAuth.h
 │   └── hal/
-│       ├── arduino/              # Arduino streams/filesystem/media wrappers
-│       ├── espidf/               # ESP-IDF filesystem/network/media wrappers
+│       ├── arduino/              # Arduino streams/filesystem/media/GPIO wrappers
+│       ├── espidf/               # ESP-IDF filesystem/network/media/GPIO wrappers
 │       ├── native/               # Native test/development adapters
-│       └── common/               # Shared storage media adapters
+│       └── common/               # Shared adapters (storage, GPIO policy/auth)
 ├── test/                        # Unit tests
 ├── examples/                    # Example sketches
 └── library.json                 # PlatformIO metadata

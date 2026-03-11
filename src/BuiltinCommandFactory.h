@@ -6,6 +6,9 @@
 #include "DirectoryNavigator.h"
 #include "interfaces/IFileSystem.h"
 #include "interfaces/INetworkInterface.h"
+#include "interfaces/IGpioInterface.h"
+#include "interfaces/IGpioPolicy.h"
+#include "interfaces/IGpioAuth.h"
 #include "commands/BuiltinCommands.h"
 
 namespace EmbeddedTerminal
@@ -62,6 +65,18 @@ namespace EmbeddedTerminal
                                      uint32_t flags = CMD_NETWORK_ALL);
 
         /**
+         * Register GPIO commands (gpio)
+         *
+         * @param terminal Terminal instance to register commands with
+         * @param gpio IGpioInterface dependency for GPIO operations
+         * @param policy IGpioPolicy dependency for policy and exclusions
+         * @param auth Optional IGpioAuth for password-protected changes
+         * @param flags Bitflags selecting which commands to register (default: all)
+         */
+        void registerGpioCommands(Terminal &terminal, IGpioInterface &gpio, IGpioPolicy &policy,
+                      IGpioAuth *auth = nullptr, uint32_t flags = CMD_GPIO_ALL);
+
+        /**
          * Register help command
          *
          * @param terminal Terminal instance to register command with
@@ -105,6 +120,15 @@ namespace EmbeddedTerminal
          */
         void deregisterNetworkCommands(Terminal &terminal,
                                        uint32_t flags = CMD_NETWORK_ALL);
+
+        /**
+         * Deregister GPIO commands from terminal
+         *
+         * @param terminal Terminal instance to deregister commands from
+         * @param flags Bitflags selecting which commands to deregister (default: all)
+         */
+        void deregisterGpioCommands(Terminal &terminal,
+                        uint32_t flags = CMD_GPIO_ALL);
 
         /**
          * Deregister help command from terminal
