@@ -23,21 +23,19 @@ Security settings are configured in `main/CMakeLists.txt`:
 
 ```cmake
 target_compile_definitions(${COMPONENT_LIB} PRIVATE
-    ET_GPIO_ENABLE=1
     ET_GPIO_ALLOWED_PINS="GPIO2,4,5,12,13,14,15"
-    ET_GPIO_FORCED_EXCLUSIONS="GPIO0:r,w,m,e,i;GPIO45:r,w,m,i;GPIO46:r,w,m,i"
-    ET_GPIO_DEFAULT_POLICY=1
-    ET_GPIO_ADMIN_HASH="0xbf1075ac"
+  ET_GPIO_FORCED_EXCLUDED_PINS="GPIO0:r,w,m,e,i;GPIO45:r,w,m,i;GPIO46:r,w,m,i"
+  ET_GPIO_DEFAULT_ALLOW=0
+  ET_GPIO_ADMIN_PASSWORD_HASH="0xbf1075ac"
 )
 ```
 
 ### Configuration Options
 
-- `ET_GPIO_ENABLE`: Enable GPIO support (0/1)
 - `ET_GPIO_ALLOWED_PINS`: CSV allowlist used by policy (optional; empty means all detected board pins)
-- `ET_GPIO_FORCED_EXCLUSIONS`: Semicolon-separated exclusion rules (format: "pin:flags")
-- `ET_GPIO_DEFAULT_POLICY`: 0=allow unlisted pins, 1=deny unlisted pins
-- `ET_GPIO_ADMIN_HASH`: FNV-1a 32-bit hash of admin password (hex format)
+- `ET_GPIO_FORCED_EXCLUDED_PINS`: Semicolon-separated exclusion rules (format: "pin:flags")
+- `ET_GPIO_DEFAULT_ALLOW`: 0=deny unlisted pins, 1=allow unlisted pins
+- `ET_GPIO_ADMIN_PASSWORD_HASH`: FNV-1a 32-bit hash of admin password (hex format)
 
 ### Exclusion Rule Flags
 
@@ -98,4 +96,4 @@ void setup() {
 2. **Protected Exclusions**: Pins marked with `e` flag require authentication to modify
 3. **Session Auth**: Authentication with `gpio auth` is session-only (resets on reboot)
 4. **No Plaintext**: Admin password is stored as compile-time hash, never in plaintext
-5. **Default Deny**: With `ET_GPIO_DEFAULT_POLICY=1`, operations on pins outside `ET_GPIO_ALLOWED_PINS` are blocked
+5. **Default Deny**: With `ET_GPIO_DEFAULT_ALLOW=0`, operations on pins outside `ET_GPIO_ALLOWED_PINS` are blocked

@@ -423,11 +423,15 @@ while true; do gpio read 10; delay 50; done
 
 # if / elif / else
 if gpio read 11; then echo fault; elif gpio read 10; then echo button; else echo idle; fi
+
+# function definition + call
+function blink; do gpio write 20 1; delay 100; gpio write 20 0; delay 100; done
+blink; blink
 ```
 
 Notes:
 
-- Terminators are `done` for loops and `fi` for `if` blocks.
+- Terminators are `done` for loops/functions and `fi` for `if` blocks.
 - `delay <ms>` is cooperative and non-blocking for the terminal loop.
 - Conditions are command chains; branch selection uses exit code (`0` = true, non-zero = false).
 
@@ -487,21 +491,17 @@ platform = espressif32
 board = esp32-s3-devkitc-1
 
 build_flags = 
-    ; Enable GPIO command
-    -DET_GPIO_ENABLE=1
-    
     ; Allowed pins (CSV list, optional)
     -DET_GPIO_ALLOWED_PINS=\"GPIO2,4,5,12,13,14,15\"
     
     ; Forced exclusions (immutable, CSV format: "pin:flags")
-    -DET_GPIO_FORCED_EXCLUSIONS=\"GPIO0:r,w,m,e,i;GPIO45:r,w,m,i;GPIO46:r,w,m,i\"
+    -DET_GPIO_FORCED_EXCLUDED_PINS=\"GPIO0:r,w,m,e,i;GPIO45:r,w,m,i;GPIO46:r,w,m,i\"
     
-    ; Policy: 0=allow (default), 1=deny
-    -DET_GPIO_DEFAULT_POLICY=1
+    ; Policy: 0=deny (default), 1=allow
+    -DET_GPIO_DEFAULT_ALLOW=0
     
     ; Admin password hash (FNV-1a 32-bit hex)
-    ; Generate: echo -n "yourpassword" | md5sum (then use FNV-1a)
-    -DET_GPIO_ADMIN_HASH=\"0x1a2b3c4d\"
+    -DET_GPIO_ADMIN_PASSWORD_HASH=\"0x1a2b3c4d\"
 ```
 
 **Generating Password Hash:**
@@ -581,10 +581,16 @@ factory.registerGpioCommands(term, gpioHal, policy, auth);
 
 ```ini
 ; Bootloader pins - completely locked
--DET_GPIO_FORCED_EXCLUSIONS=\"GPIO0:r,w,m,e,i;GPIO45:r,w,m,e,i;GPIO46:r,w,m,e,i\"
+-DET_GPIO_FORCED_EXCLUDED_PINS=\"GPIO0:r,w,m,e,i;GPIO45:r,w,m,e,i;GPIO46:r,w,m,e,i\"
 
 ; Working pins - accessible
 -DET_GPIO_ALLOWED_PINS=\"GPIO2,4,5,12,13,14,15\"
+
+; Default policy for unlisted pins: 0=deny, 1=allow
+-DET_GPIO_DEFAULT_ALLOW=0
+
+; Optional admin password hash (FNV-1a 32-bit hex)
+-DET_GPIO_ADMIN_PASSWORD_HASH=\"0xbf1075ac\"
 
 ; If ET_GPIO_ALLOWED_PINS is empty/unset, all detected board pins are policy-addressable
 
