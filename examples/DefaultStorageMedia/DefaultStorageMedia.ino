@@ -8,9 +8,9 @@
  */
 
 #include <Terminal.h>
-#include <BuiltinCommandFactory.h>
 #include <DirectoryNavigator.h>
 #include <StorageSystem.h>
+#include <commands/BuiltinCommands.h>
 #include <hal/common/DefaultStorageMedia.h>
 
 using namespace EmbeddedTerminal;
@@ -27,7 +27,22 @@ NativeSuggestedStorageMedia media("native", ".");
 
 DirectoryNavigator nav(&storage);
 Terminal term(Serial);
-BuiltinCommandFactory factory;
+
+cmd::cat catCommand(nav);
+cmd::cd cdCommand(nav);
+cmd::download downloadCommand(nav);
+cmd::ls lsCommand(nav);
+cmd::mkdir mkdirCommand(nav);
+cmd::rm rmCommand(nav);
+cmd::rmdir rmdirCommand(nav);
+cmd::tail tailCommand(nav);
+cmd::pwd pwdCommand(nav);
+cmd::xxd xxdCommand(nav);
+cmd::touch touchCommand(nav);
+cmd::echo echoCommand;
+cmd::wc wcCommand(nav);
+cmd::df dfCommand(storage);
+cmd::help helpCommand(term);
 
 void setup()
 {
@@ -42,9 +57,21 @@ void setup()
 
     storage.mountMedia(&media, "");
 
-    factory.registerFilesystemCommands(term, nav);
-    factory.registerDiskCommands(term, nav);
-    factory.registerHelpCommand(term);
+    term.registerCommand("cat", &catCommand);
+    term.registerCommand("cd", &cdCommand);
+    term.registerCommand("download", &downloadCommand);
+    term.registerCommand("ls", &lsCommand);
+    term.registerCommand("mkdir", &mkdirCommand);
+    term.registerCommand("rm", &rmCommand);
+    term.registerCommand("rmdir", &rmdirCommand);
+    term.registerCommand("tail", &tailCommand);
+    term.registerCommand("pwd", &pwdCommand);
+    term.registerCommand("xxd", &xxdCommand);
+    term.registerCommand("touch", &touchCommand);
+    term.registerCommand("echo", &echoCommand);
+    term.registerCommand("wc", &wcCommand);
+    term.registerCommand("df", &dfCommand);
+    term.registerCommand("help", &helpCommand);
 
 #if defined(ARDUINO)
     Serial.println("Default storage media example ready. Type 'help'.");

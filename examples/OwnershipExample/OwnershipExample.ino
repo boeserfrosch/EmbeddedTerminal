@@ -13,7 +13,7 @@
 #include <Terminal.h>
 #include <DirectoryNavigator.h>
 #include <StorageSystem.h>
-#include <BuiltinCommandFactory.h>
+#include <commands/BuiltinCommands.h>
 #include <interfaces/ICommand.h>
 #include <interfaces/IStorage.h>
 #include <hal/arduino/ArduinoFileSystem.h>
@@ -52,10 +52,6 @@ public:
 // Terminal instance
 Terminal term(Serial);
 
-// Factory instance - OWNS built-in commands (help, ls, cd, etc.)
-// When factory goes out of scope, it deletes all built-in commands
-BuiltinCommandFactory factory;
-
 class ExampleStorageMedia : public IStorageMedia
 {
 public:
@@ -77,8 +73,13 @@ StorageSystem storage;
 ExampleStorageMedia media("default", &fileSystem);
 DirectoryNavigator nav(&storage);
 
-// Custom command - YOU own this, YOU must delete it
+// Custom command - YOU own this and must keep it alive while registered
 RebootCommand rebootCmd;
+
+cmd::cat catCommand(nav);
+cmd::cd cdCommand(nav);
+cmd::ls lsCommand(nav);
+cmd::help helpCommand(term);
 
 void setup()
 {
@@ -99,17 +100,14 @@ void setup()
 
     storage.mountMedia(&media, "");
 
-    // Register built-in commands via factory
-    // Factory OWNS these commands and will delete them when it's destroyed
-    factory.registerFilesystemCommands(term, nav, CMD_LS | CMD_CD | CMD_CAT);
-    factory.registerHelpCommand(term);
-
-    // Register custom command
-    // YOU own this command and must ensure it lives as long as Terminal uses it
+    term.registerCommand("cat", &catCommand);
+    term.registerCommand("cd", &cdCommand);
+    term.registerCommand("ls", &lsCommand);
+    term.registerCommand("help", &helpCommand);
     term.registerCommand("reboot", &rebootCmd);
 
     Serial.println("Ownership model:");
-    Serial.println("  - Built-in commands (ls, cd, cat, help): Factory owns");
+    Serial.println("  - Built-in commands (ls, cd, cat, help): Application owns");
     Serial.println("  - Custom command (reboot): You own");
     Serial.println("  - Terminal: Owns nothing, just holds pointers");
     Serial.println();

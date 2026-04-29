@@ -12,7 +12,7 @@ The Readme is partially generated using AI but was proven to be inaccurate in so
 - ✅ **Command System**: Register and execute custom commands with keyword-based parsing
 - ✅ **Command Runtime v2 (Preview)**: Stream-oriented command execution path with exit-code support
 - ✅ **Storage System Abstraction**: Unified mountable storage model via `IStorageSystem` + `IStorageMedia`
-- ✅ **Built-in Commands**: cat, cd, ls, mkdir, rm, rmdir, pwd, xxd, df, tail, help, script, ip, ping, download, gpio
+- ✅ **Command Registration**: create the command objects you need and register them explicitly
 - ✅ **GPIO Control**: Secure, policy-driven GPIO access with compile-time password protection
 - ✅ **Network System**: Supports single or multiple interfaces through `INetworkSystem`
 - ✅ **Cross-Platform String Handling**: Custom `ETString` class works across all platforms
@@ -53,7 +53,7 @@ lib_deps =
 
 ```cpp
 #include <Terminal.h>
-#include <BuiltinCommandFactory.h>
+#include <commands/BuiltinCommands.h>
 #include <StorageSystem.h>
 #include <interfaces/IStorage.h>
 #include <hal/arduino/ArduinoFileSystem.h>
@@ -78,18 +78,22 @@ StorageSystem storage;
 ExampleStorageMedia media("default", &fs);
 DirectoryNavigator nav(&storage);
 Terminal term(Serial);
-BuiltinCommandFactory factory;
+cmd::cat catCommand(nav);
+cmd::cd cdCommand(nav);
+cmd::ls lsCommand(nav);
+cmd::df dfCommand(storage);
+cmd::help helpCommand(term);
 
 void setup() {
     Serial.begin(115200);
     SD.begin();
     storage.mountMedia(&media, "");
     
-    // Register filesystem + disk + help commands
-    // (registerAllCommands requires a valid INetworkSystem)
-    factory.registerFilesystemCommands(term, nav);
-    factory.registerDiskCommands(term, nav);
-    factory.registerHelpCommand(term);
+    term.registerCommand("cat", &catCommand);
+    term.registerCommand("cd", &cdCommand);
+    term.registerCommand("ls", &lsCommand);
+    term.registerCommand("df", &dfCommand);
+    term.registerCommand("help", &helpCommand);
     
     Serial.println("Terminal ready! Type 'help' for available commands.");
     Serial.print("> ");
@@ -107,24 +111,22 @@ Register only specific command categories using flags:
 > **Full example:** [examples/SelectiveRegistration/SelectiveRegistration.ino](examples/SelectiveRegistration/SelectiveRegistration.ino)
 
 ```cpp
-#include <BuiltinCommandFlags.h>
+#include <commands/BuiltinCommands.h>
 
-BuiltinCommandFactory factory;
+cmd::cat catCommand(nav);
+cmd::cd cdCommand(nav);
+cmd::ls lsCommand(nav);
+cmd::df dfCommand(storage);
+cmd::help helpCommand(term);
 
 void setup() {
     Serial.begin(115200);
     
-    // Register only filesystem navigation commands
-    factory.registerFilesystemCommands(term, nav, CMD_LS | CMD_CD | CMD_CAT);
-    
-    // Register disk usage command
-    factory.registerDiskCommands(term, nav);
-    
-    // Register network commands (requires INetworkSystem)
-    // factory.registerNetworkCommands(term, networkSystem);
-    
-    // Register help command
-    factory.registerHelpCommand(term);
+    term.registerCommand("cat", &catCommand);
+    term.registerCommand("cd", &cdCommand);
+    term.registerCommand("ls", &lsCommand);
+    term.registerCommand("df", &dfCommand);
+    term.registerCommand("help", &helpCommand);
     
     Serial.println("Terminal ready! Type 'help' for available commands.");
     Serial.print("> ");
@@ -137,7 +139,7 @@ void setup() {
 
 ```cpp
 #include <Terminal.h>
-#include <BuiltinCommandFactory.h>
+#include <commands/BuiltinCommands.h>
 #include <StorageSystem.h>
 #include <interfaces/IStorage.h>
 #include <interfaces/INetworkInterface.h>
@@ -166,7 +168,14 @@ DirectoryNavigator nav(&storage);
 ESPNetworkInterface netInterface;
 SingleNetworkSystem netSystem("wlan0", netInterface);
 Terminal term(Serial);
-BuiltinCommandFactory factory;
+cmd::cat catCommand(nav);
+cmd::cd cdCommand(nav);
+cmd::download downloadCommand(nav);
+cmd::ls lsCommand(nav);
+cmd::df dfCommand(storage);
+cmd::ip ipCommand(netSystem);
+cmd::ping pingCommand(netSystem);
+cmd::help helpCommand(term);
 
 void setup() {
     Serial.begin(115200);
@@ -175,8 +184,14 @@ void setup() {
     // mount storage media before using DirectoryNavigator-backed commands
     // (see examples for a complete IStorageMedia implementation)
     
-    // Register all commands including network
-    factory.registerAllCommands(term, nav, netSystem);
+    term.registerCommand("cat", &catCommand);
+    term.registerCommand("cd", &cdCommand);
+    term.registerCommand("download", &downloadCommand);
+    term.registerCommand("ls", &lsCommand);
+    term.registerCommand("df", &dfCommand);
+    term.registerCommand("ip", &ipCommand);
+    term.registerCommand("ping", &pingCommand);
+    term.registerCommand("help", &helpCommand);
     
     Serial.println("Terminal ready! Type 'help' for available commands.");
     Serial.print("> ");
@@ -523,11 +538,10 @@ void setup() {
 
 ```cpp
 #include <Terminal.h>
-#include <BuiltinCommandFactory.h>
+#include <commands/BuiltinCommands.h>
 #include <hal/common/DefaultGpioSupport.h>
 
 Terminal term(Serial);
-BuiltinCommandFactory factory;
 
 void setup() {
     Serial.begin(115200);
@@ -535,11 +549,15 @@ void setup() {
     // DefaultGpioSupport reads ET_GPIO_* compile-time macros
     DefaultGpioSupport gpioSupport;
     if (gpioSupport.available() && gpioSupport.gpio() != nullptr) {
-        factory.registerGpioCommands(term, 
-                                      *gpioSupport.gpio(),
-                                      gpioSupport.policy(),
-                                      gpioSupport.auth());
+        static cmd::gpio gpioCommand(*gpioSupport.gpio(),
+                                     gpioSupport.policy(),
+                                     gpioSupport.auth());
+        term.registerCommand("gpio", &gpioCommand);
     }
+    static cmd::help helpCommand(term);
+    static cmd::script scriptCommand(term);
+    term.registerCommand("help", &helpCommand);
+    term.registerCommand("script", &scriptCommand);
     
     Serial.println("GPIO terminal ready!");
 }
@@ -605,55 +623,19 @@ factory.registerGpioCommands(term, gpioHal, policy, auth);
 
 ## API Reference
 
-### BuiltinCommandFactory
+### Command Registration
 
-Factory class for creating and managing built-in commands.
+Built-in commands are regular command classes under [src/commands/](src/commands/). Create the command objects you need, keep them alive for as long as they remain registered, and register them with `Terminal::registerCommand(...)`.
 
 ```cpp
-class BuiltinCommandFactory {
-public:
-    // Register all built-in commands
-    void registerAllCommands(Terminal &term, DirectoryNavigator &nav, INetworkSystem &net);
-    
-    // Register command categories
-    void registerFilesystemCommands(Terminal &term, DirectoryNavigator &nav, uint32_t flags = CMD_FILESYSTEM_ALL);
-    void registerDiskCommands(Terminal &term, DirectoryNavigator &nav, uint32_t flags = CMD_DISK_ALL);
-    void registerNetworkCommands(Terminal &term, INetworkSystem &net, uint32_t flags = CMD_NETWORK_ALL);
-    void registerGpioCommands(Terminal &term, IGpioInterface &gpio, IGpioPolicy &policy, IGpioAuth &auth, uint32_t flags = CMD_GPIO_ALL);
-    void registerHelpCommand(Terminal &term);
+cmd::help helpCommand(term);
+cmd::ls lsCommand(nav);
+cmd::df dfCommand(storage);
 
-    // Deregister command categories
-    void deregisterFilesystemCommands(Terminal &term, uint32_t flags = CMD_FILESYSTEM_ALL);
-    void deregisterDiskCommands(Terminal &term, uint32_t flags = CMD_DISK_ALL);
-    void deregisterNetworkCommands(Terminal &term, uint32_t flags = CMD_NETWORK_ALL);
-    void deregisterGpioCommands(Terminal &term, uint32_t flags = CMD_GPIO_ALL);
-    void deregisterHelpCommand(Terminal &term);
-    
-    // Deregister all commands
-    void deregisterAllCommands(Terminal &term);
-    
-    // Destructor automatically cleans up all owned commands
-    ~BuiltinCommandFactory();
-};
+term.registerCommand("help", &helpCommand);
+term.registerCommand("ls", &lsCommand);
+term.registerCommand("df", &dfCommand);
 ```
-
-**Available Command Flags:**
-
-- `CMD_CAT` - Display file contents
-- `CMD_CD` - Change directory
-- `CMD_DOWNLOAD` - Download file via terminal
-- `CMD_LS` - List directory contents
-- `CMD_MKDIR` - Create directory
-- `CMD_RM` - Remove file
-- `CMD_RMDIR` - Remove directory
-- `CMD_TAIL` - Display end of file
-- `CMD_PWD` - Print current working directory
-- `CMD_XXD` - Hex dump file content
-- `CMD_DF` - Show disk usage
-- `CMD_IP` - Show network interfaces
-- `CMD_PING` - Ping host using network system
-- `CMD_HELP` - Display help
-- `CMD_GPIO` - GPIO control commands (requires IGpioInterface, IGpioPolicy, IGpioAuth)
 
 ### Terminal
 
@@ -683,8 +665,7 @@ public:
 
 **Usage Notes:**
 
-- Terminal does NOT own built-in commands - use BuiltinCommandFactory for those
-- Custom commands registered via `registerCommand()` must be owned by caller
+- Terminal does NOT own command objects - keep registered commands alive yourself
 - Call `loop()` in your main loop to process terminal input
 - On Arduino/ESP32, you can pass `Serial` or any `Stream` directly
 
@@ -827,8 +808,7 @@ public:
 EmbeddedTerminal/
 ├── src/
 │   ├── Terminal.h/cpp            # Main terminal engine
-│   ├── BuiltinCommandFactory.h/cpp
-│   ├── BuiltinCommandFlags.h
+│   ├── commands/
 │   ├── StorageSystem.h
 │   ├── DirectoryNavigator.h      # Path-aware navigation on IStorageSystem
 │   ├── ETTypes.h/cpp             # Cross-platform types (ETString, ETVector, ETMap)

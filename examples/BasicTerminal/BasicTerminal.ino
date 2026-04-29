@@ -34,9 +34,9 @@
 
 #include <Arduino.h>
 #include <Terminal.h>
-#include <BuiltinCommandFactory.h>
 #include <DirectoryNavigator.h>
 #include <StorageSystem.h>
+#include <commands/BuiltinCommands.h>
 #include <interfaces/IStorage.h>
 
 // Platform-specific file system
@@ -61,9 +61,6 @@ using namespace EmbeddedTerminal;
 // Create terminal instance (Terminal accepts Stream directly on Arduino)
 Terminal term(Serial);
 
-// Create factory instance (owns built-in commands)
-EmbeddedTerminal::BuiltinCommandFactory factory;
-
 class ExampleStorageMedia : public IStorageMedia
 {
 public:
@@ -84,6 +81,65 @@ private:
 StorageSystem storage;
 ExampleStorageMedia media("default", &fileSystem);
 DirectoryNavigator nav(&storage);
+
+#if defined(ESP32)
+class SingleNetworkSystem : public INetworkSystem
+{
+public:
+    explicit SingleNetworkSystem(INetworkInterface &iface) : iface_(&iface) {}
+    ETVector<INetworkInterface *> interfaces() const override { return ETVector<INetworkInterface *>{iface_}; }
+    INetworkInterface *getInterface(const ETString &name) const override
+    {
+        auto info = iface_->info();
+        return (info.name == name) ? iface_ : nullptr;
+    }
+    bool addInterface(const ETString &, INetworkInterface *) override { return false; }
+    bool removeInterface(const ETString &) override { return false; }
+    ETString ping(const ETString &interfaceName, const ETString &target) override
+    {
+        auto iface = getInterface(interfaceName);
+        return iface ? iface->ping(target) : "Interface not found\n";
+    }
+    ETString ping(const ETString &target) override { return iface_->ping(target); }
+
+private:
+    INetworkInterface *iface_;
+} networkSystem(networkInterface);
+
+cmd::cat catCommand(nav);
+cmd::cd cdCommand(nav);
+cmd::download downloadCommand(nav);
+cmd::ls lsCommand(nav);
+cmd::mkdir mkdirCommand(nav);
+cmd::rm rmCommand(nav);
+cmd::rmdir rmdirCommand(nav);
+cmd::tail tailCommand(nav);
+cmd::pwd pwdCommand(nav);
+cmd::xxd xxdCommand(nav);
+cmd::touch touchCommand(nav);
+cmd::echo echoCommand;
+cmd::wc wcCommand(nav);
+cmd::df dfCommand(storage);
+cmd::help helpCommand(term);
+cmd::ip ipCommand(networkSystem);
+cmd::ping pingCommand(networkSystem);
+#else
+cmd::cat catCommand(nav);
+cmd::cd cdCommand(nav);
+cmd::download downloadCommand(nav);
+cmd::ls lsCommand(nav);
+cmd::mkdir mkdirCommand(nav);
+cmd::rm rmCommand(nav);
+cmd::rmdir rmdirCommand(nav);
+cmd::tail tailCommand(nav);
+cmd::pwd pwdCommand(nav);
+cmd::xxd xxdCommand(nav);
+cmd::touch touchCommand(nav);
+cmd::echo echoCommand;
+cmd::wc wcCommand(nav);
+cmd::df dfCommand(storage);
+cmd::help helpCommand(term);
+#endif
 
 void setup()
 {
@@ -115,45 +171,25 @@ void setup()
 
     storage.mountMedia(&media, "");
 
-    // Register all built-in commands using BuiltinCommandFactory
-    // This is the simplest approach - all commands registered automatically
+    term.registerCommand("cat", &catCommand);
+    term.registerCommand("cd", &cdCommand);
+    term.registerCommand("download", &downloadCommand);
+    term.registerCommand("ls", &lsCommand);
+    term.registerCommand("mkdir", &mkdirCommand);
+    term.registerCommand("rm", &rmCommand);
+    term.registerCommand("rmdir", &rmdirCommand);
+    term.registerCommand("tail", &tailCommand);
+    term.registerCommand("pwd", &pwdCommand);
+    term.registerCommand("xxd", &xxdCommand);
+    term.registerCommand("touch", &touchCommand);
+    term.registerCommand("echo", &echoCommand);
+    term.registerCommand("wc", &wcCommand);
+    term.registerCommand("df", &dfCommand);
+    term.registerCommand("help", &helpCommand);
 #if defined(ESP32)
-    class SingleNetworkSystem : public INetworkSystem
-    {
-    public:
-        explicit SingleNetworkSystem(INetworkInterface &iface) : iface_(&iface) {}
-        ETVector<INetworkInterface *> interfaces() const override { return ETVector<INetworkInterface *>{iface_}; }
-        INetworkInterface *getInterface(const ETString &name) const override
-        {
-            auto info = iface_->info();
-            return (info.name == name) ? iface_ : nullptr;
-        }
-        bool addInterface(const ETString &, INetworkInterface *) override { return false; }
-        bool removeInterface(const ETString &) override { return false; }
-        ETString ping(const ETString &interfaceName, const ETString &target) override
-        {
-            auto iface = getInterface(interfaceName);
-            return iface ? iface->ping(target) : "Interface not found\n";
-        }
-        ETString ping(const ETString &target) override { return iface_->ping(target); }
-
-    private:
-        INetworkInterface *iface_;
-    } networkSystem(networkInterface);
-
-    factory.registerAllCommands(term, nav, networkSystem);
-#else
-    // On platforms without network support, register commands individually by category
-    factory.registerFilesystemCommands(term, nav); // cat, cd, download, ls, mkdir, rm, rmdir, tail
-    factory.registerDiskCommands(term, nav);       // df
-    factory.registerHelpCommand(term);             // help
+    term.registerCommand("ip", &ipCommand);
+    term.registerCommand("ping", &pingCommand);
 #endif
-
-    // Alternative: Selective registration with flags
-    // Uncomment to register only specific commands:
-    // factory.registerFilesystemCommands(term, nav, CMD_LS | CMD_CD | CMD_CAT);
-    // factory.registerDiskCommands(term, nav, CMD_DF);
-    // factory.registerHelpCommand(term);
 
     // Show available commands
     Serial.println();

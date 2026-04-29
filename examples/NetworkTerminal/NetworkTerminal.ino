@@ -33,9 +33,9 @@
 
 #include <Arduino.h>
 #include <Terminal.h>
-#include <BuiltinCommandFactory.h>
 #include <DirectoryNavigator.h>
 #include <StorageSystem.h>
+#include <commands/BuiltinCommands.h>
 #include <interfaces/IStorage.h>
 
 // ESP32-specific includes
@@ -109,8 +109,25 @@ StorageSystem storage;
 ExampleStorageMedia media("default", &fileSystem);
 DirectoryNavigator nav(&storage);
 Terminal term(Serial);
-BuiltinCommandFactory factory;
 SingleNetworkSystem networkSystem("wlan0", networkInterface);
+
+cmd::cat catCommand(nav);
+cmd::cd cdCommand(nav);
+cmd::download downloadCommand(nav);
+cmd::ls lsCommand(nav);
+cmd::mkdir mkdirCommand(nav);
+cmd::rm rmCommand(nav);
+cmd::rmdir rmdirCommand(nav);
+cmd::tail tailCommand(nav);
+cmd::pwd pwdCommand(nav);
+cmd::xxd xxdCommand(nav);
+cmd::touch touchCommand(nav);
+cmd::echo echoCommand;
+cmd::wc wcCommand(nav);
+cmd::df dfCommand(storage);
+cmd::ip ipCommand(networkSystem);
+cmd::ping pingCommand(networkSystem);
+cmd::help helpCommand(term);
 
 void setup()
 {
@@ -158,8 +175,23 @@ void setup()
     }
     storage.mountMedia(&media, "");
 
-    // Register all commands including network
-    factory.registerAllCommands(term, nav, networkSystem);
+    term.registerCommand("cat", &catCommand);
+    term.registerCommand("cd", &cdCommand);
+    term.registerCommand("download", &downloadCommand);
+    term.registerCommand("ls", &lsCommand);
+    term.registerCommand("mkdir", &mkdirCommand);
+    term.registerCommand("rm", &rmCommand);
+    term.registerCommand("rmdir", &rmdirCommand);
+    term.registerCommand("tail", &tailCommand);
+    term.registerCommand("pwd", &pwdCommand);
+    term.registerCommand("xxd", &xxdCommand);
+    term.registerCommand("touch", &touchCommand);
+    term.registerCommand("echo", &echoCommand);
+    term.registerCommand("wc", &wcCommand);
+    term.registerCommand("df", &dfCommand);
+    term.registerCommand("ip", &ipCommand);
+    term.registerCommand("ping", &pingCommand);
+    term.registerCommand("help", &helpCommand);
 
     // Show available commands
     Serial.println("Terminal ready! Type 'help' for available commands.");

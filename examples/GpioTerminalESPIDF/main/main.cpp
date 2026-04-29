@@ -52,8 +52,7 @@
 #include "freertos/task.h"
 #include "driver/uart.h"
 #include <Terminal.h>
-#include <BuiltinCommandFactory.h>
-#include <BuiltinCommandFlags.h>
+#include <commands/BuiltinCommands.h>
 #include <hal/common/DefaultGpioSupport.h>
 #include <hal/espidf/ESPIDFTerminalStream.h>
 
@@ -64,9 +63,6 @@ ESPIDFTerminalStream termStream(UART_NUM_0);
 
 // Create terminal instance
 Terminal term(termStream);
-
-// Create factory instance (owns built-in commands)
-BuiltinCommandFactory factory;
 
 #if ET_GPIO_ENABLE
 DefaultGpioSupport gpioSupport;
@@ -101,11 +97,10 @@ extern "C" void app_main(void)
         printf("[INFO] GPIO support enabled\n");
         printf("[INFO] Registering GPIO commands...\n");
 
-        // Register GPIO commands with security policy
-        factory.registerGpioCommands(term,
-                                     *gpio,
+        static cmd::gpio gpioCommand(*gpio,
                                      gpioSupport.policy(),
                                      gpioSupport.auth());
+        term.registerCommand("gpio", &gpioCommand);
 
         printf("[INFO] GPIO commands registered successfully\n");
         printf("[INFO] gpio list shows board pins; policy may still block operations\n");
@@ -138,8 +133,8 @@ extern "C" void app_main(void)
     printf("\n");
 #endif
 
-    // Register help command
-    factory.registerHelpCommand(term);
+    static cmd::help helpCommand(term);
+    term.registerCommand("help", &helpCommand);
 
     // Show usage instructions
     printf("Terminal ready! Available commands:\n");

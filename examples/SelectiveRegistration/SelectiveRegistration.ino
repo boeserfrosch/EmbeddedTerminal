@@ -26,10 +26,9 @@
 
 #include <Arduino.h>
 #include <Terminal.h>
-#include <BuiltinCommandFactory.h>
-#include <BuiltinCommandFlags.h>
 #include <DirectoryNavigator.h>
 #include <StorageSystem.h>
+#include <commands/BuiltinCommands.h>
 #include <interfaces/IStorage.h>
 #include <hal/arduino/ArduinoFileSystem.h>
 
@@ -69,7 +68,12 @@ StorageSystem storage;
 ExampleStorageMedia media("default", &fileSystem);
 DirectoryNavigator nav(&storage);
 Terminal term(Serial);
-BuiltinCommandFactory factory;
+
+cmd::cat catCommand(nav);
+cmd::cd cdCommand(nav);
+cmd::ls lsCommand(nav);
+cmd::df dfCommand(storage);
+cmd::help helpCommand(term);
 
 void setup()
 {
@@ -101,17 +105,11 @@ void setup()
 
     storage.mountMedia(&media, "");
 
-    // Register only filesystem navigation commands
-    factory.registerFilesystemCommands(term, nav, CMD_LS | CMD_CD | CMD_CAT);
-
-    // Register disk usage command
-    factory.registerDiskCommands(term, nav);
-
-    // Register network commands (requires INetworkSystem)
-    // factory.registerNetworkCommands(term, networkInterface);
-
-    // Register help command
-    factory.registerHelpCommand(term);
+    term.registerCommand("cat", &catCommand);
+    term.registerCommand("cd", &cdCommand);
+    term.registerCommand("ls", &lsCommand);
+    term.registerCommand("df", &dfCommand);
+    term.registerCommand("help", &helpCommand);
 
     // Show available commands
     Serial.println();

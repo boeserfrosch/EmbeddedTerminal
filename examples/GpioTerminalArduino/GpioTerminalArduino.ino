@@ -51,17 +51,13 @@
 #define ET_GPIO_ENABLE 1
 #include <Arduino.h>
 #include <Terminal.h>
-#include <BuiltinCommandFactory.h>
-#include <BuiltinCommandFlags.h>
+#include <commands/BuiltinCommands.h>
 #include <hal/common/DefaultGpioSupport.h>
 
 using namespace EmbeddedTerminal;
 
 // Create terminal instance
 Terminal term(Serial);
-
-// Create factory instance (owns built-in commands)
-BuiltinCommandFactory factory;
 
 #if ET_GPIO_ENABLE
 DefaultGpioSupport gpioSupport;
@@ -88,11 +84,10 @@ void setup()
         Serial.println("[INFO] GPIO support enabled");
         Serial.println("[INFO] Registering GPIO commands...");
 
-        // Register GPIO commands with security policy
-        factory.registerGpioCommands(term,
-                                     *gpio,
+        static cmd::gpio gpioCommand(*gpio,
                                      gpioSupport.policy(),
                                      gpioSupport.auth());
+        term.registerCommand("gpio", &gpioCommand);
 
         Serial.println("[INFO] GPIO commands registered successfully");
         Serial.println("[INFO] gpio list shows board pins; policy may still block operations");
@@ -125,9 +120,10 @@ void setup()
     Serial.println();
 #endif
 
-    // Register help command
-    factory.registerHelpCommand(term);
-    factory.registerScriptCommand(term);
+    static cmd::help helpCommand(term);
+    static cmd::script scriptCommand(term);
+    term.registerCommand("help", &helpCommand);
+    term.registerCommand("script", &scriptCommand);
 
     // Show usage instructions
     Serial.println("Terminal ready! Available commands:");

@@ -24,7 +24,7 @@
 #include <DirectoryNavigator.h>
 #include <StorageSystem.h>
 #include <commands/ip.h>
-#include <BuiltinCommandFactory.h>
+#include <commands/BuiltinCommands.h>
 #include <interfaces/INetworkInterface.h>
 #include <interfaces/IStorage.h>
 
@@ -43,9 +43,6 @@ using namespace EmbeddedTerminal;
 
 // Create terminal instance
 Terminal term(Serial);
-
-// Create factory instance (owns built-in commands)
-EmbeddedTerminal::BuiltinCommandFactory factory;
 
 class ExampleStorageMedia : public IStorageMedia
 {
@@ -153,6 +150,22 @@ StorageSystem storage;
 ExampleStorageMedia media("default", &fileSystem);
 DirectoryNavigator nav(&storage);
 
+cmd::cat catCommand(nav);
+cmd::cd cdCommand(nav);
+cmd::download downloadCommand(nav);
+cmd::ls lsCommand(nav);
+cmd::mkdir mkdirCommand(nav);
+cmd::rm rmCommand(nav);
+cmd::rmdir rmdirCommand(nav);
+cmd::tail tailCommand(nav);
+cmd::pwd pwdCommand(nav);
+cmd::xxd xxdCommand(nav);
+cmd::touch touchCommand(nav);
+cmd::echo echoCommand;
+cmd::wc wcCommand(nav);
+cmd::df dfCommand(storage);
+cmd::help helpCommand(term);
+
 // Create separate network interface instances
 StaticNetworkInterface ethernetInterface(NetworkInfo("eth0", "192.168.1.100", "00:11:22:33:44:55", "255.255.255.0", "192.168.1.1", true));
 StaticNetworkInterface wifiInterface(NetworkInfo("wlan0", "192.168.2.200", "AA:BB:CC:DD:EE:FF", "255.255.255.0", "192.168.2.1", true));
@@ -193,11 +206,22 @@ void setup()
 
     storage.mountMedia(&media, "");
 
-    // Register filesystem and disk commands using factory
-    factory.registerFilesystemCommands(term, nav, CMD_LS | CMD_CD | CMD_CAT);
-    factory.registerDiskCommands(term, nav);
-    factory.registerNetworkCommands(term, networkSystem, CMD_IP);
-    factory.registerHelpCommand(term);
+    term.registerCommand("cat", &catCommand);
+    term.registerCommand("cd", &cdCommand);
+    term.registerCommand("download", &downloadCommand);
+    term.registerCommand("ls", &lsCommand);
+    term.registerCommand("mkdir", &mkdirCommand);
+    term.registerCommand("rm", &rmCommand);
+    term.registerCommand("rmdir", &rmdirCommand);
+    term.registerCommand("tail", &tailCommand);
+    term.registerCommand("pwd", &pwdCommand);
+    term.registerCommand("xxd", &xxdCommand);
+    term.registerCommand("touch", &touchCommand);
+    term.registerCommand("echo", &echoCommand);
+    term.registerCommand("wc", &wcCommand);
+    term.registerCommand("df", &dfCommand);
+    term.registerCommand("help", &helpCommand);
+    term.registerCommand("ip", &ethIpCommand);
 
     // Register SEPARATE IP commands with DIFFERENT keywords
     // This demonstrates registering the same command type with different instances
