@@ -266,8 +266,23 @@ namespace EmbeddedTerminal
             return;
         }
 
-        if (ast.isForLoop || ast.isWhileLoop || ast.chain.segments.size() != 1)
+        if (ast.isForLoop || ast.isWhileLoop || ast.isIfBlock || ast.chain.segments.size() != 1)
         {
+            // If the user explicitly prefixed the input with the `script`
+            // keyword, hand the raw arguments off to the registered `script`
+            // command so it can interpret script syntax itself. Otherwise,
+            // report an error about script syntax being detected.
+            if (!tokens.empty() && tokens[0].type == TokenType::WORD && tokens[0].text == "script")
+            {
+                ETString args = "";
+                if (cleanedLine.length() > 6 && cleanedLine.startsWith("script "))
+                {
+                    args = cleanedLine.substr(7);
+                }
+                call("script", args);
+                return;
+            }
+
             lastExitCode_ = 2;
             input_.printTo(TerminalChannel::StdErr, "script syntax detected: use script <...>\n");
             return;
