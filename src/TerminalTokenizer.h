@@ -27,6 +27,16 @@ namespace EmbeddedTerminal
         bool doubleQuoted = false;
     };
 
+    inline static const token_t knownTokens[] = {
+        {TokenType::PIPE, "|"},
+        {TokenType::REDIR_OUT, ">"},
+        {TokenType::REDIR_IN, "<"},
+        {TokenType::REDIR_APPEND, ">>"},
+        {TokenType::SEMI, ";"},
+        {TokenType::AND_AND, "&&"},
+        {TokenType::OR_OR, "||"},
+        {TokenType::NEWLINE, "\n"}};
+
     enum class LexerError
     {
         NONE = 0,
