@@ -186,7 +186,7 @@ namespace EmbeddedTerminal
         }
     }
 
-    bool Terminal::ingestInputAndHandleAutoCompletion_()
+    bool Terminal::ingestInput_()
     {
         if (!input_.available())
         {
@@ -195,44 +195,31 @@ namespace EmbeddedTerminal
 
         ETString rawInputLine = input_.readAll();
         ETString inputLine;
-        bool hasCtrlC = false;
-        for (size_t i = 0; i < rawInputLine.length(); ++i)
-        {
-            if (rawInputLine[i] == 0x03)
-            {
-                hasCtrlC = true;
-                continue;
-            }
 
-            inputLine += rawInputLine[i];
-        }
+        return handleCommandKeys_(rawInputLine);
+    }
 
-        if (hasCtrlC)
+    bool Terminal::handleCommandKeys_(const ETString &rawInputLine)
+    {
+        if (rawInputLine.contains(0x03)) // Ctrl+C
         {
             interruptActiveExecution_();
             input_.printTo(TerminalChannel::StdErr, "^C\n");
+            return false; // Signal that an interrupt was requested
         }
-
-        bool hasTab = inputLine.contains('\t');
-        if (hasTab)
+        if (rawInputLine.contains('\t')) // Tab for auto-completion
         {
-            size_t tabPos = inputLine.find('\t');
-            while (tabPos != ETString::npos)
-            {
-                inputLine.erase(tabPos, 1);
-                tabPos = inputLine.find('\t');
-            }
-        }
-
-        input_.print(inputLine);
-        buffer += inputLine;
-
-        if (hasTab)
-        {
+            auto relevantPart = rawInputLine.substr(0, rawInputLine.find('\t')); // Remove first tab and anything after it from buffer
+            buffer += relevantPart;
+            input_.print(relevantPart);
             handleAutoCompletion_();
+            return true; // Signal that it should continue processing (with the auto-completion logic)
         }
 
-        return true;
+        input_.print(rawInputLine);
+        buffer += rawInputLine;
+
+        return true; // Signal that input was ingested and should be processed
     }
 
     void Terminal::interruptActiveExecution_()
@@ -250,7 +237,7 @@ namespace EmbeddedTerminal
         lastExitCode_ = 130;
     }
 
-    void Terminal::processBufferedLine_(const ETString &line)
+    void Terminal::processCommandLine_(const ETString &line)
     {
         ETString cleanedLine = line.cleanupString().trim();
         if (cleanedLine.empty())
@@ -258,17 +245,8 @@ namespace EmbeddedTerminal
             return;
         }
 
-        if (cleanedLine == "script")
-        {
-            call("script", "");
-            return;
-        }
-
-        if (cleanedLine.startsWith("script "))
-        {
-            call("script", cleanedLine.substr(7));
-            return;
-        }
+        // Treat "script" like a normal command; let the parser and
+        // the registered `script` command handle any script-related logic.
 
         TerminalTokenizer tokenizer;
         TerminalParser parser;
@@ -305,7 +283,7 @@ namespace EmbeddedTerminal
         {
             ETString line = buffer.substr(0, delimPosition);
             buffer.erase(0, delimPosition + 1);
-            processBufferedLine_(line);
+            processCommandLine_(line);
         }
     }
 
@@ -313,12 +291,7 @@ namespace EmbeddedTerminal
     {
         continueActiveCommandIfNeeded_();
 
-        bool ingested = ingestInputAndHandleAutoCompletion_();
-        if (!ingested)
-        {
-            processBufferedCommands_();
-            return;
-        }
+        bool ingested = ingestInput_();
 
         processBufferedCommands_();
     }
@@ -335,9 +308,9 @@ namespace EmbeddedTerminal
 #endif
     }
 
-    void Terminal::registerCommand(const ETString &keyword, ICommand *observer)
+    void Terminal::registerCommand(const ETString &keyword, ICommand *command)
     {
-        if (observer == nullptr)
+        if (command == nullptr)
         {
             return; // Ignore null command pointers
         }
@@ -351,23 +324,23 @@ namespace EmbeddedTerminal
         }
 
         // Store command pointer - Terminal does NOT take ownership
-        observer_[trimmedKeyword] = observer;
+        commands_[trimmedKeyword] = command;
     }
 
     const ETMap<ETString, ICommand *> &Terminal::getCommands() const
     {
-        return observer_;
+        return commands_;
     }
 
     void Terminal::deregisterCommand(const ETString &keyword)
     {
         ETString trimmedKeyword = keyword;
         trimmedKeyword.trim();
-        auto it = observer_.find(trimmedKeyword);
-        if (it != observer_.end())
+        auto it = commands_.find(trimmedKeyword);
+        if (it != commands_.end())
         {
             // Just remove from map - Terminal does NOT own commands
-            observer_.erase(it);
+            commands_.erase(it);
         }
     }
 
@@ -378,8 +351,8 @@ namespace EmbeddedTerminal
 
         if (trimmedKeyword.empty())
             return;
-        auto search = observer_.find(trimmedKeyword);
-        if (search != observer_.end())
+        auto search = commands_.find(trimmedKeyword);
+        if (search != commands_.end())
         {
             executeCommand_(search->second, trimmedKeyword, additional);
         }
@@ -407,17 +380,6 @@ namespace EmbeddedTerminal
 
     const ETString &Terminal::getBuffer() const
     {
-        return buffer;
-    }
-
-    ETString Terminal::getLastWord() const
-    {
-        // Extract the last word from the buffer (after the last space)
-        size_t lastSpacePos = buffer.find_last_of(' ');
-        if (lastSpacePos != ETString::npos)
-        {
-            return buffer.substr(lastSpacePos + 1);
-        }
         return buffer;
     }
 
@@ -500,8 +462,8 @@ namespace EmbeddedTerminal
             return CommandResult::completed(127);
         }
 
-        auto search = observer_.find(trimmedKeyword);
-        if (search == observer_.end())
+        auto search = commands_.find(trimmedKeyword);
+        if (search == commands_.end())
         {
             lastExitCode_ = 127;
             input_.printfTo(TerminalChannel::StdErr, "%s is unknown!\n", trimmedKeyword.c_str());
@@ -557,8 +519,8 @@ namespace EmbeddedTerminal
         {
             ETString commandKey = keywords[index];
             commandKey.trim();
-            auto search = observer_.find(commandKey);
-            if (search == observer_.end())
+            auto search = commands_.find(commandKey);
+            if (search == commands_.end())
             {
                 lastExitCode_ = 127;
                 input_.printfTo(TerminalChannel::StdErr, "%s is unknown!\n", commandKey.c_str());
@@ -625,20 +587,20 @@ namespace EmbeddedTerminal
 
     void Terminal::handleAutoCompletion_()
     {
-        // Get the keyword (first word in buffer)
-        ETString keywordPart = buffer;
-        size_t spacePos = buffer.find(' ');
-        if (spacePos != ETString::npos)
+        auto parts = split(buffer, " ");
+        if (parts.empty())
         {
-            keywordPart = buffer.substr(0, spacePos);
+            return;
         }
+        // Get the keyword (first word in buffer)
+        auto keywordPart = parts[0];
 
         // Get the partial argument being typed
-        ETString partialArg = getLastWord();
+        ETString partialArg = parts[parts.size() - 1];
 
         // Lookup the command and check if it has auto completion support
-        auto search = observer_.find(keywordPart);
-        if (search != observer_.end())
+        auto search = commands_.find(keywordPart);
+        if (search != commands_.end())
         {
             ICommand *cmd = search->second;
             // Call getSuggestions directly - it return s empty vector if not overridden
