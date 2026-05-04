@@ -49,15 +49,9 @@ void test_script_multiline_for_loop(void)
     // Test: multiline for loop via script command
     ETString scriptText = "for i in 1 2 3; do echo Item $i; done";
 
-    auto scriptIt = const_cast<ETMap<ETString, ICommand *> &>(test.terminal_.getCommands()).find("script");
-    TEST_ASSERT_TRUE(scriptIt != const_cast<ETMap<ETString, ICommand *> &>(test.terminal_.getCommands()).end());
-    
-    cmd::script &scriptCmd = *(static_cast<cmd::script *>(scriptIt->second));
-
-    ETMap<ETString, ETString> vars;
-    CommandContext context{vars, 0, true};
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(test.stream_, TerminalChannel::StdOut);
+    auto &cmdMap = const_cast<ETMap<ETString, ICommand *> &>(test.terminal_.getCommands());
+    auto scriptIt = cmdMap.find("script");
+    TEST_ASSERT_TRUE(scriptIt != cmdMap.end());
     StreamBackedOutputChannel stderrChannel(test.stream_, TerminalChannel::StdErr);
 
     CommandInvocation invocation{"script", scriptText, context, stdinChannel, stdoutChannel, stderrChannel};
