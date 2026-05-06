@@ -10,5 +10,5 @@ ETString echo::trigger(const ETString &keyword, const ETString &additional)
 
 ETString echo::usage(const ETString &keyword)
 {
-    return keyword + " [text] - Print the specified text\n";
+    return keyword + " <text> - Print the specified text\n";
 }

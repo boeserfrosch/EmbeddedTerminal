@@ -1,32 +1,40 @@
 ﻿#include "ls.h"
+#include "OptionParser.h"
 #include <sstream>
 
 using namespace EmbeddedTerminal::cmd;
 ETString ls::trigger(const ETString &keyword, const ETString &additional)
 {
-    additional.trim();
-    auto param = split(additional, " ");
+    OptionParser parser;
+    parser.addOption("-l", "--long", "List entries on separate lines with file sizes");
+    parser.addOptionalRemainingArgument("path");
 
-    auto paramCnt = param.size();
-    auto path = dir_.pwd();
-    if (param.size() > 0)
+    auto parseResult = parser.parse(additional);
+    if (!parseResult.success)
     {
-        parseConf(param);
-        if (param[paramCnt - 1].substr(0, 1) != "-")
-        {
-            if (!dir_.isDirectory(param.at(param.size() - 1).c_str()))
-            {
-                return param.at(param.size() - 1) + " is not a directory!\n";
-            }
-            path = dir_.pwd(param.at(param.size() - 1).c_str());
-        }
+        return "ls error: " + parseResult.errorMessage + "\n";
     }
+
+    const bool longListing = parseResult.options.find("--long") != parseResult.options.end() && !parseResult.options["--long"].empty();
+
+    ETString pathArg = parseResult.options.find("path") != parseResult.options.end() && !parseResult.options["path"].empty() ? parseResult.options["path"][0] : "";
+    Path path = dir_.pwd();
+    if (!pathArg.empty() && !dir_.isDirectory(pathArg.c_str()))
+    {
+        return pathArg + " is not a directory!\n";
+    }
+
+    if (!pathArg.empty())
+    {
+        path = dir_.pwd(pathArg.c_str());
+    }
+
     auto content = dir_.ls(path);
 
     ETString result = path + "\n";
     for (const auto &entry : content)
     {
-        if (lsConfig.longListing)
+        if (longListing)
         {
             auto f = dir_.open(path + "/" + entry);
             result += toETString(f.size()) + " Bytes\t" + entry.getName() + "\n";
@@ -44,26 +52,8 @@ ETString ls::usage(const ETString &keyword)
 {
     return "List the conntent of directories\n\n" +
            keyword + " - List the content of the current directory\n" +
-           keyword + " [path] - List the content of the specified directory\n" +
-           keyword + " -l ([path]) - List the content of the optinal specified directory. Each entry gets a new line. Additional the size of each entry will be displayed\n";
-}
-
-void ls::parseConf(std::vector<ETString> params)
-{
-    lsConfig.longListing = false;
-
-    for (const auto &param : params)
-    {
-        if (param.substr(0, 1) == "-")
-        {
-            if (param.contains("l"))
-            {
-                lsConfig.longListing = true;
-            }
-        }
-    }
-
-    // return lsConf();
+           keyword + " <path> - List the content of the specified directory\n" +
+           keyword + " -l (<path>) - List the content of the optional specified directory. Each entry gets a new line. Additional the size of each entry will be displayed\n";
 }
 
 ETVector<ETString> ls::getSuggestions(const ETString &partial)

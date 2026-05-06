@@ -276,6 +276,27 @@ void test_navigator_path_normalization(void)
     TEST_ASSERT_TRUE(resolved.find("/home") != ETString::npos);
 }
 
+void test_navigator_exists_returns_false_for_unavailable_path(void)
+{
+    DirectoryNavigator nav(storage);
+
+    TEST_ASSERT_FALSE(nav.exists("/invalid"));
+}
+
+void test_navigator_exists_returns_false_for_unavailable_path_relative(void)
+{
+    DirectoryNavigator nav(storage, "/home");
+
+    TEST_ASSERT_FALSE(nav.exists("invalid"));
+}
+
+void test_navigator_exists_returns_false_for_unavailable_storage(void)
+{
+    DirectoryNavigator nav(nullptr);
+
+    TEST_ASSERT_FALSE(nav.exists("/any"));
+}
+
 // --- DirectoryWalker tests (merged) ---
 
 class NavigatorTest : public EmbeddedTerminal::DirectoryNavigator
@@ -401,6 +422,9 @@ void process_tests()
     RUN_TEST(test_navigator_complex_path_resolution);
     RUN_TEST(test_navigator_cd_current);
     RUN_TEST(test_navigator_path_normalization);
+    RUN_TEST(test_navigator_exists_returns_false_for_unavailable_path);
+    RUN_TEST(test_navigator_exists_returns_false_for_unavailable_path_relative);
+    RUN_TEST(test_navigator_exists_returns_false_for_unavailable_storage);
 
     // DirectoryWalker tests
     RUN_TEST(test_resolvePath);

@@ -19,6 +19,8 @@ namespace EmbeddedTerminal
         END_OF_FILE
     };
 
+    ETString toString(TokenType type);
+
     struct token_t
     {
         TokenType type;
@@ -27,15 +29,13 @@ namespace EmbeddedTerminal
         bool doubleQuoted = false;
     };
 
-    inline static const token_t knownTokens[] = {
-        {TokenType::PIPE, "|"},
-        {TokenType::REDIR_OUT, ">"},
-        {TokenType::REDIR_IN, "<"},
-        {TokenType::REDIR_APPEND, ">>"},
-        {TokenType::SEMI, ";"},
-        {TokenType::AND_AND, "&&"},
-        {TokenType::OR_OR, "||"},
-        {TokenType::NEWLINE, "\n"}};
+    struct token_spec_t
+    {
+        TokenType type;
+        const char *text;
+    };
+
+    const token_spec_t *knownTokens(size_t &count);
 
     enum class LexerError
     {

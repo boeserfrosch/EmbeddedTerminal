@@ -83,7 +83,7 @@ void test_rm_edge_cases(void)
     ETString keyword = "rm";
     ETString arg = "   ";
     ETString result = rm.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("Can not remove unspecified file!\n") != ETString::npos);
+    TEST_ASSERT_TRUE(result.find("Missing required argument: file") != ETString::npos);
 }
 
 void test_rm_auto_completion_file_suggestions(void)

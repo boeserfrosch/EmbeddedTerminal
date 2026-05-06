@@ -11,13 +11,14 @@ namespace EmbeddedTerminal
         struct ParseResult
         {
             bool success = false;
-            ETMap<ETString, ETString> options;
+            ETMap<ETString, ETVector<ETString>> options;
             ETString remainingArguments;
             ETString errorMessage;
         };
 
-        void addOption(const ETString &shortOpt, const ETString &longOpt, const ETString &description, bool requiresValue = false);
+        void addOption(const ETString &shortOpt, const ETString &longOpt, const ETString &description, bool requiresValue = false, bool isRequired = false);
         void addRequiredRemainingArgument(const ETString &name);
+        void addOptionalRemainingArgument(const ETString &name);
         ParseResult parse(const ETString &input);
 
     private:
@@ -27,9 +28,10 @@ namespace EmbeddedTerminal
             ETString longOpt;
             ETString description;
             bool requiresValue;
+            bool isRequired;
         };
         ETVector<OptionDefinition> options_;
-        ETVector<ETString> requiredRemainingArguments_;
+        ETVector<std::pair<ETString, bool>> remainingArguments_; // pair<name, isRequired>
     };
 } // namespace EmbeddedTerminal
 

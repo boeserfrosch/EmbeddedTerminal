@@ -93,24 +93,25 @@ ETString sendFile(ETFile &file)
 
 ETString cmd::download::trigger(const ETString &keyword, const ETString &additional)
 {
-
-    additional.trim();
-    auto param = split(additional, " ");
-
-    if (param.size() != 1)
+    OptionParser parser;
+    parser.addRequiredRemainingArgument("path");
+    auto parseResult = parser.parse(additional);
+    if (!parseResult.success)
     {
-        return "Expected parameter\n";
+        return "download error: " + parseResult.errorMessage + "\n" + usage(keyword);
     }
-    if (!dir_.exists(param[0].c_str()))
+
+    auto path = parseResult.options["path"][0].trim();
+    if (!dir_.exists(path))
     {
         return "file did not exist\n";
     }
-    if (dir_.isDirectory(param[0].c_str()))
+    if (dir_.isDirectory(path))
     {
         return "file is a directory\n";
     }
 
-    auto file = dir_.open(param[0].trim(), FILE_MODE_READ, false);
+    auto file = dir_.open(path, FILE_MODE_READ, false);
 
     return sendFile(file);
 }
@@ -124,7 +125,7 @@ CommandResult cmd::download::execute(CommandInvocation &invocation)
         return error_(code, invocation);
     }
 
-    auto file = dir_.open(state.path.c_str(), FILE_MODE_READ, false);
+    auto file = dir_.open(state.path, FILE_MODE_READ, false);
     if (!file.isOpen())
     {
         return error_(errorCodes::DOWNLOAD_CMD_ERROR_FAILED_TO_OPEN_FILE, invocation);
@@ -169,7 +170,7 @@ CommandResult cmd::download::execute(CommandInvocation &invocation)
 ETString cmd::download::usage(const ETString &keyword)
 {
     return "Download a specific file\n\n" +
-           keyword + " [path] - Download the file under the given path\n If the file did not exists than just a filesize of zero will be return ed";
+           keyword + " <path> - Download the file under the given path\n If the file did not exists than just a filesize of zero will be return ed";
 }
 
 ETVector<ETString> cmd::download::getSuggestions(const ETString &partial)
@@ -202,7 +203,15 @@ EmbeddedTerminal::cmd::download::downloadState cmd::download::handleState_(Comma
     else
     {
         // New stream request
-        path = invocation.arguments.trim();
+        OptionParser parser;
+        parser.addRequiredRemainingArgument("path");
+        auto parseResult = parser.parse(invocation.arguments);
+        if (!parseResult.success)
+        {
+            return state; // Will be handled as error in the caller
+        }
+
+        path = parseResult.options["path"][0];
 
         // Store path for potential re-entry
         vars[SESSION_KEY_PATH] = path;

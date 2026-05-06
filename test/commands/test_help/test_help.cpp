@@ -56,7 +56,8 @@ void test_help_invalid_command(void)
     ETString keyword = "help";
     ETString arg = "unknown";
     ETString result = help.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("Unknown command!") != ETString::npos);
+    TEST_MESSAGE(("Result: " + result).c_str());
+    TEST_ASSERT_EQUAL_CHAR_ARRAY_MESSAGE("Unknown command: unknown\n", result.c_str(), result.length(), "Expected error message for unknown command");
 }
 
 void test_help_usage(void)

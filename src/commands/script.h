@@ -11,7 +11,47 @@ namespace EmbeddedTerminal
         class script : public ICommand
         {
         public:
-            explicit script(Terminal &terminal) : terminal_(terminal)
+            explicit script(Terminal &terminal) : terminal_(terminal), runner_{
+                                                                           [this](const ParsedCommand &command)
+                                                                           {
+                                                                               activeParsedCommand_ = command;
+                                                                               lastDispatchResult_ = terminal_.executeParsedCommandForScript(command);
+
+                                                                               bool singleCommand = (command.keywords.size() == 1) &&
+                                                                                                    command.redirectOutPath.empty() &&
+                                                                                                    command.redirectInPath.empty();
+                                                                               if (singleCommand && lastDispatchResult_.state != CommandExecutionState::Completed)
+                                                                               {
+                                                                                   ETString keyword = command.keywords[0];
+                                                                                   keyword.trim();
+                                                                                   const auto &commands = terminal_.getCommands();
+                                                                                   auto it = commands.find(keyword);
+                                                                                   if (it != commands.end())
+                                                                                   {
+                                                                                       activeSubcommand_ = it->second;
+                                                                                       activeKeyword_ = keyword;
+                                                                                       activeArguments_ = command.arguments[0];
+                                                                                       activeSubcommandState_ = lastDispatchResult_.state;
+                                                                                       hasActiveSubcommand_ = true;
+                                                                                   }
+                                                                               }
+                                                                           },
+                                                                           [this]()
+                                                                           {
+                                                                               return terminal_.getLastExitCode();
+                                                                           },
+                                                                           [this]()
+                                                                           {
+                                                                               return hasActiveSubcommand_;
+                                                                           },
+                                                                           [this]()
+                                                                           {
+                                                                               return terminal_.currentTimeMs();
+                                                                           },
+                                                                           [this](const ETString &input, const ETString &variableName, const ETString &value)
+                                                                           {
+                                                                               return substitute_(input, variableName, value);
+                                                                           }}
             {
             }
 
@@ -29,47 +69,7 @@ namespace EmbeddedTerminal
             ETString substitute_(const ETString &input, const ETString &variableName, const ETString &value) const;
 
             Terminal &terminal_;
-            ScriptRunner runner_{
-                [this](const ParsedCommand &command)
-                {
-                    activeParsedCommand_ = command;
-                    lastDispatchResult_ = terminal_.executeParsedCommandForScript(command);
-
-                    bool singleCommand = (command.keywords.size() == 1) &&
-                                         command.redirectOutPath.empty() &&
-                                         command.redirectInPath.empty();
-                    if (singleCommand && lastDispatchResult_.state != CommandExecutionState::Completed)
-                    {
-                        ETString keyword = command.keywords[0];
-                        keyword.trim();
-                        const auto &commands = terminal_.getCommands();
-                        auto it = commands.find(keyword);
-                        if (it != commands.end())
-                        {
-                            activeSubcommand_ = it->second;
-                            activeKeyword_ = keyword;
-                            activeArguments_ = command.arguments[0];
-                            activeSubcommandState_ = lastDispatchResult_.state;
-                            hasActiveSubcommand_ = true;
-                        }
-                    }
-                },
-                [this]()
-                {
-                    return terminal_.getLastExitCode();
-                },
-                [this]()
-                {
-                    return hasActiveSubcommand_;
-                },
-                [this]()
-                {
-                    return terminal_.currentTimeMs();
-                },
-                [this](const ETString &input, const ETString &variableName, const ETString &value)
-                {
-                    return substitute_(input, variableName, value);
-                }};
+            ScriptRunner runner_;
             bool hasStarted_ = false;
             bool hasActiveSubcommand_ = false;
             ICommand *activeSubcommand_ = nullptr;

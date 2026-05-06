@@ -45,6 +45,7 @@ namespace EmbeddedTerminal
         void setFileSystem(IFileSystem *fileSystem);
 
         void loop();
+        void executeScriptLine(const ETString &line);
         const ETMap<ETString, ICommand *> &getCommands() const;
         int getLastExitCode() const;
         IFileSystem *getFileSystem() const;
@@ -54,7 +55,6 @@ namespace EmbeddedTerminal
 
         // Auto completion support
         const ETString &getBuffer() const;
-        ETString getLastWord() const;
 
     protected:
         void call(const ETString &keyword, const ETString &additional);
@@ -66,16 +66,17 @@ namespace EmbeddedTerminal
         void executePipeline_(const ETVector<ETString> &keywords, const ETVector<ETString> &arguments,
                               const ETString &redirectOutPath, bool appendRedirect, const ETString &redirectInPath);
         void continueActiveCommandIfNeeded_();
-        bool ingestInputAndHandleAutoCompletion_();
+        bool ingestInput_();
+        bool handleCommandKeys_(const ETString &rawInputLine);
         void processBufferedCommands_();
-        void processBufferedLine_(const ETString &line);
+        void processCommandLine_(const ETString &line);
         void executeParsedCommand_(const ParsedCommand &command);
         void interruptActiveExecution_();
         uint64_t nowMs_() const;
 
         void reportLexerError_(LexerError error);
 
-        ETMap<ETString, ICommand *> observer_;
+        ETMap<ETString, ICommand *> commands_;
         ITerminalStream &input_;
         IFileSystem *fileSystem_ = nullptr;
 #if defined(ARDUINO)
@@ -86,6 +87,7 @@ namespace EmbeddedTerminal
         static constexpr size_t BUFFER_RESERVE_SIZE = 256;
 
         ETString buffer;
+        ETString pendingScriptInput_;
         ETString lineDelimiter = "\n";
         int lastExitCode_ = 0;
         ETMap<ETString, ETString> sessionVariables_;

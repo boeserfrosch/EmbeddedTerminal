@@ -118,6 +118,11 @@ namespace EmbeddedTerminal
         }
 
         ETString cleaned = normalized.cleanupString().trim();
+        // Remove any trailing semicolons introduced when converting newlines
+        while (!cleaned.empty() && cleaned.back() == ';')
+        {
+            cleaned.erase(cleaned.length() - 1, 1);
+        }
         if (cleaned.empty())
         {
             errorMessage = "script error: empty script";
@@ -173,7 +178,11 @@ namespace EmbeddedTerminal
         ParsedAst ast;
         if (!parser.parseTokens(tokens, ast))
         {
-            errorMessage = "script error: invalid script syntax";
+            size_t previewLength = (cleaned.length() > 50) ? 50 : cleaned.length();
+            ETString preview = cleaned.substr(0, previewLength);
+            if (cleaned.length() > 50)
+                preview = preview + "...";
+            errorMessage = "script error: invalid script syntax [parsed: " + preview + "]";
             return false;
         }
 

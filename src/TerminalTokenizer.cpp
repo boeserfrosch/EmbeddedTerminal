@@ -2,6 +2,51 @@
 
 namespace EmbeddedTerminal
 {
+    ETString toString(TokenType type)
+    {
+        switch (type)
+        {
+        case TokenType::WORD:
+            return "WORD";
+        case TokenType::PIPE:
+            return "PIPE";
+        case TokenType::REDIR_OUT:
+            return "REDIR_OUT";
+        case TokenType::REDIR_IN:
+            return "REDIR_IN";
+        case TokenType::REDIR_APPEND:
+            return "REDIR_APPEND";
+        case TokenType::SEMI:
+            return "SEMI";
+        case TokenType::AND_AND:
+            return "AND_AND";
+        case TokenType::OR_OR:
+            return "OR_OR";
+        case TokenType::NEWLINE:
+            return "NEWLINE";
+        case TokenType::END_OF_FILE:
+            return "END_OF_FILE";
+        default:
+            return "UNKNOWN";
+        }
+    }
+
+    const token_spec_t *knownTokens(size_t &count)
+    {
+        static const token_spec_t tokens[] = {
+            {TokenType::REDIR_APPEND, ">>"},
+            {TokenType::OR_OR, "||"},
+            {TokenType::AND_AND, "&&"},
+            {TokenType::PIPE, "|"},
+            {TokenType::REDIR_OUT, ">"},
+            {TokenType::REDIR_IN, "<"},
+            {TokenType::SEMI, ";"},
+            {TokenType::NEWLINE, "\n"}};
+
+        count = sizeof(tokens) / sizeof(tokens[0]);
+        return tokens;
+    }
+
     namespace
     {
         bool appendToken(token_t tokens[], size_t tokenCapacity, size_t &tokenCount,
@@ -38,6 +83,7 @@ namespace EmbeddedTerminal
         size_t tokenCount = 0;
 
         size_t index = 0;
+
         while (index < line.length())
         {
             const char current = line[index];
@@ -48,97 +94,19 @@ namespace EmbeddedTerminal
                 continue;
             }
 
-            if (current == '\n')
+            // We use knownTokens for single-character and multi-character operators to ensure consistent token text and simplify logic
+            size_t knownTokenCount = 0;
+            const token_spec_t *knownTokenTable = knownTokens(knownTokenCount);
+            for (size_t knownTokenIndex = 0; knownTokenIndex < knownTokenCount; ++knownTokenIndex)
             {
-                if (!appendToken(tokenArray, TOKEN_CAPACITY, tokenCount, TokenType::NEWLINE))
+                const token_spec_t &knownToken = knownTokenTable[knownTokenIndex];
+                const ETString tokenText = knownToken.text;
+                if (line.substr(index, tokenText.length()) == tokenText)
                 {
-                    lexerError = LexerError::TOKEN_ARRAY_EXHAUSTED;
-                    return false;
+                    appendToken(tokenArray, TOKEN_CAPACITY, tokenCount, knownToken.type, tokenText);
+                    index += tokenText.length();
+                    break;
                 }
-                index++;
-                continue;
-            }
-
-            if (current == '|')
-            {
-                if (index + 1 < line.length() && line[index + 1] == '|')
-                {
-                    if (!appendToken(tokenArray, TOKEN_CAPACITY, tokenCount, TokenType::OR_OR))
-                    {
-                        lexerError = LexerError::TOKEN_ARRAY_EXHAUSTED;
-                        return false;
-                    }
-                    index += 2;
-                }
-                else
-                {
-                    if (!appendToken(tokenArray, TOKEN_CAPACITY, tokenCount, TokenType::PIPE))
-                    {
-                        lexerError = LexerError::TOKEN_ARRAY_EXHAUSTED;
-                        return false;
-                    }
-                    index++;
-                }
-                continue;
-            }
-
-            if (current == '&')
-            {
-                if (index + 1 < line.length() && line[index + 1] == '&')
-                {
-                    if (!appendToken(tokenArray, TOKEN_CAPACITY, tokenCount, TokenType::AND_AND))
-                    {
-                        lexerError = LexerError::TOKEN_ARRAY_EXHAUSTED;
-                        return false;
-                    }
-                    index += 2;
-                    continue;
-                }
-            }
-
-            if (current == '>')
-            {
-                if (index + 1 < line.length() && line[index + 1] == '>')
-                {
-                    if (!appendToken(tokenArray, TOKEN_CAPACITY, tokenCount, TokenType::REDIR_APPEND))
-                    {
-                        lexerError = LexerError::TOKEN_ARRAY_EXHAUSTED;
-                        return false;
-                    }
-                    index += 2;
-                }
-                else
-                {
-                    if (!appendToken(tokenArray, TOKEN_CAPACITY, tokenCount, TokenType::REDIR_OUT))
-                    {
-                        lexerError = LexerError::TOKEN_ARRAY_EXHAUSTED;
-                        return false;
-                    }
-                    index++;
-                }
-                continue;
-            }
-
-            if (current == '<')
-            {
-                if (!appendToken(tokenArray, TOKEN_CAPACITY, tokenCount, TokenType::REDIR_IN))
-                {
-                    lexerError = LexerError::TOKEN_ARRAY_EXHAUSTED;
-                    return false;
-                }
-                index++;
-                continue;
-            }
-
-            if (current == ';')
-            {
-                if (!appendToken(tokenArray, TOKEN_CAPACITY, tokenCount, TokenType::SEMI))
-                {
-                    lexerError = LexerError::TOKEN_ARRAY_EXHAUSTED;
-                    return false;
-                }
-                index++;
-                continue;
             }
 
             ETString value;

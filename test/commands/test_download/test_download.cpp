@@ -47,7 +47,7 @@ void test_download_invalid_path(void)
     EmbeddedTerminal::DirectoryNavigator dir(storage);
     EmbeddedTerminal::cmd::download download(dir);
     auto result = download.trigger("download", "   ");
-    TEST_ASSERT_TRUE(result.find("Expected parameter") != ETString::npos);
+    TEST_ASSERT_TRUE(result.find("Missing required argument") != ETString::npos);
 }
 
 void test_download_file_not_found(void)
@@ -150,7 +150,7 @@ void test_download_usage(void)
     EmbeddedTerminal::cmd::download download(dir);
     ETString usage = download.usage("download");
     TEST_ASSERT_TRUE(usage.find("Download a specific file") != ETString::npos);
-    TEST_ASSERT_TRUE(usage.find("download [path]") != ETString::npos);
+    TEST_ASSERT_TRUE(usage.find("download <path>") != ETString::npos);
 }
 
 void test_download_auto_completion(void)

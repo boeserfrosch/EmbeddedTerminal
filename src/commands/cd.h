@@ -11,6 +11,14 @@ namespace EmbeddedTerminal
     namespace cmd
     {
 
+        enum CDerror
+        {
+            None = 0,
+            PathDoesNotExist = 1,
+            PathNotDirectory = 2,
+            FailedToChangeDirectory = 3
+        };
+
         class cd : public ICommand
         {
 
@@ -27,7 +35,8 @@ namespace EmbeddedTerminal
             ETVector<ETString> getSuggestions(const ETString &partial) override;
 
         private:
-            ETString checkPath_(const ETString &path);
+            CDerror checkPath_(const ETString &path);
+            CDerror changeDirectory_(const ETString &path);
 
             DirectoryNavigator &dir_;
             DirectoryCompleter completer_;

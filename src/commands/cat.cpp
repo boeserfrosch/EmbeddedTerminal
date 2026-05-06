@@ -7,11 +7,15 @@ namespace EmbeddedTerminal
     {
         ETString cat::readFileForTrigger(const ETString &additional)
         {
-            ETString path = additional.trim();
-            if (path.empty())
+            OptionParser parser;
+            parser.addRequiredRemainingArgument("file");
+            auto parseResult = parser.parse(additional);
+            if (!parseResult.success)
             {
-                return "path or name to file expected\n";
+                return parseResult.errorMessage + "\n" + usage("cat");
             }
+            ETString path = parseResult.options["file"][0];
+
             if (!dir_.exists(path.c_str()) || dir_.isDirectory(path.c_str()))
             {
                 return "file " + path + " did not exist!\n";
@@ -33,7 +37,6 @@ namespace EmbeddedTerminal
 
         CommandResult cat::executeStream(CommandInvocation &invocation)
         {
-
             CatState state = handleState_(invocation);
             auto code = checkState_(state, invocation);
             if (code != errorCodes::CAT_CMD_ERROR_NONE)
@@ -78,13 +81,14 @@ namespace EmbeddedTerminal
 
         ETString cat::trigger(const ETString &keyword, const ETString &additional)
         {
+            // Deprecated trigger, only used for non-streaming usage of cat
             (void)keyword;
             return readFileForTrigger(additional);
         }
 
         ETString cat::usage(const ETString &keyword)
         {
-            return keyword + " [file] - Returns the content of the defined file (at max the first 512 bytes)\n";
+            return keyword + " <file> - Returns the content of the defined file\n";
         }
 
         ETVector<ETString> cat::getSuggestions(const ETString &partial)
@@ -115,8 +119,15 @@ namespace EmbeddedTerminal
             }
             else
             {
+                OptionParser parser;
+                parser.addRequiredRemainingArgument("file");
+                auto parseResult = parser.parse(invocation.arguments);
+                if (!parseResult.success)
+                {
+                    return CatState(); // Will be handled as error in the caller
+                }
                 // New stream request
-                path = invocation.arguments.trim();
+                path = parseResult.options["file"][0];
 
                 // Store path for potential re-entry
                 vars[SESSION_KEY_PATH] = path;
@@ -138,12 +149,12 @@ namespace EmbeddedTerminal
             }
             if (!dir_.exists(state.path.c_str()))
             {
-                invocation.stderrChannel.print("file did not exist\n");
+                invocation.stderrChannel.print("file " + state.path + " did not exist\n");
                 return errorCodes::CAT_CMD_ERROR_FILE_NOT_FOUND; // File does not exist
             }
             if (dir_.isDirectory(state.path.c_str()))
             {
-                invocation.stderrChannel.print("file is a directory\n");
+                invocation.stderrChannel.print("file " + state.path + " is a directory\n");
                 return errorCodes::CAT_CMD_ERROR_IS_DIRECTORY; // File does not exist or is a directory
             }
             return errorCodes::CAT_CMD_ERROR_NONE; // State is valid

@@ -88,13 +88,9 @@ EmbeddedTerminal::CommandResult tail::parseOptions_(CommandInvocation &invocatio
     }
 
     size_t linesToFind = 10; // Default to last 10 lines
-    if (parseResult.options.count("-n"))
+    if (parseResult.options.count("--lines") && !parseResult.options["--lines"].empty())
     {
-        linesToFind = std::stoi(parseResult.options["-n"]);
-    }
-    else if (parseResult.options.count("--lines"))
-    {
-        linesToFind = std::stoi(parseResult.options["--lines"]);
+        linesToFind = std::stoi(parseResult.options["--lines"][0]);
     }
 
     if (linesToFind <= 0)

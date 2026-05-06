@@ -46,7 +46,7 @@ void test_ping_empty_target(void)
     ETString keyword = "ping";
     ETString additional = "";
     ETString result = pingCmd.trigger(keyword, additional);
-    TEST_ASSERT_TRUE(result.find("Cannot ping without a target") != ETString::npos);
+    TEST_ASSERT_TRUE(result.find("Missing required argument: target") != ETString::npos);
 }
 
 /**
@@ -60,7 +60,7 @@ void test_ping_whitespace_only(void)
     ETString keyword = "ping";
     ETString additional = "   ";
     ETString result = pingCmd.trigger(keyword, additional);
-    TEST_ASSERT_TRUE(result.find("Cannot ping without a target") != ETString::npos);
+    TEST_ASSERT_TRUE(result.find("Missing required argument: target") != ETString::npos);
 }
 
 /**

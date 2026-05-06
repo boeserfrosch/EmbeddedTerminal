@@ -245,16 +245,20 @@ namespace EmbeddedTerminal
             return;
         }
 
-        // Treat "script" like a normal command; let the parser and
-        // the registered `script` command handle any script-related logic.
+        ETString candidateLine = cleanedLine;
+        if (!pendingScriptInput_.empty())
+        {
+            candidateLine = pendingScriptInput_ + " " + cleanedLine;
+        }
 
         TerminalTokenizer tokenizer;
         TerminalParser parser;
 
         ETVector<token_t> tokens;
         LexerError lexerError = LexerError::NONE;
-        if (!tokenizer.tokenizeLine(cleanedLine, tokens, lexerError))
+        if (!tokenizer.tokenizeLine(candidateLine, tokens, lexerError))
         {
+            pendingScriptInput_ = "";
             reportLexerError_(lexerError);
             return;
         }
@@ -262,33 +266,49 @@ namespace EmbeddedTerminal
         ParsedAst ast;
         if (!parser.parseTokens(tokens, ast))
         {
-            reportLexerError_(LexerError::NONE);
+            pendingScriptInput_ = candidateLine;
             return;
         }
 
-        if (ast.isForLoop || ast.isWhileLoop || ast.isIfBlock || ast.chain.segments.size() != 1)
+        pendingScriptInput_ = "";
+
+        if (ast.isForLoop || ast.isWhileLoop || ast.isIfBlock)
         {
-            // If the user explicitly prefixed the input with the `script`
-            // keyword, hand the raw arguments off to the registered `script`
-            // command so it can interpret script syntax itself. Otherwise,
-            // report an error about script syntax being detected.
-            if (!tokens.empty() && tokens[0].type == TokenType::WORD && tokens[0].text == "script")
+            lastExitCode_ = 2;
+            input_.printTo(TerminalChannel::StdErr, "script block syntax is only supported from script files\n");
+            return;
+        }
+
+        for (size_t idx = 0; idx < ast.chain.segments.size(); ++idx)
+        {
+            const ParsedChainSegment &segment = ast.chain.segments[idx];
+            bool shouldRun = true;
+
+            if (segment.condition == ChainCondition::OnSuccess)
             {
-                ETString args = "";
-                if (cleanedLine.length() > 6 && cleanedLine.startsWith("script "))
-                {
-                    args = cleanedLine.substr(7);
-                }
-                call("script", args);
-                return;
+                shouldRun = (lastExitCode_ == 0);
+            }
+            else if (segment.condition == ChainCondition::OnFailure)
+            {
+                shouldRun = (lastExitCode_ != 0);
             }
 
-            lastExitCode_ = 2;
-            input_.printTo(TerminalChannel::StdErr, "script syntax detected: use script <...>\n");
-            return;
-        }
+            if (!shouldRun)
+            {
+                continue;
+            }
 
-        executeParsedCommand_(ast.chain.segments[0].command);
+            executeParsedCommand_(segment.command);
+            if (hasActiveCommand_)
+            {
+                break;
+            }
+        }
+    }
+
+    void Terminal::executeScriptLine(const ETString &line)
+    {
+        processCommandLine_(line);
     }
 
     void Terminal::processBufferedCommands_()

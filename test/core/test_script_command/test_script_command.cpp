@@ -169,6 +169,14 @@ namespace
     };
 }
 
+void writeScriptFile(MockFileSystem &fs, const ETString &path, const ETString &content)
+{
+    ETFile file = fs.open(path, FILE_MODE_WRITE, true);
+    TEST_ASSERT_TRUE(file.isOpen());
+    TEST_ASSERT_TRUE(file.writeAll(content));
+    file.close();
+}
+
 void setUp(void) {}
 void tearDown(void) {}
 
@@ -190,13 +198,15 @@ void test_script_command_rejects_missing_arguments(void)
 
     TEST_ASSERT_EQUAL(static_cast<int>(CommandExecutionState::Completed), static_cast<int>(result.state));
     TEST_ASSERT_EQUAL(2, result.exitCode);
-    TEST_ASSERT_TRUE(stderrChannel.buffer.find("missing script content") != ETString::npos);
+    TEST_ASSERT_TRUE(stderrChannel.buffer.find("Missing required argument") != ETString::npos);
 }
 
 void test_script_command_executes_inline_script_cooperatively(void)
 {
     MockStream stream;
     Terminal terminal(stream);
+    MockFileSystem fs;
+    terminal.setFileSystem(&fs);
     cmd::script scriptCommand(terminal);
     CollectArgsCommand collect;
     terminal.registerCommand("collect", &collect);
@@ -206,8 +216,10 @@ void test_script_command_executes_inline_script_cooperatively(void)
     TestOutputChannel stdoutChannel;
     TestOutputChannel stderrChannel;
     ETString keyword = "script";
-    ETString arguments = "collect one; collect two";
+    ETString arguments = "-f /inline.et";
     CommandInvocation invocation{keyword, arguments, context, stdinChannel, stdoutChannel, stderrChannel};
+
+    writeScriptFile(fs, "/inline.et", "collect one; collect two");
 
     CommandResult result = scriptCommand.execute(invocation);
     TEST_ASSERT_EQUAL(static_cast<int>(CommandExecutionState::Running), static_cast<int>(result.state));
@@ -242,10 +254,7 @@ void test_script_command_executes_script_file(void)
     ETString arguments = "-f /demo.et";
     CommandInvocation invocation{keyword, arguments, context, stdinChannel, stdoutChannel, stderrChannel};
 
-    ETFile file = fs.open("/demo.et", FILE_MODE_WRITE, true);
-    TEST_ASSERT_TRUE(file.isOpen());
-    TEST_ASSERT_TRUE(file.writeAll("collect alpha; collect beta"));
-    file.close();
+    writeScriptFile(fs, "/demo.et", "collect alpha; collect beta");
 
     CommandResult result = scriptCommand.execute(invocation);
     TEST_ASSERT_EQUAL(static_cast<int>(CommandExecutionState::Running), static_cast<int>(result.state));
@@ -265,6 +274,8 @@ void test_script_command_resumes_running_subcommand(void)
 {
     MockStream stream;
     Terminal terminal(stream);
+    MockFileSystem fs;
+    terminal.setFileSystem(&fs);
     cmd::script scriptCommand(terminal);
     RunningTwiceCommand run;
     CollectArgsCommand collect;
@@ -276,8 +287,10 @@ void test_script_command_resumes_running_subcommand(void)
     TestOutputChannel stdoutChannel;
     TestOutputChannel stderrChannel;
     ETString keyword = "script";
-    ETString arguments = "run; collect done";
+    ETString arguments = "-f /resume.et";
     CommandInvocation invocation{keyword, arguments, context, stdinChannel, stdoutChannel, stderrChannel};
+
+    writeScriptFile(fs, "/resume.et", "run; collect done");
 
     CommandResult result = scriptCommand.execute(invocation);
     TEST_ASSERT_EQUAL(static_cast<int>(CommandExecutionState::Running), static_cast<int>(result.state));
@@ -302,6 +315,8 @@ void test_script_command_waits_for_input_before_resuming_subcommand(void)
 {
     MockStream stream;
     Terminal terminal(stream);
+    MockFileSystem fs;
+    terminal.setFileSystem(&fs);
     cmd::script scriptCommand(terminal);
     WaitForInputCommand wait;
     CollectArgsCommand collect;
@@ -313,8 +328,10 @@ void test_script_command_waits_for_input_before_resuming_subcommand(void)
     TestOutputChannel stdoutChannel;
     TestOutputChannel stderrChannel;
     ETString keyword = "script";
-    ETString arguments = "wait; collect resumed";
+    ETString arguments = "-f /wait.et";
     CommandInvocation invocation{keyword, arguments, context, stdinChannel, stdoutChannel, stderrChannel};
+
+    writeScriptFile(fs, "/wait.et", "wait; collect resumed");
 
     CommandResult result = scriptCommand.execute(invocation);
     TEST_ASSERT_EQUAL(static_cast<int>(CommandExecutionState::WaitingForInput), static_cast<int>(result.state));
@@ -348,6 +365,8 @@ void test_script_command_executes_if_then_else_true_branch(void)
 {
     MockStream stream;
     Terminal terminal(stream);
+    MockFileSystem fs;
+    terminal.setFileSystem(&fs);
     cmd::script scriptCommand(terminal);
     CollectArgsCommand collect;
     terminal.registerCommand("collect", &collect);
@@ -357,8 +376,10 @@ void test_script_command_executes_if_then_else_true_branch(void)
     TestOutputChannel stdoutChannel;
     TestOutputChannel stderrChannel;
     ETString keyword = "script";
-    ETString arguments = "if collect cond; then collect yes; else collect no; fi";
+    ETString arguments = "-f /if_true.et";
     CommandInvocation invocation{keyword, arguments, context, stdinChannel, stdoutChannel, stderrChannel};
+
+    writeScriptFile(fs, "/if_true.et", "if collect cond; then collect yes; else collect no; fi");
 
     CommandResult result = scriptCommand.execute(invocation);
     TEST_ASSERT_EQUAL(static_cast<int>(CommandExecutionState::Running), static_cast<int>(result.state));
@@ -379,6 +400,8 @@ void test_script_command_executes_if_else_false_branch(void)
 {
     MockStream stream;
     Terminal terminal(stream);
+    MockFileSystem fs;
+    terminal.setFileSystem(&fs);
     cmd::script scriptCommand(terminal);
     FailCommand fail;
     CollectArgsCommand collect;
@@ -390,8 +413,10 @@ void test_script_command_executes_if_else_false_branch(void)
     TestOutputChannel stdoutChannel;
     TestOutputChannel stderrChannel;
     ETString keyword = "script";
-    ETString arguments = "if fail; then collect yes; else collect no; fi";
+    ETString arguments = "-f /if_false.et";
     CommandInvocation invocation{keyword, arguments, context, stdinChannel, stdoutChannel, stderrChannel};
+
+    writeScriptFile(fs, "/if_false.et", "if fail; then collect yes; else collect no; fi");
 
     CommandResult result = scriptCommand.execute(invocation);
     TEST_ASSERT_EQUAL(static_cast<int>(CommandExecutionState::Running), static_cast<int>(result.state));
@@ -411,6 +436,8 @@ void test_script_command_if_without_else_completes_when_condition_false(void)
 {
     MockStream stream;
     Terminal terminal(stream);
+    MockFileSystem fs;
+    terminal.setFileSystem(&fs);
     cmd::script scriptCommand(terminal);
     FailCommand fail;
     CollectArgsCommand collect;
@@ -422,8 +449,10 @@ void test_script_command_if_without_else_completes_when_condition_false(void)
     TestOutputChannel stdoutChannel;
     TestOutputChannel stderrChannel;
     ETString keyword = "script";
-    ETString arguments = "if fail; then collect yes; fi";
+    ETString arguments = "-f /if_no_else.et";
     CommandInvocation invocation{keyword, arguments, context, stdinChannel, stdoutChannel, stderrChannel};
+
+    writeScriptFile(fs, "/if_no_else.et", "if fail; then collect yes; fi");
 
     CommandResult result = scriptCommand.execute(invocation);
     TEST_ASSERT_EQUAL(static_cast<int>(CommandExecutionState::Running), static_cast<int>(result.state));
@@ -440,6 +469,8 @@ void test_script_command_executes_elif_branch(void)
 {
     MockStream stream;
     Terminal terminal(stream);
+    MockFileSystem fs;
+    terminal.setFileSystem(&fs);
     cmd::script scriptCommand(terminal);
     FailCommand fail;
     CollectArgsCommand collect;
@@ -451,8 +482,10 @@ void test_script_command_executes_elif_branch(void)
     TestOutputChannel stdoutChannel;
     TestOutputChannel stderrChannel;
     ETString keyword = "script";
-    ETString arguments = "if fail; then collect no; elif collect cond; then collect yes; else collect fallback; fi";
+    ETString arguments = "-f /elif.et";
     CommandInvocation invocation{keyword, arguments, context, stdinChannel, stdoutChannel, stderrChannel};
+
+    writeScriptFile(fs, "/elif.et", "if fail; then collect no; elif collect cond; then collect yes; else collect fallback; fi");
 
     CommandResult result = scriptCommand.execute(invocation);
     TEST_ASSERT_EQUAL(static_cast<int>(CommandExecutionState::Running), static_cast<int>(result.state));
@@ -477,6 +510,8 @@ void test_script_command_calls_user_defined_function(void)
 {
     MockStream stream;
     Terminal terminal(stream);
+    MockFileSystem fs;
+    terminal.setFileSystem(&fs);
     cmd::script scriptCommand(terminal);
     CollectArgsCommand collect;
     terminal.registerCommand("collect", &collect);
@@ -486,8 +521,10 @@ void test_script_command_calls_user_defined_function(void)
     TestOutputChannel stdoutChannel;
     TestOutputChannel stderrChannel;
     ETString keyword = "script";
-    ETString arguments = "function greet; do collect hello; done; greet; greet";
+    ETString arguments = "-f /function.et";
     CommandInvocation invocation{keyword, arguments, context, stdinChannel, stdoutChannel, stderrChannel};
+
+    writeScriptFile(fs, "/function.et", "function greet; do collect hello; done; greet; greet");
 
     CommandResult result = scriptCommand.execute(invocation);
     TEST_ASSERT_EQUAL(static_cast<int>(CommandExecutionState::Running), static_cast<int>(result.state));
@@ -508,6 +545,8 @@ void test_script_command_function_multi_step_body(void)
 {
     MockStream stream;
     Terminal terminal(stream);
+    MockFileSystem fs;
+    terminal.setFileSystem(&fs);
     cmd::script scriptCommand(terminal);
     CollectArgsCommand collect;
     terminal.registerCommand("collect", &collect);
@@ -517,8 +556,10 @@ void test_script_command_function_multi_step_body(void)
     TestOutputChannel stdoutChannel;
     TestOutputChannel stderrChannel;
     ETString keyword = "script";
-    ETString arguments = "function greet; do collect a; collect b; done; greet";
+    ETString arguments = "-f /function_multi.et";
     CommandInvocation invocation{keyword, arguments, context, stdinChannel, stdoutChannel, stderrChannel};
+
+    writeScriptFile(fs, "/function_multi.et", "function greet; do collect a; collect b; done; greet");
 
     CommandResult result = scriptCommand.execute(invocation);
     TEST_ASSERT_EQUAL(static_cast<int>(CommandExecutionState::Running), static_cast<int>(result.state));

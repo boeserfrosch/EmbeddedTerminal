@@ -52,13 +52,14 @@ void test_cd_trigger_invalid_path(void)
     ETString keyword = "cd";
     ETString additional = "/invalid";
     ETString result = cd.trigger(keyword, additional);
-    TEST_ASSERT_TRUE(result.find("did not exist") != ETString::npos);
+    TEST_MESSAGE(("Result: " + result).c_str());
+    TEST_ASSERT_TRUE(result.find("Path does not exist") != ETString::npos);
 
     // Test with a file path that is not a directory
     storage->open("/not_a_dir.txt", "w", true).writeAll("content");
     ETString filePath = "/not_a_dir.txt";
     ETString result2 = cd.trigger(keyword, filePath);
-    TEST_ASSERT_TRUE(result2.find("not a directory") != ETString::npos);
+    TEST_ASSERT_TRUE(result2.find("Path is not a directory") != ETString::npos);
 }
 
 void test_cd_usage(void)
@@ -77,7 +78,7 @@ void test_cd_empty_keyword(void)
     ETString keyword = "";
     ETString additional = "";
     ETString result = cd.trigger(keyword, additional);
-    TEST_ASSERT_TRUE(result.find("Expected parameter") != ETString::npos);
+    TEST_ASSERT_TRUE(result.find("Missing required argument") != ETString::npos);
 }
 
 void test_cd_pwd_cd_back_to_pwd(void)
@@ -199,7 +200,8 @@ void test_cd_stream_output_on_execute_invalid_path(void)
     CommandResult result = cd.execute(invocation);
 
     TEST_ASSERT_EQUAL(1, result.exitCode);
-    TEST_ASSERT_TRUE(stream.stderrBuffer.find("did not exist") != ETString::npos);
+    TEST_MESSAGE(("Result: " + stream.stderrBuffer).c_str());
+    TEST_ASSERT_TRUE(stream.stderrBuffer.find("does not exist") != ETString::npos);
 }
 
 void test_cd_stream_output_on_execute_no_parameter(void)
@@ -221,7 +223,52 @@ void test_cd_stream_output_on_execute_no_parameter(void)
     CommandResult result = cd.execute(invocation);
 
     TEST_ASSERT_EQUAL(1, result.exitCode);
-    TEST_ASSERT_TRUE(stream.stderrBuffer.find("Expected parameter") != ETString::npos);
+    TEST_ASSERT_TRUE(stream.stderrBuffer.find("Missing required argument") != ETString::npos);
+}
+
+void test_cd_correct_error_codes_and_messages(void)
+{
+    storage->mkdir("/test");
+    storage->open("/test/file.txt", "w", true).writeAll("content");
+    DirectoryNavigator dir(storage);
+    cmd::cd cd(dir);
+    MockStream stream;
+
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+    ETString keyword = "cd";
+    ETString arg = "   ";
+
+    EmptyInputChannel stdinChannel;
+    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+    CommandInvocation invocation{keyword, arg, context, stdinChannel, stdoutChannel, stderrChannel};
+    CommandResult result = cd.execute(invocation);
+
+    TEST_ASSERT_EQUAL(1, result.exitCode);
+    TEST_ASSERT_TRUE(stream.stderrBuffer.find("Missing required argument") != ETString::npos);
+
+    // Test with non-existent path
+    arg = "/nonexistent";
+    CommandInvocation invocation2{keyword, arg, context, stdinChannel, stdoutChannel, stderrChannel};
+    CommandResult result2 = cd.execute(invocation2);
+
+    TEST_ASSERT_EQUAL(1, result2.exitCode);
+    TEST_ASSERT_TRUE(stream.stderrBuffer.find("does not exist") != ETString::npos);
+
+    // Test with a file path that is not a directory
+    arg = "/test/file.txt";
+    CommandInvocation invocation3{keyword, arg, context, stdinChannel, stdoutChannel, stderrChannel};
+    CommandResult result3 = cd.execute(invocation3);
+    TEST_ASSERT_EQUAL(1, result3.exitCode);
+    TEST_ASSERT_TRUE(stream.stderrBuffer.find("is not a directory") != ETString::npos);
+
+    // Test with valid path
+    arg = "/test";
+    CommandInvocation invocation4{keyword, arg, context, stdinChannel, stdoutChannel, stderrChannel};
+    CommandResult result4 = cd.execute(invocation4);
+    TEST_ASSERT_EQUAL(0, result4.exitCode);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("> /test") != ETString::npos);
 }
 
 int process_tests_cd()
@@ -241,6 +288,7 @@ int process_tests_cd()
     RUN_TEST(test_cd_stream_output_on_execute);
     RUN_TEST(test_cd_stream_output_on_execute_invalid_path);
     RUN_TEST(test_cd_stream_output_on_execute_no_parameter);
+    RUN_TEST(test_cd_correct_error_codes_and_messages);
 
 #ifndef COMBINED_TESTS
     UNITY_END();

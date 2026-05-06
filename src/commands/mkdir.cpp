@@ -5,9 +5,15 @@
 using namespace EmbeddedTerminal::cmd;
 ETString mkdir::trigger(const ETString &keyword, const ETString &additional)
 {
-    ETString folderName = additional.trim();
-    if (folderName.empty())
-        return "Can not create folder with no name\n";
+    OptionParser parser;
+    parser.addRequiredRemainingArgument("folder");
+    auto parseResult = parser.parse(additional);
+    if (!parseResult.success)
+    {
+        return parseResult.errorMessage + "\n" + usage(keyword);
+    }
+
+    ETString folderName = parseResult.options["folder"][0];
 
     if (dir_.exists(folderName))
     {
@@ -26,7 +32,7 @@ ETString mkdir::trigger(const ETString &keyword, const ETString &additional)
 
 ETString mkdir::usage(const ETString &keyword)
 {
-    return keyword + " [folder] - Create the specified folder in the current directory\n";
+    return keyword + " <folder> - Create the specified folder in the current directory\n";
 }
 
 ETVector<ETString> mkdir::getSuggestions(const ETString &partial)

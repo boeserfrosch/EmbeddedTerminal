@@ -88,14 +88,26 @@ void test_ip_single_cases(void)
     network->addInterface("bar", new MockNetworkInterface(NetworkInfo("bar", "", "", "", "", false)));
     EmbeddedTerminal::cmd::ip ip(*network);
     ETString keyword = "ip";
-    ETString additional = "bar";
+    ETString additional = "-i bar";
     ETString result = ip.trigger(keyword, additional);
     TEST_ASSERT_TRUE(result.find("bar") != ETString::npos);
     TEST_ASSERT_TRUE(result.find("foo") == ETString::npos);
-    ETString additional2 = "foo";
+    ETString additional2 = "--interface foo";
     ETString result2 = ip.trigger(keyword, additional2);
     TEST_ASSERT_TRUE(result2.find("foo") != ETString::npos);
     TEST_ASSERT_TRUE(result2.find("bar") == ETString::npos);
+}
+
+void test_multiple_interfaces(void)
+{
+    network->addInterface("foo", new MockNetworkInterface(NetworkInfo("foo", "", "", "", "", false)));
+    network->addInterface("bar", new MockNetworkInterface(NetworkInfo("bar", "", "", "", "", false)));
+    EmbeddedTerminal::cmd::ip ip(*network);
+    ETString keyword = "ip";
+    ETString additional = "-i bar -i foo";
+    ETString result = ip.trigger(keyword, additional);
+    TEST_ASSERT_TRUE(result.find("bar") != ETString::npos);
+    TEST_ASSERT_TRUE(result.find("foo") != ETString::npos);
 }
 
 void test_unknown_iface(void)
@@ -105,9 +117,9 @@ void test_unknown_iface(void)
     network->addInterface("bar", new MockNetworkInterface(NetworkInfo("bar", "", "", "", "", false)));
     EmbeddedTerminal::cmd::ip ip(*network);
     ETString keyword = "ip";
-    ETString additional = "baz";
+    ETString additional = "-i baz";
     ETString result = ip.trigger(keyword, additional);
-    TEST_ASSERT_TRUE(result.find("Unknown interface\n") != ETString::npos);
+    TEST_ASSERT_TRUE(result.find("Unknown interface: baz") != ETString::npos);
 }
 
 void test_ip_execute_writes_stdout(void)
@@ -141,6 +153,7 @@ void process_tests()
     RUN_TEST(test_no_interface);
     RUN_TEST(test_unknown_iface);
     RUN_TEST(test_ip_execute_writes_stdout);
+    RUN_TEST(test_multiple_interfaces);
     UNITY_END();
 }
 

@@ -4,13 +4,15 @@ using namespace EmbeddedTerminal::cmd;
 
 ETString touch::trigger(const ETString &keyword, const ETString &additional)
 {
-    (void)keyword;
-
-    ETString path = additional.trim();
-    if (path.empty())
+    OptionParser parser;
+    parser.addRequiredRemainingArgument("file");
+    auto parseResult = parser.parse(additional);
+    if (!parseResult.success)
     {
-        return "path or name to file expected\n";
+        return "touch error: " + parseResult.errorMessage + "\n" + usage(keyword);
     }
+
+    ETString path = parseResult.options["file"][0].trim();
 
     if (dir_.exists(path) && dir_.isDirectory(path))
     {

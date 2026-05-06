@@ -10,64 +10,76 @@
 
 #include "commands/echo.h"
 #include "commands/script.h"
-#include "../../Mocks/MockStream.h"
+#include "../../../src/Terminal.h"
 #include "../../Mocks/CommandRuntimeTestUtils.h"
+#include "../../Mocks/MockStream.h"
+#include "../../Mocks/native/MockFileSystem.h"
 
 using namespace EmbeddedTerminal;
+
+namespace
+{
+    class CollectArgsCommand : public ICommand
+    {
+    public:
+        ETVector<ETString> collected;
+
+        ETString usage(const ETString &keyword) override
+        {
+            return keyword;
+        }
+
+        CommandResult execute(CommandInvocation &invocation) override
+        {
+            collected.push_back(invocation.arguments);
+            return CommandResult::completed(0);
+        }
+
+    protected:
+        ETString trigger(const ETString &keyword, const ETString &additional) override
+        {
+            (void)keyword;
+            (void)additional;
+            return "";
+        }
+    };
+
+    class TestScriptTerminal
+    {
+    public:
+        TestScriptTerminal() : stream_(), terminal_(stream_), script_(terminal_)
+        {
+            terminal_.registerCommand("collect", &collect_);
+            terminal_.registerCommand("echo", &echo_);
+            terminal_.registerCommand("script", &script_);
+        }
+
+        MockStream stream_;
+        Terminal terminal_;
+        CollectArgsCommand collect_;
+        cmd::echo echo_;
+        cmd::script script_;
+    };
+}
 
 void setUp(void) {}
 void tearDown(void) {}
 
-class TestScriptTerminal
-{
-public:
-    TestScriptTerminal() : terminal_(stream_)
-    {
-        terminal_.registerCommand("echo", new cmd::echo());
-        terminal_.registerCommand("script", new cmd::script(terminal_));
-    }
-
-    ~TestScriptTerminal()
-    {
-        // Terminal does NOT own commands, so we clean them up
-        auto &commands = const_cast<ETMap<ETString, ICommand *> &>(terminal_.getCommands());
-        for (auto &pair : commands)
-        {
-            delete pair.second;
-        }
-        commands.clear();
-    }
-
-    MockStream stream_;
-    Terminal terminal_;
-};
-
-void test_script_multiline_for_loop(void)
+void test_script_usage(void)
 {
     TestScriptTerminal test;
 
-    // Test: multiline for loop via script command
-    ETString scriptText = "for i in 1 2 3; do echo Item $i; done";
-
-    auto &cmdMap = const_cast<ETMap<ETString, ICommand *> &>(test.terminal_.getCommands());
-    auto scriptIt = cmdMap.find("script");
-    TEST_ASSERT_TRUE(scriptIt != cmdMap.end());
-    StreamBackedOutputChannel stderrChannel(test.stream_, TerminalChannel::StdErr);
-
-    CommandInvocation invocation{"script", scriptText, context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = scriptCmd.execute(invocation);
-
-    // Script should not crash; state can be Completed or Running depending on script complexity
-    TEST_ASSERT_TRUE(result.state == CommandExecutionState::Completed || 
-                     result.state == CommandExecutionState::Running ||
-                     result.state == CommandExecutionState::WaitingForInput);
+    ETString usage = test.script_.usage("script");
+    TEST_ASSERT_FALSE(usage.empty());
+    TEST_ASSERT_TRUE(usage.find("<path>") != ETString::npos);
+    TEST_ASSERT_TRUE(usage.find("inline") == ETString::npos);
 }
 
-void test_script_trigger_simple(void)
+void test_script_rejects_inline_script_text(void)
 {
     TestScriptTerminal test;
-    cmd::script &scriptCmd = *(new cmd::script(test.terminal_));
-    test.terminal_.registerCommand("script", &scriptCmd);
+    MockFileSystem fs;
+    test.terminal_.setFileSystem(&fs); // Ensure no file system is available
 
     ETMap<ETString, ETString> vars;
     CommandContext context{vars, 0, true};
@@ -75,66 +87,25 @@ void test_script_trigger_simple(void)
     StreamBackedOutputChannel stdoutChannel(test.stream_, TerminalChannel::StdOut);
     StreamBackedOutputChannel stderrChannel(test.stream_, TerminalChannel::StdErr);
 
-    // Execute simple script via the command's execute method
-    CommandInvocation invocation{"script", "echo hello", context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = scriptCmd.execute(invocation);
+    CommandInvocation invocation{"script", "collect first; collect second", context, stdinChannel, stdoutChannel, stderrChannel};
+    CommandResult result = test.script_.execute(invocation);
 
-    // Should return a valid execution state without crashing
-    TEST_ASSERT_TRUE(result.state == CommandExecutionState::Completed || 
-                     result.state == CommandExecutionState::Running ||
-                     result.state == CommandExecutionState::WaitingForInput);
-
-
-void test_script_execute_inline_script(void)
-{
-    TestScriptTerminal test;
-    cmd::script &scriptCmd = *(new cmd::script(test.terminal_));
-    test.terminal_.registerCommand("script", &scriptCmd);
-
-    ETMap<ETString, ETString> vars;
-    CommandContext context{vars, 0, true};
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(test.stream_, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(test.stream_, TerminalChannel::StdErr);
-
-    // Simple inline script: two echo commands
-    CommandInvocation invocation{"script", "echo first; echo second", context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = scriptCmd.execute(invocation);
-
-    // Script should execute without crashing
-    TEST_ASSERT_TRUE(result.state == CommandExecutionState::Completed || 
-                     result.state == CommandExecutionState::Running);
-
-
-void test_script_multiline_chained_commands(void)
-{
-    TestScriptTerminal test;
-    cmd::script &scriptCmd = *(new cmd::script(test.terminal_));
-    test.terminal_.registerCommand("script", &scriptCmd);
-
-    // Test: chained commands via script
-    ETString scriptText = "echo start && echo middle && echo end";
-
-    ETMap<ETString, ETString> vars;
-    CommandContext context{vars, 0, true};
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(test.stream_, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(test.stream_, TerminalChannel::StdErr);
-
-    CommandInvocation invocation{"script", scriptText, context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = scriptCmd.execute(invocation);
-
-    // Script should execute without crashing
-    TEST_ASSERT_TRUE(result.state == CommandExecutionState::Completed || 
-                     result.state == CommandExecutionState::Running);
-                     result.state == CommandExecutionState::WaitingForInput);
+    TEST_ASSERT_EQUAL(static_cast<int>(CommandExecutionState::Completed), static_cast<int>(result.state));
+    TEST_ASSERT_EQUAL(2, result.exitCode);
+    TEST_ASSERT_EQUAL(0, test.collect_.collected.size());
+    TEST_ASSERT_TRUE(test.stream_.stderrBuffer.find("script error: failed to open script file") != ETString::npos);
 }
 
-void test_script_for_loop_with_variable_substitution(void)
+void test_script_execute_file_path_form(void)
 {
     TestScriptTerminal test;
-    cmd::script &scriptCmd = *(new cmd::script(test.terminal_));
-    test.terminal_.registerCommand("script", &scriptCmd);
+    MockFileSystem fs;
+    test.terminal_.setFileSystem(&fs);
+
+    ETFile file = fs.open("demo.et", FILE_MODE_WRITE, true);
+    TEST_ASSERT_TRUE(file.isOpen());
+    TEST_ASSERT_TRUE(file.writeAll("collect first\ncollect second\n"));
+    file.close();
 
     ETMap<ETString, ETString> vars;
     CommandContext context{vars, 0, true};
@@ -142,30 +113,91 @@ void test_script_for_loop_with_variable_substitution(void)
     StreamBackedOutputChannel stdoutChannel(test.stream_, TerminalChannel::StdOut);
     StreamBackedOutputChannel stderrChannel(test.stream_, TerminalChannel::StdErr);
 
-    // Script with for loop and variable substitution
-    ETString scriptText = "for x in a b c; do echo x=$x; done";
-    CommandInvocation invocation{"script", scriptText, context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = scriptCmd.execute(invocation);
+    CommandInvocation invocation{"script", "demo.et", context, stdinChannel, stdoutChannel, stderrChannel};
+    CommandResult result = CommandResult::running(0);
+    while (result.state == CommandExecutionState::Running)
+    {
+        result = test.script_.execute(invocation);
+    }
 
-    // Script should execute without crashing
-    TEST_ASSERT_TRUE(result.state == CommandExecutionState::Completed || 
-                     result.state == CommandExecutionState::Running);
+    TEST_ASSERT_EQUAL(static_cast<int>(CommandExecutionState::Completed), static_cast<int>(result.state));
+    TEST_MESSAGE(("Stderr: " + test.stream_.stderrBuffer).c_str());
 
+    if (result.exitCode != 0)
+    {
+        TEST_FAIL_MESSAGE(("Script failed with exit code: " + test.stream_.stderrBuffer).c_str());
+    }
+    TEST_ASSERT_EQUAL(2, test.collect_.collected.size());
+    TEST_ASSERT_EQUAL_STRING("first", test.collect_.collected[0].c_str());
+    TEST_ASSERT_EQUAL_STRING("second", test.collect_.collected[1].c_str());
+}
+
+void test_script_execute_dash_f_form(void)
+{
+    TestScriptTerminal test;
+    MockFileSystem fs;
+    test.terminal_.setFileSystem(&fs);
+
+    ETFile file = fs.open("chain.et", FILE_MODE_WRITE, true);
+    TEST_ASSERT_TRUE(file.isOpen());
+    TEST_ASSERT_TRUE(file.writeAll("collect one && collect two\nmissing || collect recovered\n"));
+    file.close();
+
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+    EmptyInputChannel stdinChannel;
+    StreamBackedOutputChannel stdoutChannel(test.stream_, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(test.stream_, TerminalChannel::StdErr);
+
+    CommandInvocation invocation{"script", "chain.et", context, stdinChannel, stdoutChannel, stderrChannel};
+    CommandResult result = CommandResult::running(0);
+    while (result.state == CommandExecutionState::Running)
+    {
+        result = test.script_.execute(invocation);
+    }
+
+    TEST_ASSERT_EQUAL(static_cast<int>(CommandExecutionState::Completed), static_cast<int>(result.state));
+    TEST_MESSAGE(("Stderr: " + test.stream_.stderrBuffer).c_str());
+    if (test.collect_.collected.size() != 3)
+    {
+        TEST_FAIL_MESSAGE(("Expected 3 collected, got: " + test.stream_.stderrBuffer).c_str());
+    }
+    TEST_ASSERT_EQUAL_STRING("one", test.collect_.collected[0].c_str());
+    TEST_ASSERT_EQUAL_STRING("two", test.collect_.collected[1].c_str());
+    TEST_ASSERT_EQUAL_STRING("recovered", test.collect_.collected[2].c_str());
+}
+
+void test_script_rejects_missing_file(void)
+{
+    TestScriptTerminal test;
+    test.terminal_.setFileSystem(new MockFileSystem()); // Set a file system with no files
+
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+    EmptyInputChannel stdinChannel;
+    StreamBackedOutputChannel stdoutChannel(test.stream_, TerminalChannel::StdOut);
+    StreamBackedOutputChannel stderrChannel(test.stream_, TerminalChannel::StdErr);
+
+    CommandInvocation invocation{"script", "missing.et", context, stdinChannel, stdoutChannel, stderrChannel};
+    CommandResult result = test.script_.execute(invocation);
+
+    TEST_ASSERT_EQUAL(static_cast<int>(CommandExecutionState::Completed), static_cast<int>(result.state));
+    TEST_ASSERT_EQUAL(2, result.exitCode);
+    TEST_ASSERT_TRUE(test.stream_.stderrBuffer.find("script error: failed to open script file") != ETString::npos);
+}
 
 void process_tests()
 {
     UNITY_BEGIN();
     RUN_TEST(test_script_usage);
-    RUN_TEST(test_script_trigger_simple);
-    RUN_TEST(test_script_execute_inline_script);
-    RUN_TEST(test_script_multiline_chained_commands);
-    RUN_TEST(test_script_multiline_for_loop);
-    RUN_TEST(test_script_empty_script);
-    RUN_TEST(test_script_for_loop_with_variable_substitution);
+    RUN_TEST(test_script_rejects_inline_script_text);
+    RUN_TEST(test_script_execute_file_path_form);
+    RUN_TEST(test_script_execute_dash_f_form);
+    RUN_TEST(test_script_rejects_missing_file);
     UNITY_END();
 }
 
-#if (defined(ESP_PLATFORM) || defined(ESP32)) && not defined(ARDUINO)
+#if (defined(ESP_PLATFORM) || defined(ESP32)) && !defined(ARDUINO)
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 extern "C" void app_main()

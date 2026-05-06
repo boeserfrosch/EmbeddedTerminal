@@ -99,7 +99,7 @@ void test_xxd_trigger_edge_cases(void)
 
     // Test empty path
     ETString result = xxd.trigger("xxd", "   ");
-    TEST_ASSERT_TRUE(result.find("path or name to file expected") != ETString::npos);
+    TEST_ASSERT_TRUE(result.find("Missing required argument: file") != ETString::npos);
 
     // Test directory instead of file
     storage->mkdir("/dir");

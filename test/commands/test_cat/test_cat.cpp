@@ -93,7 +93,7 @@ void test_cat_trigger_edge_cases(void)
     ETString keyword = "cat";
     ETString arg = "   ";
     ETString result = cat.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("expected") != ETString::npos);
+    TEST_ASSERT_TRUE(result.find("Missing required argument") != ETString::npos);
     ETString arg2 = "did_not_exist.txt";
     ETString result2 = cat.trigger(keyword, arg2);
     TEST_ASSERT_TRUE(result2.find("did not exist!") != ETString::npos);

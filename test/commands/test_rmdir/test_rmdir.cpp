@@ -75,7 +75,7 @@ void test_rmdir_usage(void)
     cmd::rmdir rmdir(*dir);
     ETString keyword = "rmdir";
     ETString result = rmdir.usage(keyword);
-    TEST_ASSERT_TRUE(result.find("Remove the specfied folder") != ETString::npos);
+    TEST_ASSERT_TRUE(result.find("Remove the specified folder") != ETString::npos);
 }
 
 void test_rmdir_edge_cases(void)
@@ -84,7 +84,7 @@ void test_rmdir_edge_cases(void)
     ETString keyword = "rmdir";
     ETString arg = "   ";
     ETString result = rmdir.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("Can not remove folder with no name\n") != ETString::npos);
+    TEST_ASSERT_TRUE(result.find("Missing required argument: folder") != ETString::npos);
 }
 
 void test_rmdir_subdirectory(void)

@@ -77,13 +77,15 @@ EmbeddedTerminal::CommandResult wc::execute(EmbeddedTerminal::CommandInvocation 
 
 ETString wc::trigger(const ETString &keyword, const ETString &additional)
 {
-    (void)keyword;
-    ETString path = additional.trim();
-    if (path.empty())
+    OptionParser parser;
+    parser.addOptionalRemainingArgument("file");
+    auto parseResult = parser.parse(additional);
+    if (!parseResult.success)
     {
-        return "path or name to file expected\n";
+        return "wc error: " + parseResult.errorMessage + "\n" + usage(keyword);
     }
 
+    ETString path = parseResult.options["file"][0].trim();
     if (!dir_.exists(path.c_str()) || dir_.isDirectory(path.c_str()))
     {
         return "file " + path + " did not exist!\n";

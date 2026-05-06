@@ -3,9 +3,16 @@
 using namespace EmbeddedTerminal::cmd;
 ETString rmdir::trigger(const ETString &keyword, const ETString &additional)
 {
-    ETString folderName = additional.trim();
-    if (folderName.empty())
-        return "Can not remove folder with no name\n";
+    OptionParser parser;
+    parser.addRequiredRemainingArgument("folder");
+    auto parseResult = parser.parse(additional);
+    if (!parseResult.success)
+    {
+        return "Error: " + parseResult.errorMessage + "\nUsage: " + usage(keyword);
+    }
+
+    ETString folderName = parseResult.options["folder"][0];
+
     if (!dir_.exists(folderName))
     {
         return folderName + " did not exists\n";
@@ -27,7 +34,7 @@ ETString rmdir::trigger(const ETString &keyword, const ETString &additional)
 
 ETString rmdir::usage(const ETString &keyword)
 {
-    return keyword + " [folder] - Remove the specfied folder\n";
+    return keyword + " <folder> - Remove the specified folder\n";
 }
 
 ETVector<ETString> rmdir::getSuggestions(const ETString &partial)

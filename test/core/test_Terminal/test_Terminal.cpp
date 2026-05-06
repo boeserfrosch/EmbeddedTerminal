@@ -13,7 +13,6 @@
 
 #include "../../../src/Terminal.h"
 #include "../../../src/ETTypes.h"
-#include "../../../src/commands/script.h"
 #include "../../Mocks/MockStream.h"
 #include "../../Mocks/MockCommand.h"
 #include "../../Mocks/native/MockFileSystem.h"
@@ -538,275 +537,19 @@ void test_terminal_redirects_output_with_gt_and_overwrite(void)
     file.close();
 }
 
-void test_terminal_rejects_inline_script_syntax_without_script_command(void)
+void test_terminal_rejects_script_block_syntax_without_script_command(void)
 {
     MockStream stream;
     Terminal term(stream);
     CollectArgsCommand collect;
     term.registerCommand("collect", &collect);
 
-    stream.inputBuffer = "collect one; collect two\n";
+    stream.inputBuffer = "for i in one two; do collect $i;\ndone\n";
     term.loop();
 
     TEST_ASSERT_EQUAL(0, collect.collected.size());
-    TEST_ASSERT_TRUE(stream.stderrBuffer.find("use script <...>") != ETString::npos);
+    TEST_ASSERT_TRUE(stream.stderrBuffer.find("script block syntax is only supported from script files") != ETString::npos);
     TEST_ASSERT_EQUAL(2, term.getLastExitCode());
-}
-
-void test_terminal_for_loop_executes_body_for_each_value(void)
-{
-    MockStream stream;
-    Terminal term(stream);
-    cmd::script scriptCmd(term);
-    CollectArgsCommand collect;
-    term.registerCommand("script", &scriptCmd);
-    term.registerCommand("collect", &collect);
-
-    stream.inputBuffer = "script for i in one two three; do collect $i; done\n";
-    term.loop();
-    term.loop();
-    term.loop();
-
-    TEST_ASSERT_EQUAL(3, collect.collected.size());
-    TEST_ASSERT_EQUAL_STRING("one", collect.collected[0].c_str());
-    TEST_ASSERT_EQUAL_STRING("two", collect.collected[1].c_str());
-    TEST_ASSERT_EQUAL_STRING("three", collect.collected[2].c_str());
-}
-
-void test_terminal_for_loop_supports_braced_variable(void)
-{
-    MockStream stream;
-    Terminal term(stream);
-    cmd::script scriptCmd(term);
-    CollectArgsCommand collect;
-    term.registerCommand("script", &scriptCmd);
-    term.registerCommand("collect", &collect);
-
-    stream.inputBuffer = "script for item in alpha beta; do collect ${item}; done\n";
-    term.loop();
-    term.loop();
-
-    TEST_ASSERT_EQUAL(2, collect.collected.size());
-    TEST_ASSERT_EQUAL_STRING("alpha", collect.collected[0].c_str());
-    TEST_ASSERT_EQUAL_STRING("beta", collect.collected[1].c_str());
-}
-
-void test_terminal_semicolon_executes_both_commands(void)
-{
-    MockStream stream;
-    Terminal term(stream);
-    cmd::script scriptCmd(term);
-    CollectArgsCommand collect;
-    term.registerCommand("script", &scriptCmd);
-    term.registerCommand("collect", &collect);
-
-    stream.inputBuffer = "script missing ; collect second\n";
-    term.loop();
-    term.loop();
-
-    TEST_ASSERT_EQUAL(1, collect.collected.size());
-    TEST_ASSERT_EQUAL_STRING("second", collect.collected[0].c_str());
-}
-
-void test_terminal_andand_executes_second_only_on_success(void)
-{
-    MockStream stream;
-    Terminal term(stream);
-    cmd::script scriptCmd(term);
-    CollectArgsCommand collect;
-    term.registerCommand("script", &scriptCmd);
-    term.registerCommand("collect", &collect);
-
-    stream.inputBuffer = "script collect ok && collect yes\n";
-    term.loop();
-    term.loop();
-    TEST_ASSERT_EQUAL(2, collect.collected.size());
-    TEST_ASSERT_EQUAL_STRING("ok", collect.collected[0].c_str());
-    TEST_ASSERT_EQUAL_STRING("yes", collect.collected[1].c_str());
-
-    collect.collected.clear();
-    stream.inputBuffer = "script missing && collect no\n";
-    stream.inputPos = 0;
-    term.loop();
-    term.loop();
-    TEST_ASSERT_EQUAL(0, collect.collected.size());
-}
-
-void test_terminal_oror_executes_second_only_on_failure(void)
-{
-    MockStream stream;
-    Terminal term(stream);
-    cmd::script scriptCmd(term);
-    CollectArgsCommand collect;
-    term.registerCommand("script", &scriptCmd);
-    term.registerCommand("collect", &collect);
-
-    stream.inputBuffer = "script missing || collect recovered\n";
-    term.loop();
-    term.loop();
-    TEST_ASSERT_EQUAL(1, collect.collected.size());
-    TEST_ASSERT_EQUAL_STRING("recovered", collect.collected[0].c_str());
-
-    collect.collected.clear();
-    stream.inputBuffer = "script collect good || collect no\n";
-    stream.inputPos = 0;
-    term.loop();
-    term.loop();
-    TEST_ASSERT_EQUAL(1, collect.collected.size());
-    TEST_ASSERT_EQUAL_STRING("good", collect.collected[0].c_str());
-}
-
-void test_terminal_delay_is_non_blocking_and_resumes_later(void)
-{
-    MockStream stream;
-    Terminal term(stream);
-    cmd::script scriptCmd(term);
-    CollectArgsCommand collect;
-    term.registerCommand("script", &scriptCmd);
-    term.registerCommand("collect", &collect);
-
-    stream.inputBuffer = "script collect first; delay 30; collect second\n";
-    term.loop();
-
-    TEST_ASSERT_EQUAL(1, collect.collected.size());
-    TEST_ASSERT_EQUAL_STRING("first", collect.collected[0].c_str());
-
-    term.loop();
-    TEST_ASSERT_EQUAL(1, collect.collected.size());
-
-#if !defined(ARDUINO) && !defined(ESP_PLATFORM) && !defined(ESP_32)
-    std::this_thread::sleep_for(std::chrono::milliseconds(40));
-#endif
-
-    term.loop();
-    TEST_ASSERT_EQUAL(2, collect.collected.size());
-    TEST_ASSERT_EQUAL_STRING("second", collect.collected[1].c_str());
-}
-
-void test_script_command_executes_script_file(void)
-{
-    MockStream stream;
-    Terminal term(stream);
-    MockFileSystem fs;
-    term.setFileSystem(&fs);
-    cmd::script scriptCmd(term);
-    CollectArgsCommand collect;
-    term.registerCommand("script", &scriptCmd);
-    term.registerCommand("collect", &collect);
-
-    ETFile file = fs.open("/blink.et", FILE_MODE_WRITE, true);
-    TEST_ASSERT_TRUE(file.isOpen());
-    TEST_ASSERT_TRUE(file.writeAll("collect one; collect two"));
-    file.close();
-
-    stream.inputBuffer = "script -f /blink.et\n";
-    term.loop();
-    term.loop();
-    term.loop();
-
-    TEST_ASSERT_EQUAL(2, collect.collected.size());
-    TEST_ASSERT_EQUAL_STRING("one", collect.collected[0].c_str());
-    TEST_ASSERT_EQUAL_STRING("two", collect.collected[1].c_str());
-}
-
-void test_script_command_runs_async_subcommands_cooperatively(void)
-{
-    MockStream stream;
-    Terminal term(stream);
-    cmd::script scriptCmd(term);
-    RunningTwiceCommand run;
-    CollectArgsCommand collect;
-    term.registerCommand("script", &scriptCmd);
-    term.registerCommand("run", &run);
-    term.registerCommand("collect", &collect);
-
-    stream.inputBuffer = "script run; collect done\n";
-    term.loop();
-    TEST_ASSERT_EQUAL(1, run.executionCount);
-    TEST_ASSERT_EQUAL(0, collect.collected.size());
-
-    stream.inputBuffer = "";
-    stream.inputPos = 0;
-    term.loop();
-    TEST_ASSERT_EQUAL(2, run.executionCount);
-    TEST_ASSERT_EQUAL(0, collect.collected.size());
-
-    stream.inputBuffer = "";
-    stream.inputPos = 0;
-    term.loop();
-    TEST_ASSERT_EQUAL(2, run.executionCount);
-    TEST_ASSERT_EQUAL(1, collect.collected.size());
-    TEST_ASSERT_EQUAL_STRING("done", collect.collected[0].c_str());
-}
-
-void test_script_command_waiting_subcommand_resumes_with_input(void)
-{
-    MockStream stream;
-    Terminal term(stream);
-    cmd::script scriptCmd(term);
-    WaitForInputCommand wait;
-    CollectArgsCommand collect;
-    term.registerCommand("script", &scriptCmd);
-    term.registerCommand("wait", &wait);
-    term.registerCommand("collect", &collect);
-
-    stream.inputBuffer = "script wait; collect resumed\n";
-    term.loop();
-    TEST_ASSERT_EQUAL(1, wait.executionCount);
-    TEST_ASSERT_EQUAL(0, collect.collected.size());
-
-    stream.inputBuffer = "";
-    stream.inputPos = 0;
-    term.loop();
-    TEST_ASSERT_EQUAL(1, wait.executionCount);
-    TEST_ASSERT_EQUAL(0, collect.collected.size());
-
-    stream.inputBuffer = "x";
-    stream.inputPos = 0;
-    term.loop();
-    TEST_ASSERT_EQUAL(2, wait.executionCount);
-
-    stream.inputBuffer = "";
-    stream.inputPos = 0;
-    term.loop();
-    TEST_ASSERT_EQUAL(1, collect.collected.size());
-    TEST_ASSERT_EQUAL_STRING("resumed", collect.collected[0].c_str());
-}
-
-void test_script_while_true_repeats_until_interrupted(void)
-{
-    MockStream stream;
-    Terminal term(stream);
-    cmd::script scriptCmd(term);
-    CollectArgsCommand collect;
-    term.registerCommand("script", &scriptCmd);
-    term.registerCommand("collect", &collect);
-
-    stream.inputBuffer = "script while true; do collect tick; done\n";
-    term.loop(); // first collect
-    term.loop(); // wrap
-    term.loop(); // second collect
-    term.loop(); // wrap
-    term.loop(); // third collect
-
-    TEST_ASSERT_TRUE(collect.collected.size() >= 3);
-    size_t countBeforeInterrupt = collect.collected.size();
-
-    stream.inputBuffer = ETString("\x03");
-    stream.inputPos = 0;
-    term.loop();
-
-    size_t countAfterInterruptSignal = collect.collected.size();
-
-    stream.inputBuffer = "";
-    stream.inputPos = 0;
-    term.loop();
-    term.loop();
-
-    TEST_ASSERT_EQUAL(130, term.getLastExitCode());
-    TEST_ASSERT_TRUE(countAfterInterruptSignal == countBeforeInterrupt || countAfterInterruptSignal == (countBeforeInterrupt + 1));
-    TEST_ASSERT_EQUAL(countAfterInterruptSignal, collect.collected.size());
-    TEST_ASSERT_TRUE(stream.stderrBuffer.find("^C") != ETString::npos);
 }
 
 void process_tests()
@@ -834,17 +577,7 @@ void process_tests()
     RUN_TEST(test_terminal_redirects_input_with_lt);
     RUN_TEST(test_terminal_redirects_output_with_gtgt_append);
     RUN_TEST(test_terminal_redirects_output_with_gt_and_overwrite);
-    RUN_TEST(test_terminal_rejects_inline_script_syntax_without_script_command);
-    RUN_TEST(test_terminal_for_loop_executes_body_for_each_value);
-    RUN_TEST(test_terminal_for_loop_supports_braced_variable);
-    RUN_TEST(test_terminal_semicolon_executes_both_commands);
-    RUN_TEST(test_terminal_andand_executes_second_only_on_success);
-    RUN_TEST(test_terminal_oror_executes_second_only_on_failure);
-    RUN_TEST(test_terminal_delay_is_non_blocking_and_resumes_later);
-    RUN_TEST(test_script_command_executes_script_file);
-    RUN_TEST(test_script_command_runs_async_subcommands_cooperatively);
-    RUN_TEST(test_script_command_waiting_subcommand_resumes_with_input);
-    RUN_TEST(test_script_while_true_repeats_until_interrupted);
+    RUN_TEST(test_terminal_rejects_script_block_syntax_without_script_command);
     UNITY_END();
 }
 

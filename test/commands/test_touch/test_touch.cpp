@@ -91,7 +91,7 @@ void test_touch_empty_path(void)
 {
     cmd::touch touchCmd(*dir);
     ETString result = touchCmd.trigger("touch", "   ");
-    TEST_ASSERT_TRUE(result.find("path or name to file expected") != ETString::npos);
+    TEST_ASSERT_TRUE(result.find("Missing required argument: file") != ETString::npos);
 }
 
 void test_touch_usage(void)

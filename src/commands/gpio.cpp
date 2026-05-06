@@ -1,4 +1,5 @@
 #include "gpio.h"
+#include "OptionParser.h"
 
 #include <chrono>
 
@@ -56,7 +57,18 @@ EmbeddedTerminal::CommandResult gpio::execute(CommandInvocation &invocation)
 ETString gpio::run_(const ETString &arguments, CommandContext *context, int &exitCode)
 {
     exitCode = 0;
-    auto tokens = tokenize_(arguments);
+    OptionParser parser;
+    parser.addOption("--protected", "--protected", "Mark the policy change as password protected");
+
+    auto parseResult = parser.parse(arguments);
+    if (!parseResult.success)
+    {
+        exitCode = 1;
+        return parseResult.errorMessage;
+    }
+
+    const bool protectedRequested = parseResult.options.find("--protected") != parseResult.options.end() && !parseResult.options["--protected"].empty();
+    auto tokens = tokenize_(parseResult.remainingArguments);
     if (tokens.empty())
     {
         return usage("gpio");
@@ -338,7 +350,7 @@ ETString gpio::run_(const ETString &arguments, CommandContext *context, int &exi
             rule.denyMode = opMask.denyMode;
             rule.denyInclude = opMask.denyInclude;
             rule.denyExclude = opMask.denyExclude;
-            rule.passwordProtected = opMask.passwordProtected || protectedRule;
+            rule.passwordProtected = protectedRequested || protectedRule;
 
             if (requiresAuthentication_(rule) && !isAuthenticated_(context))
             {
@@ -577,10 +589,6 @@ ETString gpio::parseOperationTokens_(const ETVector<ETString> &tokens, size_t st
         else if (tokens[i] == "exclude" || tokens[i] == "e")
         {
             rule.denyExclude = true;
-        }
-        else if (tokens[i] == "--protected")
-        {
-            rule.passwordProtected = true;
         }
         else
         {

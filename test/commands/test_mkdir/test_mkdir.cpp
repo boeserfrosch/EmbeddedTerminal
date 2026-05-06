@@ -72,7 +72,7 @@ void test_mkdir_edge_cases(void)
     ETString keyword = "mkdir";
     ETString arg = "   ";
     ETString result = mkdir.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("Can not create folder with no name\n") != ETString::npos);
+    TEST_ASSERT_TRUE(result.find("Missing required argument: folder") != ETString::npos);
 }
 
 void test_mkdir_auto_completion_directory_suggestions(void)

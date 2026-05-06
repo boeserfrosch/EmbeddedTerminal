@@ -1,4 +1,5 @@
 #include "script.h"
+#include "OptionParser.h"
 
 using namespace EmbeddedTerminal;
 
@@ -27,25 +28,16 @@ namespace
 
 ETString cmd::script::usage(const ETString &keyword)
 {
-    return keyword + " <inline-script> - Execute script text (supports for/do/done, ;, &&, ||, delay <ms>)\n" +
-           keyword + " -f <path> - Execute script from file\n" +
-           keyword + " file <path> - Execute script from file\n";
+    return keyword + " <path> - Execute script from file\n";
 }
 
 CommandResult cmd::script::execute(CommandInvocation &invocation)
 {
+
     if (!hasStarted_)
     {
-        ETString args = invocation.arguments.trim();
-        if (args.empty())
-        {
-            invocation.stderrChannel.print("script error: missing script content\n");
-            invocation.stderrChannel.print(usage(invocation.keyword));
-            return CommandResult::completed(2);
-        }
-
         ETString errorMessage;
-        if (!startScript_(args, errorMessage))
+        if (!startScript_(invocation.arguments, errorMessage))
         {
             invocation.stderrChannel.print(errorMessage + "\n");
             return CommandResult::completed(2);
@@ -110,36 +102,49 @@ void cmd::script::onInterrupt()
 
 ETString cmd::script::trigger(const ETString &keyword, const ETString &additional)
 {
-    (void)additional;
+    OptionParser parser;
     return usage(keyword);
 }
 
 bool cmd::script::startScript_(const ETString &arguments, ETString &errorMessage)
 {
-    if (arguments.startsWith("-f "))
+    OptionParser parser;
+    parser.addOption("-f", "--file", "Path to script file", true);
+    parser.addOptionalRemainingArgument("file");
+
+    auto parseResult = parser.parse(arguments);
+    if (!parseResult.success)
     {
-        ETString path = arguments.substr(3).trim();
-        return startScriptFile_(path, errorMessage);
+        errorMessage = "script error: " + parseResult.errorMessage;
+        return false;
     }
 
-    if (arguments.startsWith("file "))
+    ETString scriptPath;
+    auto fileOpt = parseResult.options.find("--file");
+    if (fileOpt != parseResult.options.end() && !fileOpt->second.empty())
     {
-        ETString path = arguments.substr(5).trim();
-        return startScriptFile_(path, errorMessage);
+        scriptPath = fileOpt->second[0];
+    }
+    else
+    {
+        auto positionalFile = parseResult.options.find("file");
+        if (positionalFile != parseResult.options.end() && !positionalFile->second.empty())
+        {
+            scriptPath = positionalFile->second[0];
+        }
     }
 
-    return runner_.enqueueScript(arguments, errorMessage);
+    if (scriptPath.empty())
+    {
+        errorMessage = "script error: Missing required argument: file";
+        return false;
+    }
+
+    return startScriptFile_(scriptPath, errorMessage);
 }
 
 bool cmd::script::startScriptFile_(const ETString &path, ETString &errorMessage)
 {
-    ETString trimmedPath = path.trim();
-    if (trimmedPath.empty())
-    {
-        errorMessage = "script error: missing script file path";
-        return false;
-    }
-
     IFileSystem *fileSystem = terminal_.getFileSystem();
     if (fileSystem == nullptr)
     {
@@ -147,16 +152,28 @@ bool cmd::script::startScriptFile_(const ETString &path, ETString &errorMessage)
         return false;
     }
 
-    ETFile scriptFile = fileSystem->open(trimmedPath, FILE_MODE_READ, false);
+    ETFile scriptFile = fileSystem->open(path, FILE_MODE_READ, false);
     if (!scriptFile.isOpen())
     {
-        errorMessage = "script error: failed to open script file";
+        errorMessage = "script error: failed to open script file: " + path;
         return false;
     }
 
     ETString content = scriptFile.readAll();
     scriptFile.close();
-    return runner_.enqueueScript(content, errorMessage);
+
+    if (content.empty())
+    {
+        errorMessage = "script error: script file is empty: " + path;
+        return false;
+    }
+
+    if (!runner_.enqueueScript(content, errorMessage))
+    {
+        errorMessage = errorMessage + " [file: " + path + "]";
+        return false;
+    }
+    return true;
 }
 
 void cmd::script::tick_()

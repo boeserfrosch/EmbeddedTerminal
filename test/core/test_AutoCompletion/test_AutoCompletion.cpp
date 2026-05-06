@@ -103,30 +103,6 @@ void test_terminal_get_buffer(void)
     TEST_ASSERT_TRUE(term.getBuffer().contains("hello world"));
 }
 
-/// Test 6: getLastWord extracts word after last space
-void test_terminal_get_last_word_with_space(void)
-{
-    MockStream stream;
-    Terminal term(stream);
-    stream.inputBuffer = "hello world";
-    term.loop();
-
-    ETString lastWord = term.getLastWord();
-    TEST_ASSERT_EQUAL_STRING("world", lastWord.c_str());
-}
-
-/// Test 7: getLastWord return s entire buffer if no space
-void test_terminal_get_last_word_no_space(void)
-{
-    MockStream stream;
-    Terminal term(stream);
-    stream.inputBuffer = "helloworld";
-    term.loop();
-
-    ETString lastWord = term.getLastWord();
-    TEST_ASSERT_EQUAL_STRING("helloworld", lastWord.c_str());
-}
-
 /// Test 8: CommandCompleter suggests matching command names
 void test_command_completer_basic(void)
 {
@@ -260,8 +236,6 @@ int process_tests(void)
     RUN_TEST(test_auto_completion_multiple_matches);
     RUN_TEST(test_auto_completion_no_matches);
     RUN_TEST(test_terminal_get_buffer);
-    RUN_TEST(test_terminal_get_last_word_with_space);
-    RUN_TEST(test_terminal_get_last_word_no_space);
     RUN_TEST(test_command_completer_basic);
     RUN_TEST(test_command_completer_filter);
     RUN_TEST(test_auto_completion_common_prefix);

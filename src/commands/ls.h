@@ -25,13 +25,6 @@ namespace EmbeddedTerminal
             ETVector<ETString> getSuggestions(const ETString &partial) override;
 
         private:
-            struct
-            {
-                bool longListing = false;
-            } lsConfig;
-            void parseConf(std::vector<ETString> params);
-
-        private:
             DirectoryNavigator dir_;
             DirectoryCompleter completer_;
         };

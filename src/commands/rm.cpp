@@ -3,11 +3,15 @@
 using namespace EmbeddedTerminal::cmd;
 ETString rm::trigger(const ETString &keyword, const ETString &additional)
 {
-    ETString fileName = additional.trim();
-    if (fileName.empty())
+    OptionParser parser;
+    parser.addRequiredRemainingArgument("file");
+    auto parseResult = parser.parse(additional);
+    if (!parseResult.success)
     {
-        return "Can not remove unspecified file!\n";
+        return parseResult.errorMessage + "\n" + usage(keyword);
     }
+    ETString fileName = parseResult.options["file"][0];
+
     if (!dir_.exists(fileName.c_str()))
     {
         return fileName + " did not exist!\n";
@@ -26,7 +30,7 @@ ETString rm::trigger(const ETString &keyword, const ETString &additional)
 
 ETString rm::usage(const ETString &keyword)
 {
-    return keyword + " [file] - Remove the specified file\n";
+    return keyword + " <file> - Remove the specified file\n";
 }
 
 ETVector<ETString> rm::getSuggestions(const ETString &partial)

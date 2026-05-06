@@ -1,19 +1,21 @@
 ﻿#include "commands/xxd.h"
 ETString EmbeddedTerminal::cmd::xxd::trigger(const ETString &keyword, const ETString &additional)
 {
-    Path path = additional.trim();
-    if (path.isEmpty())
+    OptionParser parser;
+    parser.addRequiredRemainingArgument("file");
+    auto parseResult = parser.parse(additional);
+    if (!parseResult.success)
     {
-        return "path or name to file expected\n";
+        return "xxd error: " + parseResult.errorMessage + "\n" + usage(keyword);
     }
-    if (!dir_.exists(path))
+
+    Path path = parseResult.options["file"][0];
+
+    if (!dir_.exists(path) || dir_.isDirectory(path))
     {
         return "file " + path + " did not exist!\n";
     }
-    if (dir_.isDirectory(path))
-    {
-        return "file " + path + " did not exist!\n";
-    }
+
     auto file = dir_.open(path, "r", false);
     if (file.size() < 512)
     {
@@ -266,7 +268,14 @@ EmbeddedTerminal::cmd::xxd::XXDState EmbeddedTerminal::cmd::xxd::handleCommandSt
     }
     else
     {
-        state.path = invocation.arguments.trim();
+        OptionParser parser;
+        parser.addRequiredRemainingArgument("file");
+        auto parseResult = parser.parse(invocation.arguments);
+        if (!parseResult.success)
+        {
+            return state; // Will be handled as error in the caller
+        }
+        state.path = parseResult.options["file"][0].trim();
         vars[SESSION_KEY_PATH] = state.path;
         vars[SESSION_KEY_POS] = "0";
     }

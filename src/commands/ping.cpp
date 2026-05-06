@@ -4,20 +4,17 @@ using namespace EmbeddedTerminal::cmd;
 
 ETString ping::trigger(const ETString &keyword, const ETString &additional)
 {
-    ETString params = additional.trim();
+    OptionParser parser;
+    parser.addRequiredRemainingArgument("target");
+    auto parseResult = parser.parse(additional);
 
-    if (params.empty())
+    if (!parseResult.success)
     {
-        return "Cannot ping without a target\n";
+        return parseResult.errorMessage + "\n" + usage(keyword);
     }
 
     // Extract the target (first argument)
-    ETString target = params;
-    size_t spacePos = params.find(' ');
-    if (spacePos != ETString::npos)
-    {
-        target = params.substr(0, spacePos);
-    }
+    ETString target = parseResult.options["target"][0];
 
     // Delegate to network interface implementation
     return net_.ping(target);
