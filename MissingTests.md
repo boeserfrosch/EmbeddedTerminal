@@ -27,7 +27,7 @@ This file tracks tests that would be useful to add, but are currently missing fr
 ## File I/O & Storage
 
 - [x] Unit tests for `FileInput`/`FileOutput` and `ETFile` handling of large files, seek/seek-to-end, and readAll() limits.
-- [ ] Integration tests for `StorageSystem` + `DirectoryNavigator` covering create/list/read/delete lifecycle across nested directories.
+- [x] Integration tests for `StorageSystem` + `DirectoryNavigator` covering create/list/read/delete lifecycle across nested directories.
 - [ ] Tests for `DefaultStorageMedia` and `StorageMediaAdapter` edge cases (full storage, permission errors, partial writes).
 
 ## HAL / Platform Adapters

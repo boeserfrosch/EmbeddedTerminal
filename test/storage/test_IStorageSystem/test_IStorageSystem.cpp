@@ -3,6 +3,7 @@
 #include "ETTypes.h"
 #include "../../Mocks/native/MockStorageMedia.h"
 #include "../../../src/StorageSystem.h"
+#include "../../../src/DirectoryNavigator.h"
 
 using namespace EmbeddedTerminal;
 
@@ -129,6 +130,160 @@ void test_unmount_media()
     TEST_ASSERT_NULL(storageSystemUnderTest->getMedia("SD"));
 }
 
+void test_exists_with_variation_in_path_formats()
+{
+    MockStorageMedia m1("", true, 1000, 500, 1000, 500, new MockFileSystem());
+    MockStorageMedia m2("SD", true, 1000, 500, 1000, 500, new MockFileSystem());
+    storageSystemUnderTest->mountMedia(&m1, "/");
+    storageSystemUnderTest->mountMedia(&m2, "/SD");
+    storageSystemUnderTest->open("/file.txt", "w", true).writeAll("test");
+    storageSystemUnderTest->open("/SD/file.txt", "w", true).writeAll("test");
+
+    // Test exists with different path formats
+    TEST_ASSERT_TRUE(storageSystemUnderTest->exists("/file.txt"));
+    TEST_ASSERT_TRUE(storageSystemUnderTest->exists("file.txt"));
+    TEST_ASSERT_TRUE(storageSystemUnderTest->exists("/SD/file.txt"));
+    TEST_ASSERT_TRUE(storageSystemUnderTest->exists("SD/file.txt"));
+    TEST_ASSERT_TRUE(storageSystemUnderTest->exists("/SD//file.txt"));
+    TEST_ASSERT_TRUE(storageSystemUnderTest->exists("/SD/./file.txt"));
+    TEST_ASSERT_TRUE(storageSystemUnderTest->exists("/SD/../SD/file.txt"));
+    TEST_ASSERT_FALSE(storageSystemUnderTest->exists("/SD/nonexistent.txt"));
+}
+
+// ===== StorageSystem + DirectoryNavigator Lifecycle Tests =====
+
+void test_create_write_read_delete_lifecycle(void)
+{
+    MockStorageMedia m1("", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    storageSystemUnderTest->mountMedia(&m1, "/");
+
+    DirectoryNavigator nav(storageSystemUnderTest);
+
+    // Create and write
+    auto file = storageSystemUnderTest->open("/testfile.txt", "w", true);
+    file.writeAll("Hello World");
+    file.close();
+
+    // Verify exists
+    TEST_ASSERT_TRUE(nav.exists("/testfile.txt"));
+
+    // Read and verify
+    ETString content = storageSystemUnderTest->open("/testfile.txt", "r").readAll();
+    TEST_ASSERT_EQUAL_STRING("Hello World", content.c_str());
+
+    // Delete
+    TEST_ASSERT_TRUE(nav.remove("/testfile.txt"));
+    TEST_ASSERT_FALSE(nav.exists("/testfile.txt"));
+}
+
+void test_nested_directory_create_and_navigate(void)
+{
+    MockStorageMedia m1("", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    storageSystemUnderTest->mountMedia(&m1, "/");
+
+    DirectoryNavigator nav(storageSystemUnderTest);
+
+    // Create nested structure
+    TEST_ASSERT_TRUE(nav.mkdir("/project"));
+    TEST_ASSERT_TRUE(nav.mkdir("/project/src"));
+    TEST_ASSERT_TRUE(nav.mkdir("/project/src/lib"));
+
+    // Navigate and verify
+    TEST_ASSERT_TRUE(nav.cd("/project"));
+    TEST_ASSERT_EQUAL_STRING("/project", nav.pwd().c_str());
+
+    TEST_ASSERT_TRUE(nav.cd("src"));
+    TEST_ASSERT_EQUAL_STRING("/project/src", nav.pwd().c_str());
+
+    TEST_ASSERT_TRUE(nav.cd("lib"));
+    TEST_ASSERT_EQUAL_STRING("/project/src/lib", nav.pwd().c_str());
+}
+
+void test_write_across_nested_directories(void)
+{
+    MockStorageMedia m1("", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    storageSystemUnderTest->mountMedia(&m1, "/");
+
+    DirectoryNavigator nav(storageSystemUnderTest);
+
+    // Create structure
+    nav.mkdir("/docs");
+    nav.mkdir("/docs/sections");
+
+    // Write files
+    storageSystemUnderTest->open("/docs/readme.txt", "w", true).writeAll("Main readme");
+    storageSystemUnderTest->open("/docs/sections/chapter1.txt", "w", true).writeAll("Chapter 1");
+
+    // Verify files exist
+    TEST_ASSERT_TRUE(nav.exists("/docs/readme.txt"));
+    TEST_ASSERT_TRUE(nav.exists("/docs/sections/chapter1.txt"));
+}
+
+void test_multiple_files_in_directory_lifecycle(void)
+{
+    MockStorageMedia m1("", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    storageSystemUnderTest->mountMedia(&m1, "/");
+
+    DirectoryNavigator nav(storageSystemUnderTest);
+
+    // Create directory
+    TEST_ASSERT_TRUE(nav.mkdir("/data"));
+
+    // Create multiple files
+    storageSystemUnderTest->open("/data/file1.txt", "w", true).writeAll("content1");
+    storageSystemUnderTest->open("/data/file2.txt", "w", true).writeAll("content2");
+    storageSystemUnderTest->open("/data/file3.txt", "w", true).writeAll("content3");
+
+    // List and verify count
+    auto files = nav.ls("/data");
+    TEST_ASSERT_EQUAL(3, files.size());
+
+    // Verify contents
+    TEST_ASSERT_EQUAL_STRING("content1", storageSystemUnderTest->open("/data/file1.txt", "r").readAll().c_str());
+    TEST_ASSERT_EQUAL_STRING("content2", storageSystemUnderTest->open("/data/file2.txt", "r").readAll().c_str());
+    TEST_ASSERT_EQUAL_STRING("content3", storageSystemUnderTest->open("/data/file3.txt", "r").readAll().c_str());
+
+    // Delete all
+    TEST_ASSERT_TRUE(nav.remove("/data/file1.txt"));
+    TEST_ASSERT_TRUE(nav.remove("/data/file2.txt"));
+    TEST_ASSERT_TRUE(nav.remove("/data/file3.txt"));
+
+    // Verify directory is empty
+    files = nav.ls("/data");
+    TEST_ASSERT_EQUAL(0, files.size());
+
+    // Clean up
+    TEST_ASSERT_TRUE(nav.rmdir("/data"));
+}
+
+void test_navigate_create_delete_navigate_cycle(void)
+{
+    MockStorageMedia m1("", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    storageSystemUnderTest->mountMedia(&m1, "/");
+
+    DirectoryNavigator nav(storageSystemUnderTest);
+
+    // Create initial structure at root
+    TEST_ASSERT_TRUE(nav.mkdir("/test"));
+    TEST_ASSERT_TRUE(nav.exists("/test"));
+
+    // Create another directory
+    TEST_ASSERT_TRUE(nav.mkdir("/backup"));
+    TEST_ASSERT_TRUE(nav.exists("/backup"));
+
+    // Verify navigation
+    TEST_ASSERT_TRUE(nav.cd("/test"));
+    TEST_ASSERT_EQUAL_STRING("/test", nav.pwd().c_str());
+
+    nav.cd("/backup");
+    TEST_ASSERT_EQUAL_STRING("/backup", nav.pwd().c_str());
+
+    // Clean up
+    nav.cd("/");
+    nav.rmdir("/test");
+    nav.rmdir("/backup");
+}
+
 void setUp(void)
 {
     // This is run before EACH TEST
@@ -151,6 +306,15 @@ int run_tests()
     RUN_TEST(test_copy_move_remove);
     RUN_TEST(test_media_capacity);
     RUN_TEST(test_unmount_media);
+    RUN_TEST(test_exists_with_variation_in_path_formats);
+
+    // StorageSystem + DirectoryNavigator lifecycle tests
+    RUN_TEST(test_create_write_read_delete_lifecycle);
+    RUN_TEST(test_nested_directory_create_and_navigate);
+    RUN_TEST(test_write_across_nested_directories);
+    RUN_TEST(test_multiple_files_in_directory_lifecycle);
+    RUN_TEST(test_navigate_create_delete_navigate_cycle);
+
     return UNITY_END();
 }
 #if defined(ARDUINO)
