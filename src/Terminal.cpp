@@ -1,11 +1,11 @@
 #include "Terminal.h"
 // #include "TerminalParser.h"
 // #include "TerminalExecutor.h"
-#include "Profiling.h"
 // #include "scripting/Parser.h"
 #include "scripting/Runner.h"
 #include "lang/TokenUtils.h"
 #include <algorithm>
+#include <memory>
 
 #if defined(ARDUINO)
 #include <Arduino.h>
@@ -313,7 +313,14 @@ namespace EmbeddedTerminal
         {
             error_ = ErrorCode::RunnerError;
             lastExitCode_ = runnerErrorToPredefinedResultCodes(activeScriptRunner_->getLastError());
-            input_.printTo(TerminalChannel::StdErr, "script execution error\n");
+            if (lastExitCode_ == TerminalPredefinedResultCodes::COMMAND_NOT_FOUND)
+            {
+                input_.printTo(TerminalChannel::StdErr, "command not found\n");
+            }
+            else
+            {
+                input_.printTo(TerminalChannel::StdErr, "script execution error\n");
+            }
             activeScriptRunner_.reset();
             activeScriptAst_.reset();
             resetRunningCommandInState_();
@@ -517,7 +524,14 @@ namespace EmbeddedTerminal
         {
             error_ = ErrorCode::RunnerError;
             lastExitCode_ = runnerErrorToPredefinedResultCodes(activeScriptRunner_->getLastError());
-            input_.printTo(TerminalChannel::StdErr, "script execution error\n");
+            if (lastExitCode_ == TerminalPredefinedResultCodes::COMMAND_NOT_FOUND)
+            {
+                input_.printTo(TerminalChannel::StdErr, "command not found\n");
+            }
+            else
+            {
+                input_.printTo(TerminalChannel::StdErr, "script execution error\n");
+            }
             buffer = ""; // Clear buffer on error to avoid getting stuck with an unprocessable command in the buffer. We do this after attempting to execute the command, so that char* pointers in tokens remain valid during execution.
             activeScriptRunner_.reset();
             activeScriptAst_.reset();
@@ -659,15 +673,6 @@ namespace EmbeddedTerminal
     uint64_t Terminal::currentTimeMs() const
     {
         return nowMs_();
-    }
-
-    void Terminal::emitProfileReport(const ETString &message)
-    {
-#if ET_ENABLE_PROFILING
-        input_.printfTo(TerminalChannel::StdErr, "%s\n", message.c_str());
-#else
-        (void)message;
-#endif
     }
 
     const ETString &Terminal::getBuffer() const

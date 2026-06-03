@@ -9,7 +9,7 @@ namespace EmbeddedTerminal
         {
         public:
             void print(const ETString &text) override;
-            const ETString &getBuffer() const;
+            const ETString &getBuffer() const override;
             bool available() override;
             ETString readAll() override;
 

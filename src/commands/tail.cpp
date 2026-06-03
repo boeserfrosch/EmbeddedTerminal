@@ -128,8 +128,11 @@ EmbeddedTerminal::CommandResult tail::findStartPosition_(CommandInvocation &invo
             file.close();
             return error_(ErrorCode::FAILED_TO_READ, invocation);
         }
-        for (size_t i = bytesRead - 1; i >= 0; i--)
+
+        size_t i = bytesRead;
+        do
         {
+            i--;
             if (buffer[i] == '\n')
             {
                 linesFound++;
@@ -141,7 +144,7 @@ EmbeddedTerminal::CommandResult tail::findStartPosition_(CommandInvocation &invo
                     return CommandResult::running(ErrorCode::NONE);
                 }
             }
-        }
+        } while (i > 0);
     }
 
     // If we reached the beginning of the file, we should stream from the start

@@ -12,7 +12,7 @@ namespace EmbeddedTerminal
             virtual ~BufferedOutput();
 
             void print(const ETString &s) override;
-            const ETString &getBuffer() const;
+            const ETString &getBuffer() const override;
 
         private:
             ETString buffer_;

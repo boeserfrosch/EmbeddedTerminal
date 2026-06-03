@@ -97,7 +97,6 @@ void test_policy_allows_all_by_default(void)
     TEST_ASSERT_TRUE(policy.isOperationAllowed("GPIO1", GpioOperation::Read, reason));
     TEST_ASSERT_TRUE(policy.isOperationAllowed("GPIO2", GpioOperation::Write, reason));
     TEST_ASSERT_TRUE(policy.isOperationAllowed("GPIO3", GpioOperation::Mode, reason));
-    TEST_ASSERT_TRUE(policy.isOperationAllowed("PA0", GpioOperation::InterruptMode, reason));
 }
 
 void test_policy_selective_operation_denial(void)

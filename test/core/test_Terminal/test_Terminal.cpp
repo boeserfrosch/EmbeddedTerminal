@@ -13,6 +13,10 @@
 
 #include "../../../src/Terminal.h"
 #include "../../../src/ETTypes.h"
+#include "../../../src/StorageSystem.h"
+#include "../../../src/DirectoryNavigator.h"
+#include "../../../src/commands/echo.h"
+#include "../../../src/commands/wc.h"
 #include "../../Mocks/MockStream.h"
 #include "../../Mocks/MockCommand.h"
 #include "../../Mocks/native/MockFileSystem.h"
@@ -107,6 +111,13 @@ public:
         invocation.streams.output.print(text);
         return CommandResult::completed(0);
     }
+};
+
+class TestStorageSetup
+{
+public:
+    StorageSystem storage;
+    DirectoryNavigator navigator{&storage};
 };
 
 void setUp(void) {}
@@ -353,6 +364,26 @@ void test_terminal_waiting_command_needs_input_to_resume(void)
     term.loop();
     TEST_ASSERT_EQUAL(2, cmd.executionCount);
     TEST_ASSERT_TRUE(stream.stdoutBuffer.find("resumed") != ETString::npos);
+}
+
+void test_terminal_executes_multiline_quoted_argument_through_pipe(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    TestStorageSetup storageSetup;
+    cmd::echo echoCmd;
+    cmd::wc wcCmd(storageSetup.navigator);
+
+    term.registerCommand("echo", &echoCmd);
+    term.registerCommand("wc", &wcCmd);
+
+    stream.inputBuffer = "echo \"This is a test\nand what is that?\" | wc\n";
+    term.loop();
+
+    TEST_ASSERT_FALSE(term.error());
+    TEST_ASSERT_FALSE(term.isRunning());
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("Lines\tWords\tBytes\n") != ETString::npos);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("2\t8\t") != ETString::npos);
 }
 
 void test_terminal_uses_lexer_for_quoted_arguments(void)
@@ -806,6 +837,7 @@ void process_tests()
     RUN_TEST(test_terminal_case_sensitivity);
     RUN_TEST(test_terminal_continues_running_command_without_newline);
     RUN_TEST(test_terminal_waiting_command_needs_input_to_resume);
+    RUN_TEST(test_terminal_executes_multiline_quoted_argument_through_pipe);
     RUN_TEST(test_terminal_uses_lexer_for_quoted_arguments);
     RUN_TEST(test_terminal_does_not_autocomplete_when_tab_is_inside_quotes);
     RUN_TEST(test_termminal_did_not_run_with_unterminated_quote);

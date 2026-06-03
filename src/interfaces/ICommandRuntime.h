@@ -101,6 +101,17 @@ namespace EmbeddedTerminal
          * @param s The string to print.
          */
         virtual void print(const ETString &s) = 0;
+
+        /**
+         * @brief Returns buffered output, if the channel stores any.
+         *
+         * Non-buffering channels return an empty string.
+         */
+        virtual const ETString &getBuffer() const
+        {
+            static const ETString emptyBuffer;
+            return emptyBuffer;
+        }
     };
 
     struct StreamBundle

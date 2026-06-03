@@ -586,13 +586,9 @@ namespace EmbeddedTerminal
                 }
                 else if (stackTop != nullptr && stackTop->invocation != nullptr)
                 {
-                    if (auto *bufferedOutput = dynamic_cast<Channels::BufferedOutput *>(stackTop->invocation->streams.output.get()))
+                    if (stackTop->invocation->streams.output.get() != nullptr)
                     {
-                        *currentOutputCapture_ += bufferedOutput->getBuffer();
-                    }
-                    else if (auto *bufferedInOut = dynamic_cast<Channels::BufferedInOut *>(stackTop->invocation->streams.output.get()))
-                    {
-                        *currentOutputCapture_ += bufferedInOut->getBuffer();
+                        *currentOutputCapture_ += stackTop->invocation->streams.output.get()->getBuffer();
                     }
                 }
             }

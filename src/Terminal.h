@@ -132,7 +132,6 @@ namespace EmbeddedTerminal
         bool isActiveCommand(ICommand *const command, const ETString &keyword, const ETVector<ETString> &arguments) const;
         void setLastExitCode(int32_t code);
         uint64_t currentTimeMs() const;
-        void emitProfileReport(const ETString &message);
         void interruptActiveCommand();
         // CommandResult executeParsedCommandForScript(const ParsedCommand &command);
         CommandResult resumeCommandForScript(ICommand *const command, const ETString &keyword, const ETVector<ETString> &arguments);
