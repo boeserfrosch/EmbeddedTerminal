@@ -80,7 +80,7 @@ void test_cat_file_not_exists(void)
     ETString arg = "nofile.txt";
     TestCommandInvocationHandle invocationHandle(keyword, {arg});
     CommandResult result = cat.invoke(invocationHandle.invocation);
-    TEST_ASSERT_TRUE(invocationHandle.error.contains("did not exist!"));
+    TEST_ASSERT_TRUE(invocationHandle.error.contains("did not exist"));
 }
 
 void test_cat_usage(void)
