@@ -13,7 +13,7 @@ namespace EmbeddedTerminal
             auto parseResult = parser.parse(invocation.arguments);
             if (!parseResult.success)
             {
-                invocation.streams.error.print("usage: " + usage(invocation.keyword));
+                invocation.streams.output.print("usage: " + usage(invocation.keyword));
                 return CommandResult::completed(ErrorCode::INVALID_PATH);
             }
 
