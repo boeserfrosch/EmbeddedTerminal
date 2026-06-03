@@ -418,6 +418,22 @@ class MyCommand : public ICommand {
 | `rm` | Remove file | `rm file.txt` |
 | `rmdir` | Remove directory | `rmdir folder` |
 | `df` | Show disk usage | `df` |
+
+## Thread Safety
+
+`StorageSystem` protects its internal mount table (`mountPoints_`) with an internal mutex. This ensures that mounting, unmounting and mount-point lookups are safe to call from multiple threads concurrently.
+
+Guidelines:
+
+- The mutex protects mount-point operations and lookups only. It does not guarantee thread-safety for individual `IFileSystem` implementations or other subsystems like the scripting engine or the `Terminal` class.
+- If your application performs concurrent file or command operations, either serialize access at a higher level or ensure the underlying `IFileSystem` implementations are thread-safe.
+- You can control the maximum allowed copy size used by `copyFile()` via `StorageSystem::setMaxCopySize(bytes)`. Use `0` to disable size checks (not recommended on constrained targets).
+
+Design guidance:
+
+- Prefer performing file operations from a single thread in embedded targets.
+- For multi-threaded hosts, guard higher-level operations (commands, navigators) or use worker threads which serialize access to `StorageSystem` operations.
+
 | `tail` | Show end of file | `tail file.txt` |
 | `pwd` | Show current directory | `pwd` |
 | `xxd` | Hex dump file contents | `xxd firmware.bin` |

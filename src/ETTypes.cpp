@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <memory>
 #include <algorithm>
+#include <limits>
 #include <stdint.h>
 
 // ETString implementation
@@ -112,12 +113,16 @@ size_t ETString::find(char c, size_t pos) const
 
 size_t ETString::find_last_of(char c) const
 {
+    if (data.length() == 0)
+        return npos;
     auto pos = data.length() - 1;
     return find_last_of(c, pos);
 }
 
 bool ETString::endsWith(char c) const
 {
+    if (data.length() == 0)
+        return false;
     return data[data.length() - 1] == c;
 }
 bool ETString::endsWith(const ETString &suffix) const
@@ -143,6 +148,8 @@ bool ETString::endsWith(const ETString &suffix) const
 
 bool ETString::startsWith(char c) const
 {
+    if (data.length() == 0)
+        return false;
     return data[0] == c;
 }
 bool ETString::startsWith(const ETString &prefix) const
@@ -169,13 +176,15 @@ bool ETString::startsWith(const ETString &prefix) const
 
 size_t ETString::find_last_of(char c, size_t pos) const
 {
+    if (data.length() == 0)
+        return npos;
     if (pos > data.length() - 1)
     {
         pos = data.length() - 1;
     }
-    for (int i = pos; i >= 0; --i)
-        if (data[i] == c)
-            return i;
+    for (int i = static_cast<int>(pos); i >= 0; --i)
+        if (data[static_cast<size_t>(i)] == c)
+            return static_cast<size_t>(i);
     return npos;
 }
 size_t ETString::find_last_of(const ETString &search) const
@@ -388,6 +397,8 @@ char ETString::back() const
 #if defined(ARDUINO) //|| defined(ESP_PLATFORM)
     return data[data.length() - 1];
 #else
+    if (data.empty())
+        return '\0';
     return data.back();
 #endif
 }
@@ -428,11 +439,32 @@ size_t ETString::toull(const char *str, size_t *idx, int base)
         *idx = endPtr - str;
     return result;
 #else
+    if (str == nullptr || str[0] == '\0')
+    {
+        if (idx)
+            *idx = 0;
+        return 0;
+    }
     size_t processedChars = 0;
-    unsigned long result = std::stoul(str, &processedChars, base);
+    unsigned long long result = 0;
+    try
+    {
+        result = std::stoull(str, &processedChars, base);
+    }
+    catch (const std::invalid_argument &)
+    {
+        processedChars = 0;
+        result = 0;
+    }
+    catch (const std::out_of_range &)
+    {
+        // Clamp to max size_t
+        processedChars = 0;
+        result = static_cast<unsigned long long>(std::numeric_limits<size_t>::max());
+    }
     if (idx)
         *idx = processedChars;
-    return result;
+    return static_cast<size_t>(result);
 #endif
 }
 

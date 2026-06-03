@@ -1,4 +1,5 @@
 #include "tail.h"
+#include "utils/Conversion.h"
 using namespace EmbeddedTerminal::cmd;
 
 ETString tail::usage(const ETString &keyword) const
@@ -57,7 +58,15 @@ EmbeddedTerminal::CommandResult tail::parseOptions_(CommandInvocation &invocatio
     linesToFind_ = 10; // Default to last 10 lines, this should be configurable or at least a central constant
     if (parseResult.options.count("--lines") && !parseResult.options["--lines"].empty())
     {
-        linesToFind_ = std::stoi(parseResult.options["--lines"][0]);
+        int tmp = 0;
+        if (!EmbeddedTerminal::utils::to_int(parseResult.options["--lines"][0], tmp))
+        {
+            linesToFind_ = 10;
+        }
+        else
+        {
+            linesToFind_ = tmp;
+        }
     }
 
     if (linesToFind_ <= 0)

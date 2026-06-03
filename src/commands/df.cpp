@@ -1,5 +1,6 @@
 #include "commands/df.h"
 #include "df.h"
+#include <memory>
 
 using namespace EmbeddedTerminal::cmd;
 
@@ -21,7 +22,7 @@ EmbeddedTerminal::CommandResult EmbeddedTerminal::cmd::df::invoke(CommandInvocat
     ETString path = parseResult.remainingArguments.empty() ? ETString() : parseResult.remainingArguments[0];
 
     const float dim = 1024.0f * 1024.0f;
-    ETVector<IStorageMedia *> medias;
+    ETVector<std::shared_ptr<IStorageMedia>> medias;
     if (path.empty())
     {
         medias = storage_.media();
@@ -38,7 +39,7 @@ EmbeddedTerminal::CommandResult EmbeddedTerminal::cmd::df::invoke(CommandInvocat
     }
 
     invocation.streams.output.print("Filesystem\tSize\tUsed\tFree\n");
-    for (auto *media : medias)
+    for (auto media : medias)
     {
         const float sizeMb = static_cast<float>(media->totalBytes()) / dim;
         const float usedMb = static_cast<float>(media->usedBytes()) / dim;

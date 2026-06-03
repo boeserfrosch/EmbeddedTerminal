@@ -128,10 +128,18 @@ void test_policy_multiple_exclusions(void)
     GpioExclusionRule rule1;
     rule1.pinId = "GPIO1";
     rule1.denyWrite = true;
+    rule1.denyRead = false;
+    rule1.denyMode = false;
+    rule1.denyInclude = false;
+    rule1.denyExclude = false;
 
     GpioExclusionRule rule2;
     rule2.pinId = "GPIO2";
     rule2.denyRead = true;
+    rule2.denyWrite = false;
+    rule2.denyMode = false;
+    rule2.denyInclude = false;
+    rule2.denyExclude = false;
 
     ETString reason1, reason2;
     TEST_ASSERT_TRUE(policy.addExclusion(rule1, reason1));

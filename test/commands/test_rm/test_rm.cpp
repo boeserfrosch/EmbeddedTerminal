@@ -12,14 +12,16 @@
 #include "../utils.h"
 #include "StorageSystem.h"
 #include "../../Mocks/native/MockStorageMedia.h"
+#include <memory>
 
 IStorageSystem *storage = nullptr;
 DirectoryNavigator *dir = nullptr;
+static std::shared_ptr<MockStorageMedia> media;
 
 void setUp(void)
 {
     storage = new StorageSystem();
-    auto media = new MockStorageMedia("mock", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    media = std::make_shared<MockStorageMedia>("mock", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
     storage->mountMedia(media, "/");
     dir = new DirectoryNavigator(storage);
     storage->open("file.txt", "w", true).writeAll("hello"); // File
@@ -27,11 +29,10 @@ void setUp(void)
 }
 void tearDown(void)
 {
-    auto medias = storage->media();
-    for (auto media : medias)
+    if (media)
     {
         storage->unmountMedia(media->name());
-        delete media;
+        media.reset();
     }
     delete dir;
     dir = nullptr;

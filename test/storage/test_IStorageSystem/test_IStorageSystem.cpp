@@ -11,16 +11,16 @@ IStorageSystem *storageSystemUnderTest;
 
 void test_media_list()
 {
-    MockStorageMedia m1("SD", true, 1000, 500, 1000, 500, nullptr);
-    MockStorageMedia m2("Flash", true, 2000, 1000, 2000, 1000, nullptr);
-    storageSystemUnderTest->mountMedia(&m1, "/SD");
-    storageSystemUnderTest->mountMedia(&m2, "/Flash");
+    auto m1 = std::make_shared<MockStorageMedia>("SD", true, 1000, 500, 1000, 500, nullptr);
+    auto m2 = std::make_shared<MockStorageMedia>("Flash", true, 2000, 1000, 2000, 1000, nullptr);
+    storageSystemUnderTest->mountMedia(m1, "/SD");
+    storageSystemUnderTest->mountMedia(m2, "/Flash");
 
     auto mediaList = storageSystemUnderTest->media();
     TEST_ASSERT_EQUAL(2, mediaList.size());
     // Names may be in any order depending on implementation
     bool foundSD = false, foundFlash = false;
-    for (auto *m : mediaList)
+    for (auto m : mediaList)
     {
         if (strcmp(m->name(), "SD") == 0)
             foundSD = true;
@@ -33,42 +33,58 @@ void test_media_list()
 
 void test_getMedia()
 {
-    MockStorageMedia m1("SD", true, 1000, 500, 1000, 500, nullptr);
-    MockStorageMedia m2("Flash", true, 2000, 1000, 2000, 1000, nullptr);
+    auto m1 = std::make_shared<MockStorageMedia>("SD", true, 1000, 500, 1000, 500, nullptr);
+    auto m2 = std::make_shared<MockStorageMedia>("Flash", true, 2000, 1000, 2000, 1000, nullptr);
     // StorageSystem expects mount point == name, MockStorageSystem expects "/mnt/SD"
-    storageSystemUnderTest->mountMedia(&m1, "/SD");
-    storageSystemUnderTest->mountMedia(&m2, "/Flash");
-    IStorageMedia *sd = storageSystemUnderTest->getMedia("SD");
-    IStorageMedia *flash = storageSystemUnderTest->getMedia("Flash");
-    // Accept either pointer or nullptr if not found (depends on implementation)
-    TEST_ASSERT_TRUE_MESSAGE(sd == &m1, "getMedia(\"SD\") should return pointer to m1");
-    TEST_ASSERT_TRUE_MESSAGE(flash == &m2, "getMedia(\"Flash\") should return pointer to m2");
-    TEST_ASSERT_NULL(storageSystemUnderTest->getMedia("USB"));
+    storageSystemUnderTest->mountMedia(m1, "/SD");
+    storageSystemUnderTest->mountMedia(m2, "/Flash");
+    auto sd = storageSystemUnderTest->getMedia("SD");
+    auto flash = storageSystemUnderTest->getMedia("Flash");
+    // Verify by name rather than pointer equality
+    TEST_ASSERT_NOT_NULL(sd.get());
+    TEST_ASSERT_NOT_NULL(flash.get());
+    TEST_ASSERT_EQUAL_STRING("SD", sd->name());
+    TEST_ASSERT_EQUAL_STRING("Flash", flash->name());
+    TEST_ASSERT_TRUE(!storageSystemUnderTest->getMedia("USB"));
 }
 
 void test_getMediaFromPath()
 {
-    MockStorageMedia m1("SD", true, 1000, 500, 1000, 500, nullptr);
-    storageSystemUnderTest->mountMedia(&m1, "/SD");
+    auto m1 = std::make_shared<MockStorageMedia>("SD", true, 1000, 500, 1000, 500, nullptr);
+    storageSystemUnderTest->mountMedia(m1, "/SD");
     // StorageSystem expects "/SD/file.txt", MockStorageSystem may expect "/mnt/SD/file.txt"
-    IStorageMedia *media1 = storageSystemUnderTest->getMediaFromPath("/SD/file.txt");
-    TEST_ASSERT_FALSE_MESSAGE(media1 == nullptr, "getMediaFromPath(\"/SD/file.txt\") should not return nullptr");
-    TEST_ASSERT(media1 == &m1);
-    TEST_ASSERT_NULL(storageSystemUnderTest->getMediaFromPath("/other/file.txt"));
+    auto media1 = storageSystemUnderTest->getMediaFromPath("/SD/file.txt");
+    TEST_ASSERT_FALSE_MESSAGE(!media1, "getMediaFromPath(\"/SD/file.txt\") should not return nullptr");
+    TEST_ASSERT_EQUAL_STRING("SD", media1->name());
+    TEST_ASSERT_TRUE(!storageSystemUnderTest->getMediaFromPath("/other/file.txt"));
+}
+
+void test_open_on_mounted_path_strips_mount_prefix()
+{
+    auto m1 = std::make_shared<MockStorageMedia>("SD", true, 1000, 500, 1000, 500, new MockFileSystem());
+    storageSystemUnderTest->mountMedia(m1, "/SD");
+
+    ETFile file = storageSystemUnderTest->open("/SD/file.txt", FILE_MODE_WRITE, true);
+    TEST_ASSERT_TRUE_MESSAGE(file.isOpen(), "Expected mounted path to open successfully");
+    TEST_ASSERT_TRUE_MESSAGE(file.writeAll("hello"), "Expected write through mounted path to succeed");
+    file.close();
+
+    ETString content = storageSystemUnderTest->open("/SD/file.txt", FILE_MODE_READ).readAll();
+    TEST_ASSERT_EQUAL_STRING("hello", content.c_str());
 }
 
 void test_mountMedia()
 {
-    MockStorageMedia m1("SD", true, 1000, 500, 1000, 500, nullptr);
-    storageSystemUnderTest->mountMedia(&m1, "/SD");
+    auto m1 = std::make_shared<MockStorageMedia>("SD", true, 1000, 500, 1000, 500, nullptr);
+    storageSystemUnderTest->mountMedia(m1, "/SD");
     // Try mounting a new media
-    MockStorageMedia m2("Flash", true, 2000, 1000, 2000, 1000, nullptr);
-    bool mountRes = storageSystemUnderTest->mountMedia(&m2, "/Flash");
+    auto m2 = std::make_shared<MockStorageMedia>("Flash", true, 2000, 1000, 2000, 1000, nullptr);
+    bool mountRes = storageSystemUnderTest->mountMedia(m2, "/Flash");
     TEST_ASSERT_TRUE(mountRes);
     // Should now be accessible via media()
     auto mediaList = storageSystemUnderTest->media();
     bool foundFlash = false;
-    for (auto *m : mediaList)
+    for (auto m : mediaList)
     {
         if (strcmp(m->name(), "Flash") == 0)
             foundFlash = true;
@@ -76,10 +92,17 @@ void test_mountMedia()
     TEST_ASSERT_TRUE(foundFlash);
 }
 
+void test_mountMedia_rejects_null_media()
+{
+    bool mountRes = storageSystemUnderTest->mountMedia(nullptr, "/SD");
+    TEST_ASSERT_FALSE(mountRes);
+    TEST_ASSERT_EQUAL(0, storageSystemUnderTest->media().size());
+}
+
 void test_copy_move_remove()
 {
-    MockStorageMedia m1("SD", true, 1000, 500, 1000, 500, new MockFileSystem());
-    storageSystemUnderTest->mountMedia(&m1, "/SD");
+    auto m1 = std::make_shared<MockStorageMedia>("SD", true, 1000, 500, 1000, 500, new MockFileSystem());
+    storageSystemUnderTest->mountMedia(m1, "/SD");
 
     bool copyRes = storageSystemUnderTest->copyFile("/SD/src.txt", "/SD/dst.txt");
     storageSystemUnderTest->open("/SD/src.txt", "w", true);
@@ -99,12 +122,12 @@ void test_copy_move_remove()
 
 void test_media_capacity()
 {
-    MockStorageMedia m1("SD", true, 1000, 500, 1000, 500, new MockFileSystem());
-    MockStorageMedia m2("Flash", true, 2000, 1000, 2000, 1000, new MockFileSystem());
-    storageSystemUnderTest->mountMedia(&m1, "/SD");
-    storageSystemUnderTest->mountMedia(&m2, "/Flash");
+    auto m1 = std::make_shared<MockStorageMedia>("SD", true, 1000, 500, 1000, 500, new MockFileSystem());
+    auto m2 = std::make_shared<MockStorageMedia>("Flash", true, 2000, 1000, 2000, 1000, new MockFileSystem());
+    storageSystemUnderTest->mountMedia(m1, "/SD");
+    storageSystemUnderTest->mountMedia(m2, "/Flash");
     auto mediaList = storageSystemUnderTest->media();
-    for (auto *m : mediaList)
+    for (auto m : mediaList)
     {
         if (strcmp(m->name(), "SD") == 0)
         {
@@ -121,21 +144,21 @@ void test_media_capacity()
 
 void test_unmount_media()
 {
-    MockStorageMedia m1("SD", true, 1000, 500, 1000, 500, new MockFileSystem());
-    storageSystemUnderTest->mountMedia(&m1, "/SD");
+    auto m1 = std::make_shared<MockStorageMedia>("SD", true, 1000, 500, 1000, 500, new MockFileSystem());
+    storageSystemUnderTest->mountMedia(m1, "/SD");
     // Unmount media
     bool unmountRes = storageSystemUnderTest->unmountMedia("SD");
     TEST_ASSERT_TRUE(unmountRes); // Accept either for mock/real
     // Should not be accessible anymore
-    TEST_ASSERT_NULL(storageSystemUnderTest->getMedia("SD"));
+    TEST_ASSERT_TRUE(!storageSystemUnderTest->getMedia("SD"));
 }
 
 void test_exists_with_variation_in_path_formats()
 {
-    MockStorageMedia m1("", true, 1000, 500, 1000, 500, new MockFileSystem());
-    MockStorageMedia m2("SD", true, 1000, 500, 1000, 500, new MockFileSystem());
-    storageSystemUnderTest->mountMedia(&m1, "/");
-    storageSystemUnderTest->mountMedia(&m2, "/SD");
+    auto m1 = std::make_shared<MockStorageMedia>("", true, 1000, 500, 1000, 500, new MockFileSystem());
+    auto m2 = std::make_shared<MockStorageMedia>("SD", true, 1000, 500, 1000, 500, new MockFileSystem());
+    storageSystemUnderTest->mountMedia(m1, "/");
+    storageSystemUnderTest->mountMedia(m2, "/SD");
     storageSystemUnderTest->open("/file.txt", "w", true).writeAll("test");
     storageSystemUnderTest->open("/SD/file.txt", "w", true).writeAll("test");
 
@@ -154,8 +177,8 @@ void test_exists_with_variation_in_path_formats()
 
 void test_create_write_read_delete_lifecycle(void)
 {
-    MockStorageMedia m1("", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
-    storageSystemUnderTest->mountMedia(&m1, "/");
+    auto m1 = std::make_shared<MockStorageMedia>("", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    storageSystemUnderTest->mountMedia(m1, "/");
 
     DirectoryNavigator nav(storageSystemUnderTest);
 
@@ -178,8 +201,8 @@ void test_create_write_read_delete_lifecycle(void)
 
 void test_nested_directory_create_and_navigate(void)
 {
-    MockStorageMedia m1("", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
-    storageSystemUnderTest->mountMedia(&m1, "/");
+    auto m1 = std::make_shared<MockStorageMedia>("", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    storageSystemUnderTest->mountMedia(m1, "/");
 
     DirectoryNavigator nav(storageSystemUnderTest);
 
@@ -201,8 +224,8 @@ void test_nested_directory_create_and_navigate(void)
 
 void test_write_across_nested_directories(void)
 {
-    MockStorageMedia m1("", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
-    storageSystemUnderTest->mountMedia(&m1, "/");
+    auto m1 = std::make_shared<MockStorageMedia>("", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    storageSystemUnderTest->mountMedia(m1, "/");
 
     DirectoryNavigator nav(storageSystemUnderTest);
 
@@ -221,8 +244,8 @@ void test_write_across_nested_directories(void)
 
 void test_multiple_files_in_directory_lifecycle(void)
 {
-    MockStorageMedia m1("", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
-    storageSystemUnderTest->mountMedia(&m1, "/");
+    auto m1 = std::make_shared<MockStorageMedia>("", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    storageSystemUnderTest->mountMedia(m1, "/");
 
     DirectoryNavigator nav(storageSystemUnderTest);
 
@@ -258,8 +281,8 @@ void test_multiple_files_in_directory_lifecycle(void)
 
 void test_navigate_create_delete_navigate_cycle(void)
 {
-    MockStorageMedia m1("", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
-    storageSystemUnderTest->mountMedia(&m1, "/");
+    auto m1 = std::make_shared<MockStorageMedia>("", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    storageSystemUnderTest->mountMedia(m1, "/");
 
     DirectoryNavigator nav(storageSystemUnderTest);
 
@@ -284,6 +307,34 @@ void test_navigate_create_delete_navigate_cycle(void)
     nav.rmdir("/backup");
 }
 
+void test_overlapping_mountpoints()
+{
+    // Mount root and /SD pointing to different file systems
+    auto rootFs = new MockFileSystem();
+    auto sdFs = new MockFileSystem();
+    auto root = std::make_shared<MockStorageMedia>("root", true, 1024, 0, 1024, 1024, rootFs);
+    auto sd = std::make_shared<MockStorageMedia>("SD", true, 1024, 0, 1024, 1024, sdFs);
+    storageSystemUnderTest->mountMedia(root, "/");
+    storageSystemUnderTest->mountMedia(sd, "/SD");
+
+    // Write to root and SD separately
+    auto f1 = storageSystemUnderTest->open("/rootfile.txt", FILE_MODE_WRITE, true);
+    TEST_ASSERT_TRUE(f1.isOpen());
+    TEST_ASSERT_TRUE(f1.writeAll("rootdata"));
+    f1.close();
+
+    auto f2 = storageSystemUnderTest->open("/SD/sdfile.txt", FILE_MODE_WRITE, true);
+    TEST_ASSERT_TRUE(f2.isOpen());
+    TEST_ASSERT_TRUE(f2.writeAll("sddata"));
+    f2.close();
+
+    // Ensure reading returns correct content from respective filesystems
+    ETString r1 = storageSystemUnderTest->open("/rootfile.txt", FILE_MODE_READ).readAll();
+    ETString r2 = storageSystemUnderTest->open("/SD/sdfile.txt", FILE_MODE_READ).readAll();
+    TEST_ASSERT_EQUAL_STRING("rootdata", r1.c_str());
+    TEST_ASSERT_EQUAL_STRING("sddata", r2.c_str());
+}
+
 void setUp(void)
 {
     // This is run before EACH TEST
@@ -302,7 +353,9 @@ int run_tests()
     RUN_TEST(test_media_list);
     RUN_TEST(test_getMedia);
     RUN_TEST(test_getMediaFromPath);
+    RUN_TEST(test_open_on_mounted_path_strips_mount_prefix);
     RUN_TEST(test_mountMedia);
+    RUN_TEST(test_mountMedia_rejects_null_media);
     RUN_TEST(test_copy_move_remove);
     RUN_TEST(test_media_capacity);
     RUN_TEST(test_unmount_media);

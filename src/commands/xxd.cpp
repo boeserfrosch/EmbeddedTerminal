@@ -70,7 +70,7 @@ EmbeddedTerminal::CommandResult EmbeddedTerminal::cmd::xxd::resume(CommandInvoca
 EmbeddedTerminal::CommandResult EmbeddedTerminal::cmd::xxd::streamHexDump_(CommandInvocation &invocation)
 {
     ETString filePath = invocation.context.variables[SESSION_KEY_PATH];
-    size_t position = std::stoull(invocation.context.variables[SESSION_KEY_POS].c_str());
+    size_t position = ETString::toull(invocation.context.variables[SESSION_KEY_POS].c_str());
 
     auto file = dir_.open(filePath.c_str(), "r", false);
     auto code = checkFile_(file);
@@ -131,7 +131,7 @@ EmbeddedTerminal::cmd::xxd::HandleKeyStrokesResult EmbeddedTerminal::cmd::xxd::h
             return;
         }
 
-        size_t offset = std::stoull(pendingOffset_.c_str(), nullptr, 16);
+        size_t offset = ETString::toull(pendingOffset_.c_str(), nullptr, 16);
         invocation.context.variables[SESSION_KEY_POS] = toETString(offset);
         pendingOffset_ = "";
         collectingOffset_ = false;
@@ -195,7 +195,7 @@ EmbeddedTerminal::cmd::xxd::HandleKeyStrokesResult EmbeddedTerminal::cmd::xxd::h
                 auto fileSize = file.size();
                 file.close();
 
-                size_t currentPos = std::stoull(invocation.context.variables[SESSION_KEY_POS].c_str());
+                size_t currentPos = ETString::toull(invocation.context.variables[SESSION_KEY_POS].c_str());
                 if (currentPos + 16 > (fileSize - CHUNK_SIZE)) // @todo: 16 is the default bytesPerLine, we can enhance this later to make it configurable or at least a central constant
                 {
                     invocation.context.variables[SESSION_KEY_POS] = toETString(fileSize - CHUNK_SIZE);
@@ -212,7 +212,7 @@ EmbeddedTerminal::cmd::xxd::HandleKeyStrokesResult EmbeddedTerminal::cmd::xxd::h
             if (c == 'p')
             {
                 // Previous chunk
-                size_t currentPos = std::stoull(invocation.context.variables[SESSION_KEY_POS].c_str());
+                size_t currentPos = ETString::toull(invocation.context.variables[SESSION_KEY_POS].c_str());
                 if (currentPos >= 16) // @todo 16 is the default bytesPerLine, we can enhance this later to make it configurable or at least a central constant
                 {
                     invocation.context.variables[SESSION_KEY_POS] = toETString(currentPos - 16); // @todo 16 is the default bytesPerLine, we can enhance this later to make it configurable or at least a central constant

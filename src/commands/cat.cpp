@@ -31,7 +31,7 @@ namespace EmbeddedTerminal
                 return CommandResult::completed(code);
             }
             ETString path = invocation.context.variables[SESSION_KEY_PATH];
-            size_t filePos = std::stoul(invocation.context.variables[SESSION_KEY_POS].c_str());
+            size_t filePos = ETString::toull(invocation.context.variables[SESSION_KEY_POS].c_str());
 
             auto file = dir_.open(path.c_str(), "r", false);
             if (!file.isOpen())

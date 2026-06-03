@@ -14,25 +14,32 @@
 #include "StorageSystem.h"
 #include "../../Mocks/native/MockStorageMedia.h"
 #include "../utils.h"
+#include <memory>
 
 using namespace EmbeddedTerminal;
 IStorageSystem *storage = nullptr;
+static std::shared_ptr<MockStorageMedia> media;
+static std::shared_ptr<MockStorageMedia> media2;
 
 void setUp(void)
 {
     storage = new StorageSystem();
-    auto media = new MockStorageMedia("mock", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
-    auto media2 = new MockStorageMedia("mock2", true, 1024 * 1024 * 8, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    media = std::make_shared<MockStorageMedia>("mock", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    media2 = std::make_shared<MockStorageMedia>("mock2", true, 1024 * 1024 * 8, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
     storage->mountMedia(media, "/");
     storage->mountMedia(media2, "/mock2");
 }
 void tearDown(void)
 {
-    auto medias = storage->media();
-    for (auto media : medias)
+    if (media2)
+    {
+        storage->unmountMedia(media2->name());
+        media2.reset();
+    }
+    if (media)
     {
         storage->unmountMedia(media->name());
-        delete media;
+        media.reset();
     }
     delete storage;
     storage = nullptr;

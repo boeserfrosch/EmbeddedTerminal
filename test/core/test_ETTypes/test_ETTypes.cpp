@@ -236,6 +236,17 @@ void test_startsWith(void)
     TEST_ASSERT_FALSE(s.startsWith('Z'));
 }
 
+void test_empty_behaviors()
+{
+    ETString e = "";
+    TEST_ASSERT_TRUE(e.empty());
+    TEST_ASSERT_FALSE(e.startsWith('a'));
+    TEST_ASSERT_FALSE(e.endsWith('a'));
+    TEST_ASSERT_EQUAL_UINT32(ETString::npos, e.find_last_of('a'));
+    TEST_ASSERT_EQUAL_INT(0, e.length());
+    TEST_ASSERT_TRUE(e.back() == '\0');
+}
+
 void setUp(void) {}
 void tearDown(void) {}
 
@@ -258,6 +269,7 @@ void processTests()
     RUN_TEST(test_contains);
     RUN_TEST(test_endsWith);
     RUN_TEST(test_startsWith);
+    RUN_TEST(test_empty_behaviors);
     UNITY_END();
 }
 

@@ -12,26 +12,27 @@
 #include "../utils.h"
 #include "StorageSystem.h"
 #include "../../Mocks/native/MockStorageMedia.h"
+#include <memory>
 
 #include <unity.h>
 
 IStorageSystem *storage = nullptr;
 DirectoryNavigator *dir = nullptr;
+static std::shared_ptr<MockStorageMedia> media;
 
 void setUp(void)
 {
     storage = new StorageSystem();
-    auto media = new MockStorageMedia("mock", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    media = std::make_shared<MockStorageMedia>("mock", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
     storage->mountMedia(media, "");
     dir = new DirectoryNavigator(storage);
 }
 void tearDown(void)
 {
-    auto medias = storage->media();
-    for (auto media : medias)
+    if (media)
     {
         storage->unmountMedia(media->name());
-        delete media;
+        media.reset();
     }
     delete dir;
     dir = nullptr;
@@ -261,7 +262,7 @@ void test_xxd_execute_navigates_with_go_begin_and_end(void)
     input.buffer = "G";
     xxd.resume(invocation);
     TEST_ASSERT_TRUE(vars.find("xxd__pos") != vars.end());
-    TEST_ASSERT_TRUE(std::stoull(vars["xxd__pos"].c_str()) > 0);
+    TEST_ASSERT_TRUE(ETString::toull(vars["xxd__pos"].c_str()) > 0);
 
     stream.stdoutBuffer = "";
     input.buffer = "g";

@@ -184,7 +184,7 @@ cmd::download::State EmbeddedTerminal::cmd::download::getState_(CommandInvocatio
         return state; // Will be handled as error in the caller
     }
     state.path = Path(vars[SESSION_KEY_PATH]);
-    state.position = std::stoull(vars[SESSION_KEY_POS].c_str());
+    state.position = ETString::toull(vars[SESSION_KEY_POS].c_str());
     state.initialized = true;
     return state;
 }

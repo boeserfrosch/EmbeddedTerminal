@@ -13,27 +13,28 @@
 #include "../../../src/ETFile.h"
 #include "../../Mocks/native/MockStorageMedia.h"
 #include "StorageSystem.h"
+#include <memory>
 
 using namespace EmbeddedTerminal;
 
 // --- DirectoryNavigator tests ---
 
 IStorageSystem *storage;
+static std::shared_ptr<MockStorageMedia> media;
 
 void setUp(void)
 {
     storage = new StorageSystem();
-    auto media = new MockStorageMedia("root", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    media = std::make_shared<MockStorageMedia>("root", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
 
     storage->mountMedia(media, "");
 }
 void tearDown(void)
 {
-    auto media = storage->media();
-    for (auto m : media)
+    if (media)
     {
-        storage->unmountMedia(m->name());
-        delete m;
+        storage->unmountMedia(media->name());
+        media.reset();
     }
     delete storage;
 }

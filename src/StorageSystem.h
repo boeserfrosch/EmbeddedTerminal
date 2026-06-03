@@ -4,6 +4,7 @@
 #include "interfaces/IStorage.h"
 #include "ETTypes.h"
 #include <cstring>
+#include <mutex>
 
 namespace EmbeddedTerminal
 {
@@ -13,8 +14,12 @@ namespace EmbeddedTerminal
         StorageSystem() = default;
         ~StorageSystem() override = default;
 
-        bool mountMedia(IStorageMedia *media, const Path &mountPoint) override
+        bool mountMedia(std::shared_ptr<IStorageMedia> media, const Path &mountPoint) override
         {
+            std::lock_guard<std::mutex> guard(mountMutex_);
+            if (!media)
+                return false;
+
             if (mountPoints_.find(mountPoint) != mountPoints_.end())
                 return false;
             mountPoints_[mountPoint] = media;
@@ -23,12 +28,14 @@ namespace EmbeddedTerminal
 
         bool unmountMedia(const ETString &name) override
         {
-            // Find mount point by media name
+            std::lock_guard<std::mutex> guard(mountMutex_);
+            // Find mount point by media name and erase directly while holding the lock
             for (auto it = mountPoints_.begin(); it != mountPoints_.end(); ++it)
             {
-                if (strcmp(it->second->name(), name.c_str()) == 0)
+                if (it->second && strcmp(it->second->name(), name.c_str()) == 0)
                 {
-                    return unmountMediaFromMountpoint(it->first);
+                    mountPoints_.erase(it);
+                    return true;
                 }
             }
             return false;
@@ -36,37 +43,40 @@ namespace EmbeddedTerminal
 
         bool unmountMediaFromMountpoint(const Path &mountPoint) override
         {
+            std::lock_guard<std::mutex> guard(mountMutex_);
             return mountPoints_.erase(mountPoint) > 0;
         }
 
-        ETVector<IStorageMedia *> media() const override
+        ETVector<std::shared_ptr<IStorageMedia>> media() const override
         {
-            ETVector<IStorageMedia *> result;
+            std::lock_guard<std::mutex> guard(mountMutex_);
+            ETVector<std::shared_ptr<IStorageMedia>> result;
             for (const auto &kv : mountPoints_)
                 result.push_back(kv.second);
             return result;
         }
 
-        IStorageMedia *getMedia(const ETString &name) const override
+        std::shared_ptr<IStorageMedia> getMedia(const ETString &name) const override
         {
+            std::lock_guard<std::mutex> guard(mountMutex_);
             // Find media mount point by media name
             for (const auto &kv : mountPoints_)
             {
-                if (strcmp(kv.second->name(), name.c_str()) == 0)
+                if (kv.second && strcmp(kv.second->name(), name.c_str()) == 0)
                     return kv.second;
             }
             return nullptr;
         }
-        IStorageMedia *getMediaFromPath(const Path &path) const override
+        std::shared_ptr<IStorageMedia> getMediaFromPath(const Path &path) const override
         {
+            std::lock_guard<std::mutex> guard(mountMutex_);
             Path p = path;
             if (!p.isAbsolute())
             {
                 p = Path("/") + p; // Make it absolute for easier matching
             }
-
             const Path *longestMatch = nullptr;
-            IStorageMedia *found = nullptr;
+            std::shared_ptr<IStorageMedia> found = nullptr;
             for (const auto &kv : mountPoints_)
             {
                 Path prefix = kv.first + "/";
@@ -173,9 +183,13 @@ namespace EmbeddedTerminal
             return fs->list(fsPath, prefix);
         }
 
+        // Configure maximum allowed copy size (in bytes). Default set in StorageSystem.cpp
+        static void setMaxCopySize(size_t bytes);
+        static size_t getMaxCopySize();
+
         bool copyFile(const Path &srcPath, const Path &dstPath) override
         {
-            // Booth src and dst must be valid and src have to exist and media must exist
+            // Both src and dst must be valid and src must exist and media must exist
             if (srcPath.isEmpty() || dstPath.isEmpty())
                 return false;
 
@@ -199,12 +213,38 @@ namespace EmbeddedTerminal
             ETFile srcFile = srcFS->open(srcFSPath, FILE_MODE_READ);
             if (!srcFile.isOpen())
                 return false;
-            auto content = srcFile.readAll();
-            srcFile.close();
+
+            // Optional size check to avoid OOM on constrained devices
+            size_t totalSize = srcFile.size();
+            size_t maxCopy = StorageSystem::getMaxCopySize();
+            if (totalSize > 0 && maxCopy > 0 && totalSize > maxCopy)
+            {
+                srcFile.close();
+                return false;
+            }
+
             ETFile dstFile = dstFS->open(dstFSPath, FILE_MODE_WRITE, true);
             if (!dstFile.isOpen())
+            {
+                srcFile.close();
                 return false;
-            bool ok = dstFile.writeAll(content);
+            }
+
+            const size_t CHUNK_SIZE = 4096;
+            std::vector<char> buffer(CHUNK_SIZE);
+            size_t readBytes = 0;
+            bool ok = true;
+            while ((readBytes = srcFile.read(buffer.data(), CHUNK_SIZE)) > 0)
+            {
+                size_t written = dstFile.write(buffer.data(), readBytes);
+                if (written != readBytes)
+                {
+                    ok = false;
+                    break;
+                }
+            }
+
+            srcFile.close();
             dstFile.close();
             return ok;
         }
@@ -234,17 +274,37 @@ namespace EmbeddedTerminal
          */
         Path stripMediaPrefix(const Path &path) const
         {
+            std::lock_guard<std::mutex> guard(mountMutex_);
+            const Path *longestMatch = nullptr;
             for (const auto &kv : mountPoints_)
             {
                 Path prefix = kv.first + "/";
-                if (path.isChildOf(prefix) == 0)
-                    return path.relativeTo(prefix);
+                if (path.isChildOf(prefix))
+                {
+                    if (!longestMatch)
+                    {
+                        longestMatch = &kv.first;
+                    }
+                    else
+                    {
+                        Path currentLongestPrefix = (*longestMatch) + "/";
+                        if (prefix.isChildOf(currentLongestPrefix))
+                            longestMatch = &kv.first;
+                    }
+                }
+            }
+            if (longestMatch)
+            {
+                Path prefix = (*longestMatch) + "/";
+                return path.relativeTo(prefix);
             }
             return path;
         }
 
     private:
-        ETMap<Path, IStorageMedia *> mountPoints_;
+        ETMap<Path, std::shared_ptr<IStorageMedia>> mountPoints_;
+        mutable std::mutex mountMutex_;
+        static size_t maxCopySize_;
     };
 }
 

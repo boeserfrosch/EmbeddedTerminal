@@ -174,7 +174,7 @@ void test_command_completer_suggestions(void)
 void test_filepath_completer_basic(void)
 {
     StorageSystem storage;
-    auto media = new MockStorageMedia("root", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    auto media = std::make_shared<MockStorageMedia>("root", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
     storage.mountMedia(media, "");
     storage.mkdir("/home");
     storage.mkdir("/bin");
@@ -214,7 +214,7 @@ void test_directory_completer_basic(void)
 {
     return;
     StorageSystem storage;
-    auto media = new MockStorageMedia("root", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    auto media = std::make_shared<MockStorageMedia>("root", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
     storage.mountMedia(media, "");
     storage.mkdir("/dir");
     storage.mkdir("/dir2");

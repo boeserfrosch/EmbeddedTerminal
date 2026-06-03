@@ -70,20 +70,20 @@ namespace EmbeddedTerminal
          * @brief Gets a list of all available storage media.
          * @return A vector of pointers to IStorageMedia objects representing the available storage media.
          */
-        virtual ETVector<IStorageMedia *> media() const = 0;
+        virtual ETVector<std::shared_ptr<IStorageMedia>> media() const = 0;
 
         /**
          * @brief Gets a specific storage media by name.
          * @param name The name of the storage media to retrieve.
          */
-        virtual IStorageMedia *getMedia(const ETString &name) const = 0;
+        virtual std::shared_ptr<IStorageMedia> getMedia(const ETString &name) const = 0;
 
         /**
          * @brief Gets the storage media associated with a specific path in the file system.
          * @param path The path to look up.
          * @return A pointer to the IStorageMedia associated with the given path, or nullptr if no media is associated with that path.
          */
-        virtual IStorageMedia *getMediaFromPath(const Path &path) const = 0;
+        virtual std::shared_ptr<IStorageMedia> getMediaFromPath(const Path &path) const = 0;
 
         /**
          * @brief Mounts a storage media to a specified mount point in the file system.
@@ -91,7 +91,7 @@ namespace EmbeddedTerminal
          * @param mountPoint The mount point in the file system where the media should be mounted.
          * @return True if the media was successfully mounted, false otherwise.
          */
-        virtual bool mountMedia(IStorageMedia *media, const Path &mountPoint) = 0;
+        virtual bool mountMedia(std::shared_ptr<IStorageMedia> media, const Path &mountPoint) = 0;
 
         /**
          * @brief Unmounts a storage media from the file system.

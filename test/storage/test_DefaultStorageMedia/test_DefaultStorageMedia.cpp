@@ -64,9 +64,9 @@ void test_native_suggested_storage_media_reports_space(void)
 void test_native_suggested_storage_media_mounts_in_storage_system(void)
 {
     StorageSystem storage;
-    NativeSuggestedStorageMedia media("native", ".");
+    auto media = std::make_shared<NativeSuggestedStorageMedia>("native", ".");
 
-    TEST_ASSERT_TRUE(storage.mountMedia(&media, ""));
+    TEST_ASSERT_TRUE(storage.mountMedia(media, ""));
     TEST_ASSERT_NOT_NULL(storage.getMedia("native"));
     TEST_ASSERT_TRUE(storage.exists("."));
 }

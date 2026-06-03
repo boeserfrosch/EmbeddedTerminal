@@ -15,24 +15,25 @@
 #include "StorageSystem.h"
 #include "../../Mocks/native/MockStorageMedia.h"
 #include "../utils.h"
+#include <memory>
 
 #include <unity.h>
 
 IStorageSystem *storage = nullptr;
+static std::shared_ptr<MockStorageMedia> media;
 
 void setUp(void)
 {
     storage = new StorageSystem();
-    auto media = new MockStorageMedia("mock", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
+    media = std::make_shared<MockStorageMedia>("mock", true, 1024 * 1024, 0, 1024 * 1024, 1024 * 1024, new MockFileSystem());
     storage->mountMedia(media, "/");
 }
 void tearDown(void)
 {
-    auto medias = storage->media();
-    for (auto media : medias)
+    if (media)
     {
         storage->unmountMedia(media->name());
-        delete media;
+        media.reset();
     }
     delete storage;
     storage = nullptr;
@@ -103,7 +104,7 @@ void test_cat_edge_cases(void)
     ETString arg2 = "did_not_exist.txt";
     TestCommandInvocationHandle invocationHandle2(keyword, {arg2});
     CommandResult result2 = cat.invoke(invocationHandle2.invocation);
-    TEST_ASSERT_TRUE(invocationHandle2.error.contains("did not exist!"));
+    TEST_ASSERT_TRUE(invocationHandle2.error.contains("did not exist"));
 }
 
 void test_cat_small_file_writes_stdout(void)
