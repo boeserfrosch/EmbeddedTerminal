@@ -97,8 +97,7 @@ void test_cat_edge_cases(void)
     EmbeddedTerminal::DirectoryNavigator dir(storage);
     EmbeddedTerminal::cmd::cat cat(dir);
     ETString keyword = "cat";
-    ETString arg = "   ";
-    TestCommandInvocationHandle invocationHandle(keyword, {arg});
+    TestCommandInvocationHandle invocationHandle(keyword);
     CommandResult result = cat.invoke(invocationHandle.invocation);
     TEST_ASSERT_TRUE(invocationHandle.output.contains(cat.usage(keyword)));
     ETString arg2 = "did_not_exist.txt";
