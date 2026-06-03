@@ -36,7 +36,8 @@ void test_download_basic(void)
     storage->open("/file.txt", "w", true).writeAll("hello1234"); // Small file
     EmbeddedTerminal::cmd::download download(dir);
 
-    auto iHandle = TestCommandInvocationHandle("download", {"file.txt"});
+    TestCommandInvocationHandle iHandle("download", {"file.txt"});
+    ;
     CommandResult result = download.invoke(iHandle.invocation);
     TEST_ASSERT_EQUAL(CommandExecutionState::Completed, result.state);
 
@@ -49,7 +50,8 @@ void test_download_invalid_path(void)
 {
     EmbeddedTerminal::DirectoryNavigator dir(storage);
     EmbeddedTerminal::cmd::download download(dir);
-    auto iHandle = TestCommandInvocationHandle("download", {});
+    TestCommandInvocationHandle iHandle("download", {});
+    ;
     CommandResult result = download.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains(download.usage("download")));
 }
@@ -58,7 +60,8 @@ void test_download_file_not_found(void)
 {
     EmbeddedTerminal::DirectoryNavigator dir(storage);
     EmbeddedTerminal::cmd::download download(dir);
-    auto iHandle = TestCommandInvocationHandle("download", {"nofile.txt"});
+    TestCommandInvocationHandle iHandle("download", {"nofile.txt"});
+    ;
     CommandResult result = download.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.error.contains("did not exist"));
     TEST_ASSERT_TRUE(iHandle.output.empty());
@@ -69,7 +72,8 @@ void test_download_is_directory(void)
     EmbeddedTerminal::DirectoryNavigator dir(storage);
     storage->mkdir("/mydir");
     EmbeddedTerminal::cmd::download download(dir);
-    auto iHandle = TestCommandInvocationHandle("download", {"mydir"});
+    TestCommandInvocationHandle iHandle("download", {"mydir"});
+    ;
     CommandResult result = download.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.error.contains("is a directory"));
     TEST_ASSERT_TRUE(iHandle.output.empty());
@@ -87,7 +91,8 @@ void test_download_streaming(void)
 
     EmbeddedTerminal::cmd::download download(dir);
 
-    auto iHandle = TestCommandInvocationHandle("download", {"bigfile.txt"});
+    TestCommandInvocationHandle iHandle("download", {"bigfile.txt"});
+    ;
     CommandResult result = download.invoke(iHandle.invocation);
 
     TEST_ASSERT_MESSAGE(iHandle.output.contains("SIZE 6000"), "Expected SIZE header with file size");
@@ -134,7 +139,8 @@ void test_download_streaming_error(void)
 {
     EmbeddedTerminal::DirectoryNavigator dir(storage);
     EmbeddedTerminal::cmd::download download(dir);
-    auto iHandle = TestCommandInvocationHandle("download", {"nofile.txt"});
+    TestCommandInvocationHandle iHandle("download", {"nofile.txt"});
+    ;
     CommandResult result = download.invoke(iHandle.invocation);
     TEST_ASSERT_MESSAGE(result.state == CommandExecutionState::Completed, "Expected state to be Completed on error");
     TEST_ASSERT_MESSAGE(result.exitCode != 0, "Expected non-zero exit code on error");

@@ -43,7 +43,8 @@ void test_ping_empty_target(void)
 
     EmbeddedTerminal::cmd::ping pingCmd(*network);
     ETString keyword = "ping";
-    auto iHandle = TestCommandInvocationHandle("ping");
+    TestCommandInvocationHandle iHandle("ping");
+    ;
     CommandResult result = pingCmd.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains(pingCmd.usage(keyword)));
 }
@@ -72,7 +73,8 @@ void test_ping_target_extraction(void)
     EmbeddedTerminal::cmd::ping pingCmd(*network);
     ETString keyword = "ping";
     ETString additional = "8.8.8.8 extra arguments";
-    auto iHandle = TestCommandInvocationHandle("ping", {"8.8.8.8", "extra", "arguments"});
+    TestCommandInvocationHandle iHandle("ping", {"8.8.8.8", "extra", "arguments"});
+    ;
 
     CommandResult result = pingCmd.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains("8.8.8.8"));
@@ -87,7 +89,8 @@ void test_ping_localhost_success(void)
 
     EmbeddedTerminal::cmd::ping pingCmd(*network);
     ETString keyword = "ping";
-    auto iHandle = TestCommandInvocationHandle("ping", {"localhost"});
+    TestCommandInvocationHandle iHandle("ping", {"localhost"});
+    ;
     CommandResult result = pingCmd.invoke(iHandle.invocation);
 
     // Mock return s success for localhost
@@ -104,7 +107,8 @@ void test_ping_ipv4_address(void)
 
     EmbeddedTerminal::cmd::ping pingCmd(*network);
     ETString keyword = "ping";
-    auto iHandle = TestCommandInvocationHandle("ping", {"192.168.1.1"});
+    TestCommandInvocationHandle iHandle("ping", {"192.168.1.1"});
+    ;
     CommandResult result = pingCmd.invoke(iHandle.invocation);
 
     TEST_ASSERT_TRUE(iHandle.output.contains("192.168.1.1"));
@@ -120,7 +124,8 @@ void test_ping_unreachable_host(void)
 
     EmbeddedTerminal::cmd::ping pingCmd(*network);
     ETString keyword = "ping";
-    auto iHandle = TestCommandInvocationHandle("ping", {"10.255.255.255"}); // Mock return s unreachable
+    TestCommandInvocationHandle iHandle("ping", {"10.255.255.255"});
+    ; // Mock return s unreachable
     CommandResult result = pingCmd.invoke(iHandle.invocation);
 
     TEST_ASSERT_TRUE(iHandle.output.contains("not reachable"));
@@ -135,7 +140,8 @@ void test_ping_invalid_host(void)
 
     EmbeddedTerminal::cmd::ping pingCmd(*network);
     ETString keyword = "ping";
-    auto iHandle = TestCommandInvocationHandle("ping", {"invalid"});
+    TestCommandInvocationHandle iHandle("ping", {"invalid"});
+    ;
     CommandResult result = pingCmd.invoke(iHandle.invocation);
 
     TEST_ASSERT_TRUE(iHandle.output.contains("not reachable"));
@@ -151,7 +157,8 @@ void test_ping_response_includes_statistics(void)
     EmbeddedTerminal::cmd::ping pingCmd(*network);
     ETString keyword = "ping";
     ETString additional = "8.8.8.8";
-    auto iHandle = TestCommandInvocationHandle("ping", {"8.8.8.8"});
+    TestCommandInvocationHandle iHandle("ping", {"8.8.8.8"});
+    ;
     CommandResult result = pingCmd.invoke(iHandle.invocation);
     // Mock ping includes statistics
 
@@ -165,7 +172,8 @@ void test_ping_execute_writes_stdout(void)
 
     EmbeddedTerminal::cmd::ping pingCmd(*network);
 
-    auto iHandle = TestCommandInvocationHandle("ping", {"localhost"});
+    TestCommandInvocationHandle iHandle("ping", {"localhost"});
+    ;
     CommandResult result = pingCmd.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);

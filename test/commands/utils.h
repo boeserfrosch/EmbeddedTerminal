@@ -1,5 +1,5 @@
 #include "interfaces/ICommandRuntime.h"
-#include "../../Mocks/MockTerminal.h"
+#include "../Mocks/MockTerminal.h"
 
 namespace EmbeddedTerminal
 {

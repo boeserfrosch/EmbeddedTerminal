@@ -28,31 +28,31 @@ void test_cleanupLine()
     ETString s4 = "abc\b\b\b";    // should become ""
     ETString s5 = "a\b\b\b\b";    // should become ""
 
-    TEST_ASSERT_EQUAL_STRING(s1.cleanupString().c_str(), "acd");
-    TEST_ASSERT_EQUAL_STRING(s2.cleanupString().c_str(), "def");
-    TEST_ASSERT_EQUAL_STRING(s3.cleanupString().c_str(), "abc");
-    TEST_ASSERT_EQUAL_STRING(s4.cleanupString().c_str(), "");
-    TEST_ASSERT_EQUAL_STRING(s5.cleanupString().c_str(), "");
+    TEST_ASSERT_EQUAL_STRING("acd", s1.cleanupString().c_str());
+    TEST_ASSERT_EQUAL_STRING("def", s2.cleanupString().c_str());
+    TEST_ASSERT_EQUAL_STRING("abc", s3.cleanupString().c_str());
+    TEST_ASSERT_EQUAL_STRING("", s4.cleanupString().c_str());
+    TEST_ASSERT_EQUAL_STRING("", s5.cleanupString().c_str());
 
     // Left arrow: ab\x1B[Dcd (move left, insert c, insert d) -> acdb
     ETString s6 = "ab\x1B[Dcd";
-    TEST_ASSERT_EQUAL_STRING(s6.cleanupString().c_str(), "acdb");
+    TEST_ASSERT_EQUAL_STRING("acdb", s6.cleanupString().c_str());
 
     // Right arrow: ab\x1B[Dcd\x1B[Cef (move left, insert c, d, move right, insert e, f) -> acdbef
     ETString s7 = "ab\x1B[Dcd\x1B[Cef";
-    TEST_ASSERT_EQUAL_STRING(s7.cleanupString().c_str(), "acdbef");
+    TEST_ASSERT_EQUAL_STRING("acdbef", s7.cleanupString().c_str());
 
     // Home: abcd\x1B[Hxy (move to start, insert x, y) -> xyabcd
     ETString s8 = "abcd\x1B[Hxy";
-    TEST_ASSERT_EQUAL_STRING(s8.cleanupString().c_str(), "xyabcd");
+    TEST_ASSERT_EQUAL_STRING("xyabcd", s8.cleanupString().c_str());
 
     // End: abcd\x1B[Fxy (move to end, insert x, y) -> abcdxy
     ETString s9 = "abcd\x1B[Fxy";
-    TEST_ASSERT_EQUAL_STRING(s9.cleanupString().c_str(), "abcdxy");
+    TEST_ASSERT_EQUAL_STRING("abcdxy", s9.cleanupString().c_str());
 
     // Combination: abcd\x1B[Hxy\x1B[Fz (move to start, insert x, y, move to end, insert z) -> xyabcdz
     ETString s10 = "abcd\x1B[Hxy\x1B[Fz";
-    TEST_ASSERT_EQUAL_STRING(s10.cleanupString().c_str(), "xyabcdz");
+    TEST_ASSERT_EQUAL_STRING("xyabcdz", s10.cleanupString().c_str());
 }
 
 void test_back_push_pop_back()

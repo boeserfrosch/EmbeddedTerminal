@@ -41,7 +41,8 @@ void test_pwd_returns_root_directory(void)
 {
     cmd::pwd pwd(*dir);
     ETString keyword = "pwd";
-    auto iHandle = TestCommandInvocationHandle("pwd");
+    TestCommandInvocationHandle iHandle("pwd");
+    ;
     CommandResult result = pwd.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains("/"));
 }
@@ -55,7 +56,8 @@ void test_pwd_returns_changed_directory(void)
     dir->cd("/home");
     ETString keyword = "pwd";
     ETString additional = "";
-    auto iHandle = TestCommandInvocationHandle("pwd");
+    TestCommandInvocationHandle iHandle("pwd");
+    ;
     CommandResult result = pwd.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains("home"));
 }
@@ -68,7 +70,8 @@ void test_pwd_ignores_additional_parameters(void)
     dir->cd("/test");
     ETString keyword = "pwd";
     ETString additional = "extra params that should be ignored";
-    auto iHandle = TestCommandInvocationHandle("pwd");
+    TestCommandInvocationHandle iHandle("pwd");
+    ;
     CommandResult result = pwd.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains("test"));
 }
@@ -93,7 +96,8 @@ void test_pwd_with_nested_directories(void)
     dir->cd("bin");
     ETString keyword = "pwd";
     ETString additional = "";
-    auto iHandle = TestCommandInvocationHandle("pwd");
+    TestCommandInvocationHandle iHandle("pwd");
+    ;
     CommandResult result = pwd.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains("bin"));
 }
@@ -102,7 +106,8 @@ void test_pwd_returns_string_ending_with_newline(void)
 {
     cmd::pwd pwd(*dir);
     ETString keyword = "pwd";
-    auto iHandle = TestCommandInvocationHandle("pwd");
+    TestCommandInvocationHandle iHandle("pwd");
+    ;
     CommandResult result = pwd.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.endsWith("\n"));
 }
@@ -111,7 +116,8 @@ void test_pwd_execute_writes_stdout(void)
 {
     cmd::pwd pwd(*dir);
 
-    auto iHandle = TestCommandInvocationHandle("pwd");
+    TestCommandInvocationHandle iHandle("pwd");
+    ;
     CommandResult result = pwd.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);

@@ -25,7 +25,8 @@ void test_gpio_list_contains_known_pins(void)
     MockGpioPolicy policy;
     cmd::gpio gpioCmd(gpioHw, policy);
 
-    auto iHandle = TestCommandInvocationHandle("gpio", {"list"});
+    TestCommandInvocationHandle iHandle("gpio", {"list"});
+    ;
     auto result = gpioCmd.invoke(iHandle.invocation);
     TEST_ASSERT_EQUAL(0, result.exitCode);
 
@@ -39,12 +40,13 @@ void test_gpio_read_and_write(void)
     MockGpioPolicy policy;
     cmd::gpio gpioCmd(gpioHw, policy);
 
-    auto iHandle = TestCommandInvocationHandle("gpio", {"write", "2", "1"});
+    TestCommandInvocationHandle iHandle("gpio", {"write", "2", "1"});
+    ;
     CommandResult writeResult = gpioCmd.invoke(iHandle.invocation);
     TEST_ASSERT_EQUAL(0, writeResult.exitCode);
     TEST_ASSERT_TRUE(iHandle.output.contains("OK"));
 
-    auto iHandle2 = TestCommandInvocationHandle("gpio", {"read", "2"});
+    TestCommandInvocationHandle iHandle2("gpio", {"read", "2"});
     CommandResult readResult = gpioCmd.invoke(iHandle2.invocation);
     TEST_ASSERT_TRUE(iHandle2.output.contains("GPIO2=1"));
 }
@@ -65,7 +67,8 @@ void test_gpio_forced_exclusion_cannot_be_allowed(void)
 
     cmd::gpio gpioCmd(gpioHw, policy);
 
-    auto iHandle = TestCommandInvocationHandle("gpio", {"allow", "2"});
+    TestCommandInvocationHandle iHandle("gpio", {"allow", "2"});
+    ;
     CommandResult result = gpioCmd.invoke(iHandle.invocation);
     TEST_ASSERT_NOT_EQUAL(0, result.exitCode);
     TEST_ASSERT_TRUE(iHandle.error.contains("forced"));
@@ -78,12 +81,13 @@ void test_gpio_protected_exclusion_requires_authentication(void)
     MockGpioAuth auth;
     cmd::gpio gpioCmd(gpioHw, policy, &auth);
 
-    auto iHandle = TestCommandInvocationHandle("gpio", {"deny", "2", "write", "--protected"});
+    TestCommandInvocationHandle iHandle("gpio", {"deny", "2", "write", "--protected"});
+    ;
     CommandResult excludeResult = gpioCmd.invoke(iHandle.invocation);
     TEST_ASSERT_NOT_EQUAL(0, excludeResult.exitCode);
     TEST_ASSERT_TRUE(iHandle.error.contains("Authentication required"));
 
-    auto authInvoke = TestCommandInvocationHandle("gpio", {"auth", "secret"});
+    TestCommandInvocationHandle authInvoke("gpio", {"auth", "secret"});
     TEST_ASSERT_FALSE(authInvoke.variables.find("gpio__authenticated") != authInvoke.variables.end());
     CommandResult authResult = gpioCmd.invoke(authInvoke.invocation);
     TEST_ASSERT_EQUAL(0, authResult.exitCode);

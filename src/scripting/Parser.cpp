@@ -613,6 +613,12 @@ Expression ScriptParser::buildCommandExpression(const token_list_t &tokens, size
                 index++; // Move index to the next token so that the caller can continue parsing from there after we return, even though we encountered an error with the current token. This allows the parser to skip over invalid tokens and attempt to parse the rest of the script, rather than getting stuck on the first error.
                 return Expression::createNil();
             }
+            if (!tokens[index].terminated)
+            {
+                error_ = ScriptParser::ErrorCode::UnexpectedEndOfInput;
+                index++; // Move index to the next token so that the caller can continue parsing from there after we return, even though we encountered an error with the current token. This allows the parser to skip over invalid tokens and attempt to parse the rest of the script, rather than getting stuck on the first error.
+                return Expression::createNil();
+            }
             argTokens.push_back(tokens[index]);
             index++;
             break;

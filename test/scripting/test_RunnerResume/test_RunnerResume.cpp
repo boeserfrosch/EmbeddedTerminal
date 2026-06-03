@@ -333,7 +333,7 @@ void test_runner_function_local_variables_dont_leak(void)
     TEST_ASSERT_EQUAL(1, variables.size());
 }
 
-int main()
+int process_tests()
 {
     UNITY_BEGIN();
     RUN_TEST(test_runner_handles_multiple_resume_states);
@@ -342,3 +342,26 @@ int main()
     UNITY_END();
     return 0;
 }
+
+#if (defined(ESP_PLATFORM) || defined(ESP32)) && !defined(ARDUINO)
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+extern "C" void app_main()
+{
+    vTaskDelay(pdMS_TO_TICKS(4000));
+    process_tests();
+}
+#elif defined(ARDUINO)
+void setup()
+{
+    delay(2500);
+    process_tests();
+}
+void loop() {}
+#else
+int main()
+{
+    process_tests();
+    return 0;
+}
+#endif

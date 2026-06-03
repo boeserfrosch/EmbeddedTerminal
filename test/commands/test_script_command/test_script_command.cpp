@@ -307,7 +307,8 @@ void test_script_command_resumes_running_subcommand(void)
     terminal.registerCommand("run", &run);
     terminal.registerCommand("collect", &collect);
 
-    auto iHandle = TestCommandInvocationHandle("script", {"/resume.et"});
+    TestCommandInvocationHandle iHandle("script", {"/resume.et"});
+    ;
 
     writeScriptFile(fs, "/resume.et", "run; collect done");
 

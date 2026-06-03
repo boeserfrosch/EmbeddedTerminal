@@ -42,7 +42,8 @@ void tearDown(void)
 void test_mkdir_valid_directory(void)
 {
     cmd::mkdir mkdir(*dir);
-    auto iHandle = TestCommandInvocationHandle("mkdir", {"newdir"});
+    TestCommandInvocationHandle iHandle("mkdir", {"newdir"});
+    ;
     CommandResult result = mkdir.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains("created"));
 }
@@ -50,7 +51,8 @@ void test_mkdir_valid_directory(void)
 void test_mkdir_existing_directory(void)
 {
     cmd::mkdir mkdir(*dir);
-    auto iHandle = TestCommandInvocationHandle("mkdir", {"existingdir"});
+    TestCommandInvocationHandle iHandle("mkdir", {"existingdir"});
+    ;
     CommandResult result = mkdir.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains("already exists"));
 }
@@ -67,7 +69,8 @@ void test_mkdir_edge_cases(void)
 {
     cmd::mkdir mkdir(*dir);
     ETString keyword = "mkdir";
-    auto iHandle = TestCommandInvocationHandle("mkdir");
+    TestCommandInvocationHandle iHandle("mkdir");
+    ;
     CommandResult result = mkdir.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains(mkdir.usage(keyword)));
 }
@@ -84,7 +87,8 @@ void test_mkdir_execute_writes_stdout(void)
 {
     cmd::mkdir mkdir(*dir);
 
-    auto iHandle = TestCommandInvocationHandle("mkdir", {"newdir"});
+    TestCommandInvocationHandle iHandle("mkdir", {"newdir"});
+    ;
     CommandResult result = mkdir.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);

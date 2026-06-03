@@ -40,7 +40,8 @@ void test_ip_valid(void)
     EmbeddedTerminal::cmd::ip ip(*network);
     ETString keyword = "ip";
 
-    auto iHandle = TestCommandInvocationHandle(keyword);
+    TestCommandInvocationHandle iHandle(keyword);
+    ;
     CommandResult result = ip.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains("192.168.1.123"));
     TEST_ASSERT_TRUE(iHandle.output.contains("UP"));
@@ -56,7 +57,8 @@ void test_no_interface(void)
 
     EmbeddedTerminal::cmd::ip ip(*network);
     ETString keyword = "ip";
-    auto iHandle = TestCommandInvocationHandle(keyword);
+    TestCommandInvocationHandle iHandle(keyword);
+    ;
     CommandResult result = ip.invoke(iHandle.invocation);
 
     TEST_ASSERT_TRUE(iHandle.output.contains("No interface available\n"));
@@ -68,7 +70,8 @@ void test_ip_not_connected(void)
     network->addInterface("test", new MockNetworkInterface(NetworkInfo("test", "", "", "", "", false)));
     EmbeddedTerminal::cmd::ip ip(*network);
     ETString keyword = "ip";
-    auto iHandle = TestCommandInvocationHandle(keyword);
+    TestCommandInvocationHandle iHandle(keyword);
+    ;
     CommandResult result = ip.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains("DOWN"));
 }
@@ -89,11 +92,12 @@ void test_ip_single_cases(void)
     network->addInterface("bar", new MockNetworkInterface(NetworkInfo("bar", "", "", "", "", false)));
     EmbeddedTerminal::cmd::ip ip(*network);
     ETString keyword = "ip";
-    auto iHandle = TestCommandInvocationHandle(keyword, {"-i", "bar"});
+    TestCommandInvocationHandle iHandle(keyword, {"-i", "bar"});
+    ;
     CommandResult result = ip.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains("bar"));
     TEST_ASSERT_FALSE(iHandle.output.contains("foo"));
-    auto iHandle2 = TestCommandInvocationHandle(keyword, {"--interface", "foo"});
+    TestCommandInvocationHandle iHandle2(keyword, {"--interface", "foo"});
     CommandResult result2 = ip.invoke(iHandle2.invocation);
     TEST_ASSERT_TRUE(iHandle2.output.contains("foo"));
     TEST_ASSERT_FALSE(iHandle2.output.contains("bar"));
@@ -106,7 +110,8 @@ void test_multiple_interfaces(void)
     EmbeddedTerminal::cmd::ip ip(*network);
     ETString keyword = "ip";
     ETString additional = "-i bar -i foo";
-    auto iHandle = TestCommandInvocationHandle(keyword, {"-i", "bar", "-i", "foo"});
+    TestCommandInvocationHandle iHandle(keyword, {"-i", "bar", "-i", "foo"});
+    ;
     CommandResult result = ip.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains("bar"));
     TEST_ASSERT_TRUE(iHandle.output.contains("foo"));
@@ -119,7 +124,8 @@ void test_unknown_iface(void)
     network->addInterface("bar", new MockNetworkInterface(NetworkInfo("bar", "", "", "", "", false)));
     EmbeddedTerminal::cmd::ip ip(*network);
     ETString keyword = "ip";
-    auto iHandle = TestCommandInvocationHandle(keyword, {"-i", "baz"});
+    TestCommandInvocationHandle iHandle(keyword, {"-i", "baz"});
+    ;
     CommandResult result = ip.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains("Unknown interface: baz"));
 }
@@ -130,7 +136,8 @@ void test_ip_execute_writes_stdout(void)
     network->addInterface("test", new MockNetworkInterface(NetworkInfo("test", "192.168.1.123", "", "", "", true)));
     EmbeddedTerminal::cmd::ip ip(*network);
 
-    auto iHandle = TestCommandInvocationHandle("ip");
+    TestCommandInvocationHandle iHandle("ip");
+    ;
     CommandResult result = ip.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);

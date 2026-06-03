@@ -328,6 +328,11 @@ namespace
             return content;
         }
 
+        printf("Failed to read fixture from any of the following paths:\n");
+        for (const auto &candidate : candidates)
+        {
+            printf("  %s\n", candidate.c_str());
+        }
         return "";
     }
 }
@@ -436,7 +441,9 @@ void test_script2_error_state_drives_buzzer_pattern(void)
 void process_tests()
 {
     UNITY_BEGIN();
+#if not defined(ESP_PLATFORM) && not defined(ESP32) && not defined(ARDUINO)
     RUN_TEST(test_script_fixtures_present_and_contain_expected_sections);
+#endif
     RUN_TEST(test_script2_startup_sequence_led_behavior);
     RUN_TEST(test_script2_button_press_starts_system);
     RUN_TEST(test_script2_button_press_stops_system);

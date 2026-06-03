@@ -46,7 +46,8 @@ void test_rm_valid_file(void)
     cmd::rm rm(*dir);
     ETString keyword = "rm";
     ETString arg = "file.txt";
-    auto iHandle = TestCommandInvocationHandle("rm", {arg});
+    TestCommandInvocationHandle iHandle("rm", {arg});
+    ;
     CommandResult result = rm.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains("removed"));
 }
@@ -56,7 +57,8 @@ void test_rm_nonexistent_file(void)
     cmd::rm rm(*dir);
     ETString keyword = "rm";
     ETString arg = "no_file.txt";
-    auto iHandle = TestCommandInvocationHandle("rm", {arg});
+    TestCommandInvocationHandle iHandle("rm", {arg});
+    ;
     CommandResult result = rm.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains("did not exist"));
 }
@@ -66,7 +68,8 @@ void test_rm_directory_instead_of_file(void)
     cmd::rm rm(*dir);
     ETString keyword = "rm";
     ETString arg = "dir1";
-    auto iHandle = TestCommandInvocationHandle("rm", {arg});
+    TestCommandInvocationHandle iHandle("rm", {arg});
+    ;
     CommandResult result = rm.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains("not a file"));
 }
@@ -83,7 +86,8 @@ void test_rm_edge_cases(void)
 {
     cmd::rm rm(*dir);
     ETString keyword = "rm";
-    auto iHandle = TestCommandInvocationHandle("rm");
+    TestCommandInvocationHandle iHandle("rm");
+    ;
     CommandResult result = rm.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains(rm.usage(keyword)));
 }
@@ -108,7 +112,8 @@ void test_rm_execute_writes_stdout(void)
 {
     cmd::rm rm(*dir);
 
-    auto iHandle = TestCommandInvocationHandle("rm", {"file.txt"});
+    TestCommandInvocationHandle iHandle("rm", {"file.txt"});
+    ;
     CommandResult result = rm.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);

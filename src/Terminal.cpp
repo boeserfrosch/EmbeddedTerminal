@@ -2,6 +2,9 @@
 // #include "TerminalParser.h"
 // #include "TerminalExecutor.h"
 // #include "scripting/Parser.h"
+#include "channels/BufferedInput.h"
+#include "channels/BufferedOutput.h"
+#include "channels/StreamChannel.h"
 #include "scripting/Runner.h"
 #include "lang/TokenUtils.h"
 #include <algorithm>
@@ -98,99 +101,15 @@ namespace EmbeddedTerminal
         }
 
     }
-    class StreamInputChannel : public IInputChannel
-    {
-    public:
-        StreamInputChannel(ITerminalStream &stream) : stream_(stream)
-        {
-        }
-
-        bool available() override
-        {
-            return stream_.available();
-        }
-
-        ETString readAll() override
-        {
-            return stream_.readAll();
-        }
-
-    private:
-        ITerminalStream &stream_;
-    };
-
-    class StreamOutputChannel : public IOutputChannel
-    {
-    public:
-        StreamOutputChannel(ITerminalStream &stream, TerminalChannel channel)
-            : stream_(stream), channel_(channel)
-        {
-        }
-
-        void print(const ETString &s) override
-        {
-            stream_.printTo(channel_, s);
-        }
-
-    private:
-        ITerminalStream &stream_;
-        TerminalChannel channel_;
-    };
-
-    class BufferedInputChannel : public IInputChannel
-    {
-    public:
-        BufferedInputChannel(const ETString &buffer) : buffer_(buffer), consumed_(false)
-        {
-        }
-
-        bool available() override
-        {
-            return !consumed_ && !buffer_.empty();
-        }
-
-        ETString readAll() override
-        {
-            if (consumed_)
-            {
-                return "";
-            }
-
-            consumed_ = true;
-            return buffer_;
-        }
-
-    private:
-        ETString buffer_;
-        bool consumed_;
-    };
-
-    class BufferedOutputChannel : public IOutputChannel
-    {
-    public:
-        void print(const ETString &s) override
-        {
-            buffer_ += s;
-        }
-
-        const ETString &buffer() const
-        {
-            return buffer_;
-        }
-
-    private:
-        ETString buffer_;
-    };
-
     Terminal::Terminal(ITerminalStream &input) : input_(input)
 #if defined(ARDUINO)
                                                  ,
                                                  ownedStream_(nullptr)
 #endif
     {
-        defaultInputChannel_ = std::make_unique<StreamInputChannel>(input_);
-        defaultOutputChannel_ = std::make_unique<StreamOutputChannel>(input_, TerminalChannel::StdOut);
-        defaultErrorChannel_ = std::make_unique<StreamOutputChannel>(input_, TerminalChannel::StdErr);
+        defaultInputChannel_ = std::make_unique<Channels::StreamInput>(input_);
+        defaultOutputChannel_ = std::make_unique<Channels::StreamOutput>(input_, TerminalChannel::StdOut);
+        defaultErrorChannel_ = std::make_unique<Channels::StreamOutput>(input_, TerminalChannel::StdErr);
         currentInputChannel_ = defaultInputChannel_.get();
         currentOutputChannel_ = defaultOutputChannel_.get();
         currentErrorChannel_ = defaultErrorChannel_.get();
@@ -201,9 +120,9 @@ namespace EmbeddedTerminal
     Terminal::Terminal(Stream &stream)
         : input_(*(ownedStream_ = new ArduinoStream(stream)))
     {
-        defaultInputChannel_ = std::make_unique<StreamInputChannel>(input_);
-        defaultOutputChannel_ = std::make_unique<StreamOutputChannel>(input_, TerminalChannel::StdOut);
-        defaultErrorChannel_ = std::make_unique<StreamOutputChannel>(input_, TerminalChannel::StdErr);
+        defaultInputChannel_ = std::make_unique<Channels::StreamInput>(input_);
+        defaultOutputChannel_ = std::make_unique<Channels::StreamOutput>(input_, TerminalChannel::StdOut);
+        defaultErrorChannel_ = std::make_unique<Channels::StreamOutput>(input_, TerminalChannel::StdErr);
         currentInputChannel_ = defaultInputChannel_.get();
         currentOutputChannel_ = defaultOutputChannel_.get();
         currentErrorChannel_ = defaultErrorChannel_.get();
@@ -892,9 +811,9 @@ namespace EmbeddedTerminal
             return;
         }
 
-        StreamInputChannel input(input_);
-        StreamOutputChannel output(input_, TerminalChannel::StdOut);
-        StreamOutputChannel error(input_, TerminalChannel::StdErr);
+        Channels::StreamInput input(input_);
+        Channels::StreamOutput output(input_, TerminalChannel::StdOut);
+        Channels::StreamOutput error(input_, TerminalChannel::StdErr);
 
         CommandResult result;
         if (resume)
@@ -924,9 +843,9 @@ namespace EmbeddedTerminal
             return CommandResult::completed(TerminalPredefinedResultCodes::COMMAND_NOT_FOUND);
         }
 
-        StreamInputChannel input(input_);
-        StreamOutputChannel output(input_, TerminalChannel::StdOut);
-        StreamOutputChannel error(input_, TerminalChannel::StdErr);
+        Channels::StreamInput input(input_);
+        Channels::StreamOutput output(input_, TerminalChannel::StdOut);
+        Channels::StreamOutput error(input_, TerminalChannel::StdErr);
         CommandContext context(sessionVariables_, lastExitCode_, true);
         CommandInvocation invocation{keyword, arguments, context, input, output, error};
         CommandResult result = command->resume(invocation);
@@ -1002,8 +921,8 @@ namespace EmbeddedTerminal
             return;
         }
 
-        StreamInputChannel streamInput(input_);
-        StreamOutputChannel error(input_, TerminalChannel::StdErr);
+        Channels::StreamInput streamInput(input_);
+        Channels::StreamOutput error(input_, TerminalChannel::StdErr);
         ETString pipedStdout;
         ETString redirectedInputContent;
 
@@ -1042,10 +961,10 @@ namespace EmbeddedTerminal
             }
 
             bool isLast = (index + 1 == keywords.size());
-            BufferedInputChannel bufferedInput(pipedStdout);
-            BufferedInputChannel redirectedInput(redirectedInputContent);
-            BufferedOutputChannel stageOutput;
-            StreamOutputChannel finalOutput(input_, TerminalChannel::StdOut);
+            Channels::BufferedInput bufferedInput(pipedStdout);
+            Channels::BufferedInput redirectedInput(redirectedInputContent);
+            Channels::BufferedOutput stageOutput;
+            Channels::StreamOutput finalOutput(input_, TerminalChannel::StdOut);
             ETVector<ETString> stageArguments = tokensToArguments_(arguments[index]);
 
             IInputChannel &input = (index == 0)
@@ -1067,7 +986,7 @@ namespace EmbeddedTerminal
 
             if (!isLast)
             {
-                pipedStdout = stageOutput.buffer();
+                pipedStdout = stageOutput.getBuffer();
             }
             else if (writeToFile)
             {
@@ -1087,7 +1006,7 @@ namespace EmbeddedTerminal
                     return;
                 }
 
-                if (!file.writeAll(stageOutput.buffer()))
+                if (!file.writeAll(stageOutput.getBuffer()))
                 {
                     file.close();
                     lastExitCode_ = TerminalPredefinedResultCodes::REDIRECTION_FAILED;

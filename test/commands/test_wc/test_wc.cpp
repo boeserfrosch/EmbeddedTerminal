@@ -49,7 +49,8 @@ void test_wc_trigger_file_counts(void)
     file.close();
 
     cmd::wc wcCmd(*dir);
-    auto iHandle = TestCommandInvocationHandle("wc", {"sample.txt"});
+    TestCommandInvocationHandle iHandle("wc", {"sample.txt"});
+    ;
     CommandResult result = wcCmd.invoke(iHandle.invocation);
     TEST_ASSERT_EQUAL(0, result.exitCode);
     TEST_ASSERT_TRUE(iHandle.output.contains("sample.txt:\t2\t3\t14\n"));
@@ -58,7 +59,8 @@ void test_wc_trigger_file_counts(void)
 void test_wc_trigger_missing_file(void)
 {
     cmd::wc wcCmd(*dir);
-    auto iHandle = TestCommandInvocationHandle("wc", {"missing.txt"});
+    TestCommandInvocationHandle iHandle("wc", {"missing.txt"});
+    ;
     CommandResult result = wcCmd.invoke(iHandle.invocation);
     TEST_ASSERT_EQUAL(1, result.exitCode);
 
@@ -76,7 +78,8 @@ void test_wc_execute_reads_stdin_when_no_file(void)
 {
     cmd::wc wcCmd(*dir);
 
-    auto iHandle = TestCommandInvocationHandle("wc");
+    TestCommandInvocationHandle iHandle("wc");
+    ;
     iHandle.input.print("hello world\nthis is a test\n");
     CommandResult result = wcCmd.invoke(iHandle.invocation);
 
@@ -96,7 +99,8 @@ void test_wc_execute_file_counts(void)
 
     cmd::wc wcCmd(*dir);
 
-    auto iHandle = TestCommandInvocationHandle("wc", {"file.txt"});
+    TestCommandInvocationHandle iHandle("wc", {"file.txt"});
+    ;
     CommandResult result = wcCmd.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);

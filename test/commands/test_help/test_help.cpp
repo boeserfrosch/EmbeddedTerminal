@@ -54,7 +54,8 @@ void test_help_valid_command(void)
     TestHelp help;
     ETString keyword = "help";
     ETString arg = "dummy";
-    auto iHandle = TestCommandInvocationHandle(keyword, {arg});
+    TestCommandInvocationHandle iHandle(keyword, {arg});
+    ;
     CommandResult result = help.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains("Dummy usage"));
 }
@@ -65,7 +66,8 @@ void test_help_invalid_command(void)
     ETString keyword = "help";
     ETString arg = "unknown";
 
-    auto iHandle = TestCommandInvocationHandle(keyword, {arg});
+    TestCommandInvocationHandle iHandle(keyword, {arg});
+    ;
     CommandResult result = help.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE_MESSAGE(iHandle.output.contains("Unknown command: 'unknown'"), iHandle.output.c_str());
 }
@@ -82,7 +84,8 @@ void test_help_edge_cases(void)
 {
     TestHelp help;
     ETString keyword = "help";
-    auto iHandle = TestCommandInvocationHandle(keyword, {});
+    TestCommandInvocationHandle iHandle(keyword, {});
+    ;
     CommandResult result = help.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE_MESSAGE(iHandle.output.contains("Available commands"), iHandle.output.c_str());
 }
@@ -92,7 +95,8 @@ void test_help_output_format(void)
     TestHelp help;
     ETString keyword = "help";
     ETString arg = "dummy";
-    auto iHandle = TestCommandInvocationHandle(keyword, {arg});
+    TestCommandInvocationHandle iHandle(keyword, {arg});
+    ;
     CommandResult result = help.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE_MESSAGE(iHandle.output.contains("Dummy usage"), iHandle.output.c_str());
 }
@@ -109,7 +113,8 @@ void test_help_execute_writes_stdout(void)
 {
     TestHelp help;
 
-    auto iHandle = TestCommandInvocationHandle("help", {"dummy"});
+    TestCommandInvocationHandle iHandle("help", {"dummy"});
+    ;
     CommandResult result = help.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);

@@ -25,7 +25,8 @@ void test_mockcommand_trigger()
     MockCommand cmd;
     ETString keyword = "foo";
     ETString additional = "bar";
-    auto iHandle = TestCommandInvocationHandle(keyword, {additional});
+    TestCommandInvocationHandle iHandle(keyword, {additional});
+    ;
     CommandResult result = cmd.invoke(iHandle.invocation);
 
     TEST_ASSERT_TRUE(iHandle.output.contains("foo bar"));

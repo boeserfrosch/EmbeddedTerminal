@@ -58,7 +58,8 @@ void test_tail_trigger_file_not_exists(void)
     cmd::tail tail(*dir);
     ETString keyword = "tail";
     ETString arg = "nofile.txt";
-    auto iHandle = TestCommandInvocationHandle("tail", {arg});
+    TestCommandInvocationHandle iHandle("tail", {arg});
+    ;
     CommandResult result = tail.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.error.contains("did not exist"));
 }
@@ -75,7 +76,8 @@ void test_tail_trigger_edge_cases(void)
 {
     cmd::tail tail(*dir);
     ETString keyword = "tail";
-    auto iHandle = TestCommandInvocationHandle("tail");
+    TestCommandInvocationHandle iHandle("tail");
+    ;
     CommandResult result = tail.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.error.contains("Invalid options"));
 }
@@ -103,7 +105,8 @@ void test_tail_streaming_execution(void)
     file.close();
 
     cmd::tail tail(*dir);
-    auto iHandle = TestCommandInvocationHandle("tail", {"file.txt"});
+    TestCommandInvocationHandle iHandle("tail", {"file.txt"});
+    ;
     auto result = tail.invoke(iHandle.invocation);
     TEST_ASSERT_MESSAGE(result.exitCode == 0, "Expected exit code to be 0");
 

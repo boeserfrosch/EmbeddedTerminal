@@ -41,7 +41,7 @@ void test_cd_trigger_valid_path(void)
     cmd::cd cd(dir);
     ETString keyword = "cd";
     ETString additional = "/valid";
-    auto invocationHandle = TestCommandInvocationHandle(keyword, {additional});
+    TestCommandInvocationHandle invocationHandle(keyword, {additional});
     CommandResult result = cd.invoke(invocationHandle.invocation);
     TEST_ASSERT_TRUE(invocationHandle.output.contains("> /valid"));
 }
@@ -52,7 +52,7 @@ void test_cd_trigger_invalid_path(void)
     cmd::cd cd(dir);
     ETString keyword = "cd";
     ETString additional = "/invalid";
-    auto invocationHandle = TestCommandInvocationHandle(keyword, {additional});
+    TestCommandInvocationHandle invocationHandle(keyword, {additional});
     CommandResult result = cd.invoke(invocationHandle.invocation);
     TEST_ASSERT_EQUAL(cmd::cd::ErrorCode::PathDoesNotExist, result.exitCode);
     TEST_ASSERT_TRUE(invocationHandle.error.contains("Path does not exist"));
@@ -60,7 +60,7 @@ void test_cd_trigger_invalid_path(void)
     // Test with a file path that is not a directory
     storage->open("/not_a_dir.txt", "w", true).writeAll("content");
     ETString filePath = "/not_a_dir.txt";
-    auto invocationHandle2 = TestCommandInvocationHandle(keyword, {filePath});
+    TestCommandInvocationHandle invocationHandle2(keyword, {filePath});
     CommandResult result2 = cd.invoke(invocationHandle2.invocation);
     TEST_ASSERT_EQUAL(cmd::cd::ErrorCode::PathNotDirectory, result2.exitCode);
     TEST_ASSERT_TRUE(invocationHandle2.error.contains("Path is not a directory"));
@@ -80,7 +80,7 @@ void test_cd_empty_keyword(void)
     DirectoryNavigator dir(storage);
     cmd::cd cd(dir);
     ETString keyword = "";
-    auto invocationHandle = TestCommandInvocationHandle(keyword, {});
+    TestCommandInvocationHandle invocationHandle(keyword, {});
     CommandResult result = cd.invoke(invocationHandle.invocation);
     TEST_ASSERT_TRUE(invocationHandle.output.contains(cd.usage(keyword)));
 }
@@ -99,31 +99,32 @@ void test_cd_pwd_cd_back_to_pwd(void)
     TEST_ASSERT_TRUE(dir.pwd().isRoot());
 
     // cd into folder
-    auto iHandle = TestCommandInvocationHandle("cd", {"folder"});
+    TestCommandInvocationHandle iHandle("cd", {"folder"});
+    ;
     CommandResult result = cd.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(dir.pwd() == "/folder");
     // cd into another
-    auto iHandle2 = TestCommandInvocationHandle("cd", {"another"});
+    TestCommandInvocationHandle iHandle2("cd", {"another"});
     CommandResult result2 = cd.invoke(iHandle2.invocation);
     TEST_ASSERT_TRUE(dir.pwd() == "/folder/another");
     // cd into deeper
-    auto iHandle3 = TestCommandInvocationHandle("cd", {"deeper"});
+    TestCommandInvocationHandle iHandle3("cd", {"deeper"});
     CommandResult result3 = cd.invoke(iHandle3.invocation);
     TEST_ASSERT_TRUE(dir.pwd() == "/folder/another/deeper");
     // cd back to another
-    auto iHandle4 = TestCommandInvocationHandle("cd", {".."});
+    TestCommandInvocationHandle iHandle4("cd", {".."});
     CommandResult result4 = cd.invoke(iHandle4.invocation);
     TEST_ASSERT_TRUE(dir.pwd() == "/folder/another");
     // cd back to folder
-    auto iHandle5 = TestCommandInvocationHandle("cd", {".."});
+    TestCommandInvocationHandle iHandle5("cd", {".."});
     CommandResult result5 = cd.invoke(iHandle5.invocation);
     TEST_ASSERT_TRUE(dir.pwd() == "/folder");
     // cd staying in folder
-    auto iHandle6 = TestCommandInvocationHandle("cd", {});
+    TestCommandInvocationHandle iHandle6("cd", {});
     CommandResult result6 = cd.invoke(iHandle6.invocation);
     TEST_ASSERT_TRUE(dir.pwd() == "/folder");
     // cd back to root
-    auto iHandle7 = TestCommandInvocationHandle("cd", {"/"});
+    TestCommandInvocationHandle iHandle7("cd", {"/"});
     CommandResult result7 = cd.invoke(iHandle7.invocation);
     TEST_ASSERT_TRUE(dir.pwd() == "/");
     TEST_ASSERT_TRUE(dir.pwd().isRoot());
@@ -182,7 +183,7 @@ void test_cd_stream_output_on_execute(void)
     ETString keyword = "cd";
     ETVector<ETString> arg = {"folder"};
 
-    auto invocationHandle = TestCommandInvocationHandle(keyword, arg);
+    TestCommandInvocationHandle invocationHandle(keyword, arg);
     CommandResult result = cd.invoke(invocationHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);
@@ -200,7 +201,8 @@ void test_cd_stream_output_on_execute_invalid_path(void)
     ETString keyword = "cd";
     ETVector<ETString> arg = {"nonexistent"};
 
-    auto iHandle = TestCommandInvocationHandle(keyword, arg);
+    TestCommandInvocationHandle iHandle(keyword, arg);
+    ;
     CommandResult result = cd.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(1, result.exitCode);
@@ -219,7 +221,8 @@ void test_cd_stream_output_on_execute_no_parameter(void)
     ETString keyword = "cd";
     ETVector<ETString> arg = {}; // No argument provided
 
-    auto iHandle = TestCommandInvocationHandle(keyword, arg);
+    TestCommandInvocationHandle iHandle(keyword, arg);
+    ;
     CommandResult result = cd.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(1, result.exitCode);
@@ -238,7 +241,8 @@ void test_cd_correct_error_codes_and_messages(void)
     ETString keyword = "cd";
     ETVector<ETString> arg = {}; // No argument provided
 
-    auto iHandle = TestCommandInvocationHandle(keyword, arg);
+    TestCommandInvocationHandle iHandle(keyword, arg);
+    ;
     CommandResult result = cd.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(1, result.exitCode);
@@ -246,7 +250,7 @@ void test_cd_correct_error_codes_and_messages(void)
 
     // Test with non-existent path
     arg = {"/nonexistent"};
-    auto iHandle2 = TestCommandInvocationHandle(keyword, arg);
+    TestCommandInvocationHandle iHandle2(keyword, arg);
     CommandResult result2 = cd.invoke(iHandle2.invocation);
 
     TEST_ASSERT_EQUAL(cmd::cd::ErrorCode::PathDoesNotExist, result2.exitCode);
@@ -254,14 +258,14 @@ void test_cd_correct_error_codes_and_messages(void)
 
     // Test with a file path that is not a directory
     arg = {"/test/file.txt"};
-    auto iHandle3 = TestCommandInvocationHandle(keyword, arg);
+    TestCommandInvocationHandle iHandle3(keyword, arg);
     CommandResult result3 = cd.invoke(iHandle3.invocation);
     TEST_ASSERT_EQUAL(cmd::cd::ErrorCode::PathNotDirectory, result3.exitCode);
     TEST_ASSERT_TRUE(iHandle3.error.contains("is not a directory"));
 
     // Test with valid path
     arg = {"/test"};
-    auto iHandle4 = TestCommandInvocationHandle(keyword, arg);
+    TestCommandInvocationHandle iHandle4(keyword, arg);
     CommandResult result4 = cd.invoke(iHandle4.invocation);
     TEST_ASSERT_EQUAL(cmd::cd::ErrorCode::None, result4.exitCode);
     TEST_ASSERT_TRUE(iHandle4.output.contains("> /test"));

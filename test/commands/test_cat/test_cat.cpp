@@ -46,10 +46,11 @@ void test_cat_small_file(void)
 
     ETString keyword = "cat";
     ETString arg = "file.txt";
-    auto invocationHandle = TestCommandInvocationHandle(keyword, {arg});
+    TestCommandInvocationHandle invocationHandle(keyword, {arg});
+    ;
     CommandResult result = cat.invoke(invocationHandle.invocation);
     TEST_ASSERT_EQUAL(CommandExecutionState::Completed, result.state);
-    TEST_ASSERT_TRUE(invocationHandle.output.contains("hello1234") != ETString::npos);
+    TEST_ASSERT_TRUE(invocationHandle.output.contains("hello1234"));
 }
 
 void test_cat_large_file(void)
@@ -63,7 +64,7 @@ void test_cat_large_file(void)
     EmbeddedTerminal::cmd::cat cat(dir);
     ETString keyword = "cat";
     ETString arg = "big.txt";
-    auto invocationHandle = TestCommandInvocationHandle(keyword, {arg});
+    TestCommandInvocationHandle invocationHandle(keyword, {arg});
     CommandResult result = cat.invoke(invocationHandle.invocation);
     TEST_ASSERT_TRUE(dir.exists("/big.txt"));
     TEST_ASSERT_TRUE(dir.exists("big.txt"));
@@ -77,9 +78,9 @@ void test_cat_file_not_exists(void)
 
     ETString keyword = "cat";
     ETString arg = "nofile.txt";
-    auto invocationHandle = TestCommandInvocationHandle(keyword, {arg});
+    TestCommandInvocationHandle invocationHandle(keyword, {arg});
     CommandResult result = cat.invoke(invocationHandle.invocation);
-    TEST_ASSERT_TRUE(invocationHandle.error.contains("did not exist!") != ETString::npos);
+    TEST_ASSERT_TRUE(invocationHandle.error.contains("did not exist!"));
 }
 
 void test_cat_usage(void)
@@ -97,13 +98,13 @@ void test_cat_edge_cases(void)
     EmbeddedTerminal::cmd::cat cat(dir);
     ETString keyword = "cat";
     ETString arg = "   ";
-    auto invocationHandle = TestCommandInvocationHandle(keyword, {arg});
+    TestCommandInvocationHandle invocationHandle(keyword, {arg});
     CommandResult result = cat.invoke(invocationHandle.invocation);
-    TEST_ASSERT_TRUE(invocationHandle.output.contains(cat.usage(keyword)) != ETString::npos);
+    TEST_ASSERT_TRUE(invocationHandle.output.contains(cat.usage(keyword)));
     ETString arg2 = "did_not_exist.txt";
-    auto invocationHandle2 = TestCommandInvocationHandle(keyword, {arg2});
+    TestCommandInvocationHandle invocationHandle2(keyword, {arg2});
     CommandResult result2 = cat.invoke(invocationHandle2.invocation);
-    TEST_ASSERT_TRUE(invocationHandle2.error.contains("did not exist!") != ETString::npos);
+    TEST_ASSERT_TRUE(invocationHandle2.error.contains("did not exist!"));
 }
 
 void test_cat_small_file_writes_stdout(void)
@@ -115,11 +116,11 @@ void test_cat_small_file_writes_stdout(void)
     ETString keyword = "cat";
     ETVector<ETString> arg = {"file.txt"};
 
-    auto invocationHandle = TestCommandInvocationHandle(keyword, arg);
+    TestCommandInvocationHandle invocationHandle(keyword, arg);
     CommandResult result = cat.invoke(invocationHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);
-    TEST_ASSERT_TRUE(invocationHandle.output.contains("hello1234") != ETString::npos);
+    TEST_ASSERT_TRUE(invocationHandle.output.contains("hello1234"));
     TEST_ASSERT_TRUE(invocationHandle.error.empty());
 }
 
@@ -131,11 +132,11 @@ void test_cat_missing_file_writes_stderr(void)
     ETString keyword = "cat";
     ETVector<ETString> arg = {"missing.txt"};
 
-    auto invocationHandle = TestCommandInvocationHandle(keyword, arg);
+    TestCommandInvocationHandle invocationHandle(keyword, arg);
     CommandResult result = cat.invoke(invocationHandle.invocation);
 
     TEST_ASSERT_EQUAL(2, result.exitCode);
-    TEST_ASSERT_TRUE(invocationHandle.error.contains("did not exist") != ETString::npos);
+    TEST_ASSERT_TRUE(invocationHandle.error.contains("did not exist"));
     TEST_ASSERT_TRUE(invocationHandle.output.empty());
 }
 
@@ -188,7 +189,7 @@ void test_cat_execute_streaming_simple(void)
 
     EmbeddedTerminal::cmd::cat cat(dir);
     // First invocation
-    auto invocationHandle = TestCommandInvocationHandle("cat", {"large.txt"});
+    TestCommandInvocationHandle invocationHandle("cat", {"large.txt"});
     CommandResult result1 = cat.invoke(invocationHandle.invocation);
 
     TEST_ASSERT_EQUAL(CommandExecutionState::Running, result1.state);

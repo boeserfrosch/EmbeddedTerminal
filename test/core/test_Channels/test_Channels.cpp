@@ -3,7 +3,6 @@
 #include "../../../src/channels/BufferedInput.h"
 #include "../../../src/channels/BufferedOutput.h"
 #include "../../../src/channels/BufferedInOut.h"
-#include "../../../src/channels/TeeOutput.h"
 #include "../../../src/channels/FileInput.h"
 #include "../../../src/channels/FileOutput.h"
 #include "../../Mocks/MockStream.h"
@@ -172,63 +171,6 @@ void test_buffered_inout_available_tracking(void)
     TEST_ASSERT_TRUE(io.available());
 }
 
-// ===== TeeOutput Tests =====
-
-void test_tee_output_forwards_and_captures(void)
-{
-    MockStream stream;
-    ETString capture;
-
-    // StdOut
-    {
-        TeeOutput tee(stream, TerminalChannel::StdOut, capture);
-        tee.print("one");
-    }
-    TEST_ASSERT_TRUE(capture.find("one") != ETString::npos);
-    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("one") != ETString::npos);
-
-    // StdErr
-    {
-        TeeOutput teeErr(stream, TerminalChannel::StdErr, capture);
-        teeErr.print("err");
-    }
-    TEST_ASSERT_TRUE(capture.find("err") != ETString::npos);
-    TEST_ASSERT_TRUE(stream.stderrBuffer.find("err") != ETString::npos);
-}
-
-void test_tee_output_multiple_prints(void)
-{
-    MockStream stream;
-    ETString capture;
-    TeeOutput tee(stream, TerminalChannel::StdOut, capture);
-
-    tee.print("first");
-    tee.print(" ");
-    tee.print("second");
-
-    TEST_ASSERT_EQUAL_STRING("first second", capture.c_str());
-    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("first") != ETString::npos);
-    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("second") != ETString::npos);
-}
-
-void test_tee_output_fanout_to_multiple_tees(void)
-{
-    MockStream stream;
-    ETString capture1, capture2;
-
-    TeeOutput tee1(stream, TerminalChannel::StdOut, capture1);
-    tee1.print("data1");
-
-    TeeOutput tee2(stream, TerminalChannel::StdErr, capture2);
-    tee2.print("data2");
-
-    TEST_ASSERT_EQUAL_STRING("data1", capture1.c_str());
-    TEST_ASSERT_EQUAL_STRING("data2", capture2.c_str());
-
-    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("data1") != ETString::npos);
-    TEST_ASSERT_TRUE(stream.stderrBuffer.find("data2") != ETString::npos);
-}
-
 // ===== FileInput Tests =====
 
 void test_file_input_basic_read(void)
@@ -361,7 +303,7 @@ void test_file_io_write_then_read(void)
     TEST_ASSERT_EQUAL_STRING("test data", result.c_str());
 }
 
-int main()
+int process_tests()
 {
     UNITY_BEGIN();
 
@@ -383,11 +325,6 @@ int main()
     RUN_TEST(test_buffered_inout_interleaved_write_read);
     RUN_TEST(test_buffered_inout_available_tracking);
 
-    // TeeOutput tests
-    RUN_TEST(test_tee_output_forwards_and_captures);
-    RUN_TEST(test_tee_output_multiple_prints);
-    RUN_TEST(test_tee_output_fanout_to_multiple_tees);
-
     // FileInput tests
     RUN_TEST(test_file_input_basic_read);
     RUN_TEST(test_file_input_empty_file);
@@ -406,3 +343,26 @@ int main()
     UNITY_END();
     return 0;
 }
+
+#if (defined(ESP_PLATFORM) || defined(ESP32)) && !defined(ARDUINO)
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+extern "C" void app_main()
+{
+    vTaskDelay(pdMS_TO_TICKS(4000));
+    process_tests();
+}
+#elif defined(ARDUINO)
+void setup()
+{
+    delay(2500);
+    process_tests();
+}
+void loop() {}
+#else
+int main()
+{
+    process_tests();
+    return 0;
+}
+#endif

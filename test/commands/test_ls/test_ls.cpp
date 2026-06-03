@@ -49,7 +49,8 @@ void test_ls_valid_directory(void)
 {
     cmd::ls ls(*dir);
     ETString keyword = "ls";
-    auto iHandle = TestCommandInvocationHandle("ls", {"-l", "dir2"});
+    TestCommandInvocationHandle iHandle("ls", {"-l", "dir2"});
+    ;
     CommandResult result = ls.invoke(iHandle.invocation);
     TEST_ASSERT_EQUAL(0, result.exitCode);
     // Should show foo.txt with details (simulate long listing)
@@ -63,7 +64,8 @@ void test_ls_edge_cases(void)
 {
     cmd::ls ls(*dir);
     ETString keyword = "ls";
-    auto iHandle = TestCommandInvocationHandle("ls");
+    TestCommandInvocationHandle iHandle("ls");
+    ;
     CommandResult result = ls.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains("file.txt"));
 }
@@ -73,7 +75,8 @@ void test_ls_output_format(void)
     cmd::ls ls(*dir);
     ETString keyword = "ls";
     ETString arg = "dir3";
-    auto iHandle = TestCommandInvocationHandle("ls", {"dir3"});
+    TestCommandInvocationHandle iHandle("ls", {"dir3"});
+    ;
     CommandResult result = ls.invoke(iHandle.invocation);
 
     // The order is not garuanteed
@@ -87,7 +90,8 @@ void test_ls_flag_l(void)
     cmd::ls ls(*dir);
     ETString keyword = "ls";
     ETString arg = "-l dir2";
-    auto iHandle = TestCommandInvocationHandle("ls", {"-l", "dir2"});
+    TestCommandInvocationHandle iHandle("ls", {"-l", "dir2"});
+    ;
     CommandResult result = ls.invoke(iHandle.invocation);
     // Should show foo.txt with details (simulate long listing)
     TEST_ASSERT_TRUE(iHandle.output.contains("foo.txt"));
@@ -101,7 +105,8 @@ void test_ls_nonexistent_directory(void)
     cmd::ls ls(*dir);
     ETString keyword = "ls";
     ETString arg = "non_exist";
-    auto iHandle = TestCommandInvocationHandle("ls", {"non_exist"});
+    TestCommandInvocationHandle iHandle("ls", {"non_exist"});
+    ;
     CommandResult result = ls.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains("is not a directory"));
 }
@@ -110,7 +115,8 @@ void test_ls_execute_writes_stdout(void)
 {
     cmd::ls ls(*dir);
 
-    auto iHandle = TestCommandInvocationHandle("ls", {"dir2"});
+    TestCommandInvocationHandle iHandle("ls", {"dir2"});
+    ;
     CommandResult result = ls.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);

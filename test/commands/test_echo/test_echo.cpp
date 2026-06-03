@@ -19,7 +19,8 @@ void tearDown(void) {}
 void test_echo_with_text(void)
 {
     cmd::echo echoCmd;
-    auto iHandle = TestCommandInvocationHandle("echo", {"hello world"});
+    TestCommandInvocationHandle iHandle("echo", {"hello world"});
+    ;
     echoCmd.invoke(iHandle.invocation);
     TEST_ASSERT_EQUAL_STRING("hello world\n", iHandle.output.debugOutput.c_str());
 }
@@ -27,7 +28,8 @@ void test_echo_with_text(void)
 void test_echo_empty_text(void)
 {
     cmd::echo echoCmd;
-    auto iHandle = TestCommandInvocationHandle("echo", {""});
+    TestCommandInvocationHandle iHandle("echo", {""});
+    ;
     CommandResult result = echoCmd.invoke(iHandle.invocation);
     TEST_ASSERT_EQUAL_STRING("\n", iHandle.output.debugOutput.c_str());
 }
@@ -43,7 +45,8 @@ void test_echo_execute_writes_stdout(void)
 {
     cmd::echo echoCmd;
 
-    auto iHandle = TestCommandInvocationHandle("echo", {"embedded terminal"});
+    TestCommandInvocationHandle iHandle("echo", {"embedded terminal"});
+    ;
     CommandResult result = echoCmd.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);

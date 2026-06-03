@@ -46,7 +46,8 @@ void test_xxd_trigger_small_file(void)
 
     ETString keyword = "xxd";
     ETString arg = "file.txt";
-    auto iHandle = TestCommandInvocationHandle(keyword, {arg});
+    TestCommandInvocationHandle iHandle(keyword, {arg});
+    ;
     CommandResult result = xxd.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains("68 65 6C 6C 6F 31 32 33 34")); // Hex for "hello123"
 }
@@ -67,7 +68,8 @@ void test_xxd_trigger_large_file(void)
     EmbeddedTerminal::cmd::xxd xxd(*dir);
     ETString keyword = "xxd";
     ETString arg = "big.txt";
-    auto iHandle = TestCommandInvocationHandle(keyword, {arg});
+    TestCommandInvocationHandle iHandle(keyword, {arg});
+    ;
 
     CommandResult result = xxd.invoke(iHandle.invocation);
     TEST_ASSERT_EQUAL(CommandExecutionState::Running, result.state); // Should be running since we read 512 bytes and not truncate
@@ -93,7 +95,8 @@ void test_xxd_trigger_file_not_exists(void)
 
     ETString keyword = "xxd";
     ETString arg = "nofile.txt";
-    auto iHandle = TestCommandInvocationHandle(keyword, {arg});
+    TestCommandInvocationHandle iHandle(keyword, {arg});
+    ;
     CommandResult result = xxd.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.error.contains("file not found"));
 }
@@ -112,13 +115,14 @@ void test_xxd_trigger_edge_cases(void)
     EmbeddedTerminal::cmd::xxd xxd(*dir);
 
     // Test empty path
-    auto iHandle = TestCommandInvocationHandle("xxd");
+    TestCommandInvocationHandle iHandle("xxd");
+    ;
     CommandResult result = xxd.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains(xxd.usage("xxd")));
 
     // Test directory instead of file
     storage->mkdir("/dir");
-    auto iHandle2 = TestCommandInvocationHandle("xxd", {"dir"});
+    TestCommandInvocationHandle iHandle2("xxd", {"dir"});
     CommandResult result2 = xxd.invoke(iHandle2.invocation);
     TEST_ASSERT_TRUE(iHandle2.error.contains("path points to a directory"));
 }
@@ -161,7 +165,8 @@ void test_xxd_execute_missing_file_writes_stderr(void)
 {
     EmbeddedTerminal::cmd::xxd xxd(*dir);
 
-    auto iHandle = TestCommandInvocationHandle("xxd", {"nofile.txt"});
+    TestCommandInvocationHandle iHandle("xxd", {"nofile.txt"});
+    ;
     CommandResult result = xxd.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(EmbeddedTerminal::cmd::xxd::ErrorCode::FILE_NOT_FOUND, result.exitCode);
@@ -332,7 +337,8 @@ void test_xxd_execute_quit_key_completes(void)
     storage->open("/quit.bin", "w", true).writeAll("0123456789ABCDEF");
     EmbeddedTerminal::cmd::xxd xxd(*dir);
 
-    auto iHandle = TestCommandInvocationHandle("xxd", {"quit.bin"});
+    TestCommandInvocationHandle iHandle("xxd", {"quit.bin"});
+    ;
     xxd.invoke(iHandle.invocation);
 
     iHandle.input.print("q");

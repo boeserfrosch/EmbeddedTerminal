@@ -47,7 +47,8 @@ void test_rmdir_valid_directory(void)
     cmd::rmdir rmdir(*dir);
     ETString keyword = "rmdir";
     ETString arg = "dir1";
-    auto iHandle = TestCommandInvocationHandle("rmdir", {arg});
+    TestCommandInvocationHandle iHandle("rmdir", {arg});
+    ;
     rmdir.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains("removed"));
 }
@@ -57,7 +58,8 @@ void test_rmdir_nonexistent_directory(void)
     cmd::rmdir rmdir(*dir);
     ETString keyword = "rmdir";
     ETString arg = "no_dir";
-    auto iHandle = TestCommandInvocationHandle("rmdir", {arg});
+    TestCommandInvocationHandle iHandle("rmdir", {arg});
+    ;
     rmdir.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains("did not exist"));
 }
@@ -67,7 +69,8 @@ void test_rmdir_file_instead_of_directory(void)
     cmd::rmdir rmdir(*dir);
     ETString keyword = "rmdir";
     ETString arg = "file.txt";
-    auto iHandle = TestCommandInvocationHandle("rmdir", {arg});
+    TestCommandInvocationHandle iHandle("rmdir", {arg});
+    ;
     rmdir.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains("not a directory"));
 }
@@ -84,7 +87,8 @@ void test_rmdir_edge_cases(void)
 {
     cmd::rmdir rmdir(*dir);
     ETString keyword = "rmdir";
-    auto iHandle = TestCommandInvocationHandle("rmdir");
+    TestCommandInvocationHandle iHandle("rmdir");
+    ;
     rmdir.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains(rmdir.usage(keyword)));
 }
@@ -94,7 +98,8 @@ void test_rmdir_subdirectory(void)
     cmd::rmdir rmdir(*dir);
     ETString keyword = "rmdir";
     ETString arg = "/foo/bar/baz";
-    auto iHandle = TestCommandInvocationHandle("rmdir", {arg});
+    TestCommandInvocationHandle iHandle("rmdir", {arg});
+    ;
     rmdir.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains("removed"));
     TEST_ASSERT_TRUE(storage->exists("/foo/bar"));
@@ -106,7 +111,8 @@ void test_rmdir_notemptydirectory(void)
     cmd::rmdir rmdir(*dir);
     ETString keyword = "rmdir";
     ETString arg = "/foo/bar";
-    auto iHandle = TestCommandInvocationHandle("rmdir", {arg});
+    TestCommandInvocationHandle iHandle("rmdir", {arg});
+    ;
     rmdir.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(iHandle.output.contains("is not empty"));
     TEST_ASSERT_TRUE(storage->exists("/foo/bar/baz"));
@@ -133,7 +139,8 @@ void test_rmdir_execute_writes_stdout(void)
 {
     cmd::rmdir rmdir(*dir);
 
-    auto iHandle = TestCommandInvocationHandle("rmdir", {"dir1"});
+    TestCommandInvocationHandle iHandle("rmdir", {"dir1"});
+    ;
     CommandResult result = rmdir.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);

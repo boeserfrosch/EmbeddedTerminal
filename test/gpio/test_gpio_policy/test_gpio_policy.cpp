@@ -114,7 +114,7 @@ void test_policy_selective_operation_denial(void)
     TEST_ASSERT_TRUE(policy.addExclusion(denyReadRule, addReason));
 
     TEST_ASSERT_FALSE(policy.isOperationAllowed("GPIO5", GpioOperation::Read, reason));
-    TEST_ASSERT_TRUE(reason.find("denied") != ETString::npos);
+    TEST_ASSERT_EQUAL_STRING("Operation blocked by policy", reason.c_str());
 
     TEST_ASSERT_TRUE(policy.isOperationAllowed("GPIO5", GpioOperation::Write, reason));
     TEST_ASSERT_TRUE(policy.isOperationAllowed("GPIO5", GpioOperation::Mode, reason));

@@ -227,7 +227,7 @@ void ETString::insert(size_t pos, const ETString &str)
 void ETString::remove(size_t pos)
 {
 #if defined(ARDUINO) //|| defined(ESP_PLATFORM)
-    data.remove(pos);
+    data.remove(pos, 1);
 #else
     data.erase(pos, 1);
 #endif

@@ -5,8 +5,6 @@
 #include "channels/FileOutput.h"
 #include "channels/BufferedInput.h"
 #include "channels/BufferedOutput.h"
-#include "channels/BufferedInOut.h"
-#include "channels/TeeOutput.h"
 
 using namespace EmbeddedTerminal::Lang;
 

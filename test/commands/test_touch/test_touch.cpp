@@ -44,7 +44,8 @@ void tearDown(void)
 void test_touch_creates_missing_file(void)
 {
     cmd::touch touchCmd(*dir);
-    auto iHandle = TestCommandInvocationHandle("touch", {"new.txt"});
+    TestCommandInvocationHandle iHandle("touch", {"new.txt"});
+    ;
     CommandResult result = touchCmd.invoke(iHandle.invocation);
 
     TEST_ASSERT_TRUE(result.state == CommandExecutionState::Completed);
@@ -58,7 +59,8 @@ void test_touch_existing_file(void)
     storage->open("/existing.txt", FILE_MODE_WRITE, true).close();
 
     cmd::touch touchCmd(*dir);
-    auto iHandle = TestCommandInvocationHandle("touch", {"existing.txt"});
+    TestCommandInvocationHandle iHandle("touch", {"existing.txt"});
+    ;
     CommandResult result = touchCmd.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(result.state == CommandExecutionState::Completed);
     TEST_ASSERT_TRUE(iHandle.output.contains("touched"));
@@ -73,7 +75,8 @@ void test_touch_existing_file_keeps_content(void)
     file.close();
 
     cmd::touch touchCmd(*dir);
-    auto iHandle = TestCommandInvocationHandle("touch", {"content.txt"});
+    TestCommandInvocationHandle iHandle("touch", {"content.txt"});
+    ;
     CommandResult result = touchCmd.invoke(iHandle.invocation);
 
     TEST_ASSERT_TRUE(result.state == CommandExecutionState::Completed);
@@ -88,7 +91,8 @@ void test_touch_rejects_directory(void)
     storage->mkdir("/dir");
 
     cmd::touch touchCmd(*dir);
-    auto iHandle = TestCommandInvocationHandle("touch", {"dir"});
+    TestCommandInvocationHandle iHandle("touch", {"dir"});
+    ;
     CommandResult result = touchCmd.invoke(iHandle.invocation);
 
     TEST_ASSERT_TRUE(result.state == CommandExecutionState::Completed);
@@ -98,7 +102,8 @@ void test_touch_rejects_directory(void)
 void test_touch_empty_path(void)
 {
     cmd::touch touchCmd(*dir);
-    auto iHandle = TestCommandInvocationHandle("touch");
+    TestCommandInvocationHandle iHandle("touch");
+    ;
     CommandResult result = touchCmd.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(result.state == CommandExecutionState::Completed);
     TEST_ASSERT_TRUE(iHandle.output.contains(touchCmd.usage("touch")));
@@ -115,7 +120,8 @@ void test_touch_execute_writes_stdout(void)
 {
     cmd::touch touchCmd(*dir);
 
-    auto iHandle = TestCommandInvocationHandle("touch", {"runtime.txt"});
+    TestCommandInvocationHandle iHandle("touch", {"runtime.txt"});
+    ;
     CommandResult result = touchCmd.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);

@@ -51,7 +51,8 @@ void test_df_edge_cases(void)
     cmd::df df(*storage);
     ETString keyword = "df";
 
-    auto iHandle = TestCommandInvocationHandle(keyword, {});
+    TestCommandInvocationHandle iHandle(keyword, {});
+    ;
     CommandResult result = df.invoke(iHandle.invocation);
     TEST_ASSERT_EQUAL(0, result.exitCode);
     TEST_ASSERT_TRUE(iHandle.output.contains("Size"));
@@ -64,7 +65,8 @@ void test_df_output_format(void)
     cmd::df df(*storage);
     ETString keyword = "df";
     ETString additional = "";
-    auto iHandle = TestCommandInvocationHandle(keyword, {additional});
+    TestCommandInvocationHandle iHandle(keyword, {additional});
+    ;
     CommandResult cmdResult = df.invoke(iHandle.invocation);
     // Check for expected columns
     TEST_ASSERT_TRUE(iHandle.output.contains("Used"));
@@ -76,7 +78,7 @@ void test_df_writes_stdout(void)
     cmd::df df(*storage);
 
     ETMap<ETString, ETString> vars;
-    auto invocationHandle = TestCommandInvocationHandle("df", {});
+    TestCommandInvocationHandle invocationHandle("df", {});
 
     CommandResult result = df.invoke(invocationHandle.invocation);
 
