@@ -189,6 +189,12 @@ namespace EmbeddedTerminal
         uint64_t nowMs_() const;
         void handleAutoCompletionOfCommand_(const ETString &keywordPart, const ETString &argumentPart);
         void outputAutoCompletionSuggestions_(const ETString &partial, const ETVector<ETString> &suggestions);
+        void commitCurrentInputLine_();
+        void clearCurrentInputLine_();
+        void exitHistoryNavigation_();
+        void redrawCurrentInputLine_(size_t previousCursor, const ETString &oldLine, const ETString &newLine, size_t newCursor);
+        void recallHistory_(bool previous);
+        bool isCursorInsideQuotes_(size_t cursor) const;
 
         // void reportLexerError_(LexerError error);
 
@@ -212,6 +218,11 @@ namespace EmbeddedTerminal
         // token_t tokensBuffer_[64];
 
         ETString buffer;
+        ETString inputLine_;
+        size_t inputCursor_ = 0;
+        ETVector<ETString> commandHistory_;
+        size_t historyIndex_ = ETString::npos;
+        ETString historyDraft_;
         ETString pendingScriptInput_;
         ETString lineDelimiter = "\n";
         int32_t lastExitCode_ = 0;

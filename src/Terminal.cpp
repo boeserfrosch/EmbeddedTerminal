@@ -356,69 +356,116 @@ namespace EmbeddedTerminal
 
     bool Terminal::handleCommandKeys_(const ETString &rawInputLine)
     {
-        auto findUnquotedTab = [](const ETString &line) -> size_t
+        auto insertCharacterAtCursor = [&](char ch)
         {
-            bool inSingleQuote = false;
-            bool inDoubleQuote = false;
-            bool escaped = false;
-
-            for (size_t i = 0; i < line.length(); ++i)
+            exitHistoryNavigation_();
+            if (inputCursor_ == inputLine_.length())
             {
-                char ch = line[i];
-
-                if (escaped)
-                {
-                    escaped = false;
-                    continue;
-                }
-
-                if (ch == '\\')
-                {
-                    escaped = true;
-                    continue;
-                }
-
-                if (ch == '\'' && !inDoubleQuote)
-                {
-                    inSingleQuote = !inSingleQuote;
-                    continue;
-                }
-
-                if (ch == '"' && !inSingleQuote)
-                {
-                    inDoubleQuote = !inDoubleQuote;
-                    continue;
-                }
-
-                if (ch == '\t' && !inSingleQuote && !inDoubleQuote)
-                {
-                    return i;
-                }
+                inputLine_ += ch;
+                ++inputCursor_;
+                input_.print(ETString(ch));
+                return;
             }
 
-            return ETString::npos;
+            size_t previousCursor = inputCursor_;
+            ETString updatedLine = inputLine_;
+            updatedLine.insert(inputCursor_, ch);
+            redrawCurrentInputLine_(previousCursor, inputLine_, updatedLine, previousCursor + 1);
         };
 
-        if (rawInputLine.contains(0x03)) // Ctrl+C
+        size_t index = 0;
+        while (index < rawInputLine.length())
         {
-            interruptActiveExecution_();
-            input_.printTo(TerminalChannel::StdErr, "^C\n");
-            // clearCommandBuffer_();
-            return false; // Signal that an interrupt was requested
-        }
+            unsigned char current = static_cast<unsigned char>(rawInputLine[index]);
 
-        const size_t tabPosition = findUnquotedTab(rawInputLine);
-        if (tabPosition != ETString::npos) // Tab for auto-completion (outside quoted strings)
-        {
-            auto relevantPart = rawInputLine.substr(0, tabPosition); // Remove first tab and anything after it from buffer
-            buffer += relevantPart;
-            input_.print(relevantPart);
-            handleAutoCompletion_();
-            return true; // Signal that it should continue processing (with the auto-completion logic)
-        }
+            if (current == 0x03) // Ctrl+C
+            {
+                interruptActiveExecution_();
+                clearCurrentInputLine_();
+                input_.printTo(TerminalChannel::StdErr, "^C\n");
+                return false; // Signal that an interrupt was requested
+            }
 
-        input_.print(rawInputLine);
-        buffer += rawInputLine;
+            if (current == '\r' || current == '\n')
+            {
+                commitCurrentInputLine_();
+                if (current == '\r' && index + 1 < rawInputLine.length() && rawInputLine[index + 1] == '\n')
+                {
+                    ++index;
+                }
+                ++index;
+                continue;
+            }
+
+            if (current == '\t')
+            {
+                if (!isCursorInsideQuotes_(inputCursor_) && inputCursor_ == inputLine_.length())
+                {
+                    exitHistoryNavigation_();
+                    handleAutoCompletion_();
+                }
+                else
+                {
+                    insertCharacterAtCursor('\t');
+                }
+                ++index;
+                continue;
+            }
+
+            if (current == 0x1b && index + 2 < rawInputLine.length() && rawInputLine[index + 1] == '[')
+            {
+                char key = rawInputLine[index + 2];
+                switch (key)
+                {
+                case 'A':
+                    recallHistory_(true);
+                    break;
+                case 'B':
+                    recallHistory_(false);
+                    break;
+                case 'C':
+                    if (inputCursor_ < inputLine_.length())
+                    {
+                        redrawCurrentInputLine_(inputCursor_, inputLine_, inputLine_, inputCursor_ + 1);
+                    }
+                    break;
+                case 'D':
+                    if (inputCursor_ > 0)
+                    {
+                        redrawCurrentInputLine_(inputCursor_, inputLine_, inputLine_, inputCursor_ - 1);
+                    }
+                    break;
+                default:
+                    break;
+                }
+
+                index += 3;
+                continue;
+            }
+
+            if (current == 0x7f || current == 0x08)
+            {
+                if (inputCursor_ > 0)
+                {
+                    exitHistoryNavigation_();
+                    size_t previousCursor = inputCursor_;
+                    ETString updatedLine = inputLine_;
+                    updatedLine.erase(inputCursor_ - 1, 1);
+                    redrawCurrentInputLine_(previousCursor, inputLine_, updatedLine, previousCursor - 1);
+                }
+                ++index;
+                continue;
+            }
+
+            if (current >= ' ')
+            {
+                insertCharacterAtCursor(static_cast<char>(current));
+                ++index;
+                continue;
+            }
+
+            ++index;
+        }
 
         return true; // Signal that input was ingested and should be processed
     }
@@ -677,7 +724,148 @@ namespace EmbeddedTerminal
 
     const ETString &Terminal::getBuffer() const
     {
-        return buffer;
+        return inputLine_;
+    }
+
+    void Terminal::clearCurrentInputLine_()
+    {
+        inputLine_ = "";
+        inputCursor_ = 0;
+        historyIndex_ = ETString::npos;
+        historyDraft_ = "";
+    }
+
+    void Terminal::exitHistoryNavigation_()
+    {
+        historyIndex_ = ETString::npos;
+        historyDraft_ = "";
+    }
+
+    void Terminal::commitCurrentInputLine_()
+    {
+        if (!inputLine_.empty() && (commandHistory_.empty() || commandHistory_.back() != inputLine_))
+        {
+            commandHistory_.push_back(inputLine_);
+        }
+
+        buffer += inputLine_;
+        buffer += "\n";
+        input_.print("\n");
+        clearCurrentInputLine_();
+    }
+
+    void Terminal::redrawCurrentInputLine_(size_t previousCursor, const ETString &oldLine, const ETString &newLine, size_t newCursor)
+    {
+        ETString output;
+        for (size_t i = 0; i < previousCursor; ++i)
+        {
+            output += '\b';
+        }
+        output += newLine;
+
+        size_t clearCount = oldLine.length() > newLine.length() ? oldLine.length() - newLine.length() : 0;
+        for (size_t i = 0; i < clearCount; ++i)
+        {
+            output += ' ';
+        }
+
+        size_t targetTail = oldLine.length() > newLine.length() ? oldLine.length() : newLine.length();
+        if (targetTail > newCursor)
+        {
+            for (size_t i = 0; i < targetTail - newCursor; ++i)
+            {
+                output += '\b';
+            }
+        }
+
+        input_.print(output);
+
+        inputLine_ = newLine;
+        inputCursor_ = newCursor;
+    }
+
+    void Terminal::recallHistory_(bool previous)
+    {
+        if (commandHistory_.empty())
+        {
+            return;
+        }
+
+        ETString nextLine;
+
+        if (historyIndex_ == ETString::npos)
+        {
+            if (!previous)
+            {
+                return;
+            }
+
+            historyDraft_ = inputLine_;
+            historyIndex_ = commandHistory_.size() - 1;
+            nextLine = commandHistory_[historyIndex_];
+        }
+        else if (previous)
+        {
+            if (historyIndex_ > 0)
+            {
+                --historyIndex_;
+            }
+            nextLine = commandHistory_[historyIndex_];
+        }
+        else if (historyIndex_ + 1 < commandHistory_.size())
+        {
+            ++historyIndex_;
+            nextLine = commandHistory_[historyIndex_];
+        }
+        else
+        {
+            nextLine = historyDraft_;
+            historyIndex_ = ETString::npos;
+        }
+
+        redrawCurrentInputLine_(inputCursor_, inputLine_, nextLine, nextLine.length());
+    }
+
+    bool Terminal::isCursorInsideQuotes_(size_t cursor) const
+    {
+        bool inSingleQuote = false;
+        bool inDoubleQuote = false;
+        bool escaped = false;
+
+        if (cursor > inputLine_.length())
+        {
+            cursor = inputLine_.length();
+        }
+
+        for (size_t i = 0; i < cursor; ++i)
+        {
+            char ch = inputLine_[i];
+
+            if (escaped)
+            {
+                escaped = false;
+                continue;
+            }
+
+            if (ch == '\\')
+            {
+                escaped = true;
+                continue;
+            }
+
+            if (ch == '\'' && !inDoubleQuote)
+            {
+                inSingleQuote = !inSingleQuote;
+                continue;
+            }
+
+            if (ch == '"' && !inSingleQuote)
+            {
+                inDoubleQuote = !inDoubleQuote;
+            }
+        }
+
+        return inSingleQuote || inDoubleQuote;
     }
 
     CommandResult Terminal::executeCommandInternal_(ICommand *const command, const ETString &keyword, const ETVector<ETString> &arguments,
@@ -914,7 +1102,8 @@ namespace EmbeddedTerminal
 
     void Terminal::handleAutoCompletion_()
     {
-        auto parts = split(buffer, " ");
+        exitHistoryNavigation_();
+        auto parts = split(inputLine_, " ");
         if (parts.empty())
         {
             return;
@@ -925,7 +1114,7 @@ namespace EmbeddedTerminal
         if (parts.size() == 1)
         {
             // If there is a space at the end of the buffer, treat it as if user has completed the keyword and is now typing the first argument
-            if (buffer.endsWith(' '))
+            if (inputLine_.endsWith(' '))
             {
                 handleAutoCompletionOfCommand_(keywordPart, ""); // Re-run auto-completion logic to handle argument suggestions
             }
@@ -977,7 +1166,8 @@ namespace EmbeddedTerminal
             if (match.length() > partialArg.length())
             {
                 ETString toAppend = match.substr(partialArg.length());
-                buffer += toAppend;
+                inputLine_ += toAppend;
+                inputCursor_ = inputLine_.length();
                 input_.print(toAppend);
             }
         }
@@ -1000,7 +1190,8 @@ namespace EmbeddedTerminal
             if (commonPrefix.length() > partialArg.length())
             {
                 ETString toAppend = commonPrefix.substr(partialArg.length());
-                buffer += toAppend;
+                inputLine_ += toAppend;
+                inputCursor_ = inputLine_.length();
                 input_.print(toAppend);
             }
 

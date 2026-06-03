@@ -8,7 +8,10 @@
 
 // ETString implementation
 ETString::ETString() : data() {}
-ETString::ETString(char c) : data(1, c) {}
+ETString::ETString(char c) : data("")
+{
+    data += c;
+}
 ETString::ETString(const char *s) : data(s) {}
 
 ETString::ETString(const ETString &other) : data(other.data) {}
@@ -204,7 +207,9 @@ void ETString::erase(size_t pos, size_t len)
 void ETString::insert(size_t pos, char c)
 {
 #if defined(ARDUINO) //|| defined(ESP_PLATFORM)
-    data = data.substring(0, pos) + String(c) + data.substring(pos);
+    data = data.substring(0, pos);
+    data += c;
+    data += data.substring(pos);
 #else
     data = data.substr(0, pos) + c + data.substr(pos);
 #endif

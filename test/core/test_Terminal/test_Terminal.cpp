@@ -366,6 +366,57 @@ void test_terminal_waiting_command_needs_input_to_resume(void)
     TEST_ASSERT_TRUE(stream.stdoutBuffer.find("resumed") != ETString::npos);
 }
 
+void test_terminal_history_navigation_with_up_and_down_arrows(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    MockCommand cmd;
+    term.registerCommand("test", &cmd);
+
+    stream.inputBuffer = "test first\n";
+    term.loop();
+    TEST_ASSERT_EQUAL_STRING("first", cmd.lastAdditional.c_str());
+
+    stream.inputBuffer = "test draft";
+    stream.inputPos = 0;
+    term.loop();
+
+    stream.inputBuffer = "\x1b[A\x1b[B\n";
+    stream.inputPos = 0;
+    term.loop();
+
+    TEST_ASSERT_EQUAL_STRING("draft", cmd.lastAdditional.c_str());
+}
+
+void test_terminal_cursor_navigation_with_left_and_right_arrows(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    MockCommand cmd;
+    term.registerCommand("test", &cmd);
+
+    stream.inputBuffer = "test abcd";
+    term.loop();
+
+    stream.inputBuffer = "\x1b[D\x1b[D";
+    stream.inputPos = 0;
+    term.loop();
+
+    stream.inputBuffer = "X";
+    stream.inputPos = 0;
+    term.loop();
+
+    stream.inputBuffer = "\x1b[C";
+    stream.inputPos = 0;
+    term.loop();
+
+    stream.inputBuffer = "Y\n";
+    stream.inputPos = 0;
+    term.loop();
+
+    TEST_ASSERT_EQUAL_STRING("abXcYd", cmd.lastAdditional.c_str());
+}
+
 void test_terminal_executes_multiline_quoted_argument_through_pipe(void)
 {
     MockStream stream;
@@ -837,6 +888,8 @@ void process_tests()
     RUN_TEST(test_terminal_case_sensitivity);
     RUN_TEST(test_terminal_continues_running_command_without_newline);
     RUN_TEST(test_terminal_waiting_command_needs_input_to_resume);
+    RUN_TEST(test_terminal_history_navigation_with_up_and_down_arrows);
+    RUN_TEST(test_terminal_cursor_navigation_with_left_and_right_arrows);
     RUN_TEST(test_terminal_executes_multiline_quoted_argument_through_pipe);
     RUN_TEST(test_terminal_uses_lexer_for_quoted_arguments);
     RUN_TEST(test_terminal_does_not_autocomplete_when_tab_is_inside_quotes);
