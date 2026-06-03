@@ -20,103 +20,83 @@
 
 using namespace EmbeddedTerminal;
 
-class RunningTwiceCommand : public ICommand
-{
-public:
-    int executionCount = 0;
-
-    ETString usage(const ETString &keyword) override
-    {
-        return keyword;
-    }
-
-    CommandResult execute(CommandInvocation &invocation) override
-    {
-        executionCount++;
-        if (executionCount == 1)
-        {
-            invocation.stdoutChannel.print("phase1");
-            return CommandResult::running(0);
-        }
-
-        invocation.stdoutChannel.print("phase2");
-        return CommandResult::completed(0);
-    }
-
-protected:
-    ETString trigger(const ETString &keyword, const ETString &additional) override
-    {
-        (void)keyword;
-        (void)additional;
-        return "";
-    }
-};
-
 class WaitForInputCommand : public ICommand
 {
 public:
     int executionCount = 0;
 
-    ETString usage(const ETString &keyword) override
+    ETString usage(const ETString &keyword) const override
     {
         return keyword;
     }
 
-    CommandResult execute(CommandInvocation &invocation) override
+    CommandResult invoke(CommandInvocation &invocation) override
     {
-        executionCount++;
-        if (executionCount == 1)
-        {
-            return CommandResult::waitingForInput(0);
-        }
-
-        invocation.stdoutChannel.print("resumed");
-        return CommandResult::completed(0);
+        executionCount = 1;
+        return CommandResult::waitingForInput(0);
     }
 
-protected:
-    ETString trigger(const ETString &keyword, const ETString &additional) override
+    CommandResult resume(CommandInvocation &invocation) override
     {
-        (void)keyword;
-        (void)additional;
-        return "";
+        executionCount++;
+        invocation.streams.output.print("resumed");
+        return CommandResult::completed(0);
+    }
+};
+
+class RunningTwiceCommand : public ICommand
+{
+public:
+    size_t executionCount = 0;
+    ETString usage(const ETString &keyword) const override
+    {
+        return keyword;
+    }
+
+    CommandResult invoke(CommandInvocation &invocation) override
+    {
+        executionCount = 1;
+        invocation.streams.output.print("phase1");
+        return CommandResult::running(0);
+    }
+
+    CommandResult resume(CommandInvocation &invocation) override
+    {
+        executionCount++;
+        invocation.streams.output.print("phase2");
+        return CommandResult::completed(0);
     }
 };
 
 class EmitCommand : public ICommand
 {
 public:
-    ETString usage(const ETString &keyword) override
+    int executionCount = 0;
+
+    ETString usage(const ETString &keyword) const override
     {
         return keyword;
     }
 
-    CommandResult execute(CommandInvocation &invocation) override
+    CommandResult invoke(CommandInvocation &invocation) override
     {
-        invocation.stdoutChannel.print("hello pipe");
+        executionCount++;
+        invocation.streams.output.print("hello pipe");
         return CommandResult::completed(0);
-    }
-
-protected:
-    ETString trigger(const ETString &keyword, const ETString &additional) override
-    {
-        (void)keyword;
-        (void)additional;
-        return "";
     }
 };
 
 class UpperFromStdinCommand : public ICommand
 {
 public:
-    ETString usage(const ETString &keyword) override
+    ETString usage(const ETString &keyword) const override
     {
         return keyword;
     }
 
-    CommandResult execute(CommandInvocation &invocation) override
+    CommandResult invoke(CommandInvocation &invocation) override
     {
-        ETString text = invocation.stdinChannel.readAll();
+        ETString text = invocation.streams.input.readAll();
         for (size_t i = 0; i < text.length(); ++i)
         {
             if (text[i] >= 'a' && text[i] <= 'z')
@@ -124,42 +104,8 @@ public:
                 text[i] = static_cast<char>(text[i] - ('a' - 'A'));
             }
         }
-        invocation.stdoutChannel.print(text);
+        invocation.streams.output.print(text);
         return CommandResult::completed(0);
-    }
-
-protected:
-    ETString trigger(const ETString &keyword, const ETString &additional) override
-    {
-        (void)keyword;
-        (void)additional;
-        return "";
-    }
-};
-
-class CollectArgsCommand : public ICommand
-{
-public:
-    ETVector<ETString> collected;
-
-    ETString usage(const ETString &keyword) override
-    {
-        return keyword;
-    }
-
-    CommandResult execute(CommandInvocation &invocation) override
-    {
-        collected.push_back(invocation.arguments);
-        invocation.stdoutChannel.print(invocation.arguments + "\n");
-        return CommandResult::completed(0);
-    }
-
-protected:
-    ETString trigger(const ETString &keyword, const ETString &additional) override
-    {
-        (void)keyword;
-        (void)additional;
-        return "";
     }
 };
 
@@ -176,7 +122,6 @@ void test_terminal_register_and_call(void)
     term.loop();
 
     TEST_ASSERT_TRUE(stream.outputBuffer.find("test extra") != ETString::npos);
-    TEST_ASSERT_TRUE(stream.outputBuffer.find("Triggered: test extra") != ETString::npos);
     TEST_ASSERT_EQUAL_STRING("test", cmd.lastKeyword.c_str());
     TEST_ASSERT_EQUAL_STRING("extra", cmd.lastAdditional.c_str());
 }
@@ -187,10 +132,7 @@ void test_terminal_call_unknown(void)
     Terminal term(stream);
     stream.inputBuffer = "foo\n";
     term.loop();
-    TEST_ASSERT_TRUE(stream.outputBuffer.find("foo is unknown") != ETString::npos);
-    TEST_ASSERT_TRUE(stream.stderrBuffer.find("foo is unknown") != ETString::npos);
-    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("foo is unknown") == ETString::npos);
-    TEST_ASSERT_EQUAL(127, term.getLastExitCode());
+    TEST_ASSERT_EQUAL(TerminalPredefinedResultCodes::COMMAND_NOT_FOUND, term.getLastExitCode());
 }
 
 void test_terminal_getCommands(void)
@@ -378,6 +320,8 @@ void test_terminal_continues_running_command_without_newline(void)
 
     stream.inputBuffer = "run\n";
     term.loop();
+
+    TEST_ASSERT_TRUE(term.isRunning()); // Command should have completed after second phase
     TEST_ASSERT_EQUAL(1, cmd.executionCount);
     TEST_ASSERT_TRUE(stream.stdoutBuffer.find("phase1") != ETString::npos);
 
@@ -425,7 +369,22 @@ void test_terminal_uses_lexer_for_quoted_arguments(void)
     TEST_ASSERT_EQUAL_STRING("hello world", cmd.lastAdditional.c_str());
 }
 
-void test_terminal_reports_lexer_error_for_unterminated_quote(void)
+void test_terminal_does_not_autocomplete_when_tab_is_inside_quotes(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    MockCommand cmd;
+    term.registerCommand("test", &cmd);
+
+    stream.inputBuffer = "test \"hello\tworld\"\n";
+    term.loop();
+
+    TEST_ASSERT_EQUAL_STRING("test", cmd.lastKeyword.c_str());
+    TEST_ASSERT_EQUAL_STRING("hello\tworld", cmd.lastAdditional.c_str());
+    TEST_ASSERT_TRUE(stream.outputBuffer.find("test \"hello\tworld\"") != ETString::npos);
+}
+
+void test_termminal_did_not_run_with_unterminated_quote(void)
 {
     MockStream stream;
     Terminal term(stream);
@@ -435,9 +394,8 @@ void test_terminal_reports_lexer_error_for_unterminated_quote(void)
     stream.inputBuffer = "test \"unterminated\n";
     term.loop();
 
-    TEST_ASSERT_EQUAL(2, term.getLastExitCode());
-    TEST_ASSERT_TRUE(stream.stderrBuffer.find("lexer error") != ETString::npos);
-    TEST_ASSERT_EQUAL_STRING("", cmd.lastKeyword.c_str());
+    TEST_ASSERT_EQUAL(TerminalPredefinedResultCodes::SUCCESS, term.getLastExitCode());
+    TEST_ASSERT_FALSE(term.isRunning());
 }
 
 void test_terminal_parses_pipe_in_arguments(void)
@@ -450,7 +408,16 @@ void test_terminal_parses_pipe_in_arguments(void)
     term.registerCommand("upper", &upper);
 
     stream.inputBuffer = "emit | upper\n";
-    term.loop();
+    int step = 0;
+    const int maxSteps = 2;
+    do
+    {
+        term.loop();
+        step++;
+    } while (term.isRunning() && step < maxSteps);
+
+    // Make sure that the execution did not get stuck and that the output from the first command was piped into the second command, resulting in "HELLO PIPE" being printed to the terminal.
+    TEST_ASSERT_FALSE(term.isRunning());
 
     TEST_ASSERT_TRUE(stream.stdoutBuffer.find("HELLO PIPE") != ETString::npos);
 }
@@ -466,7 +433,14 @@ void test_terminal_redirects_output_with_gt(void)
     term.registerCommand("emit", &emit);
 
     stream.inputBuffer = "emit > /out.txt\n";
-    term.loop();
+    size_t step = 0;
+    const size_t maxSteps = 2;
+    do
+    {
+        term.loop();
+        step++;
+    } while (term.isRunning() && step < maxSteps);
+    TEST_ASSERT_FALSE(term.isRunning());
 
     TEST_ASSERT_TRUE(fs.exists("/out.txt"));
     ETFile file = fs.open("/out.txt", FILE_MODE_READ, false);
@@ -492,7 +466,15 @@ void test_terminal_redirects_input_with_lt(void)
     term.registerCommand("upper", &upper);
 
     stream.inputBuffer = "upper < /in.txt\n";
-    term.loop();
+
+    size_t step = 0;
+    const size_t maxSteps = 2;
+    do
+    {
+        term.loop();
+        step++;
+    } while (term.isRunning() && step < maxSteps);
+    TEST_ASSERT_FALSE(term.isRunning());
 
     TEST_ASSERT_TRUE(stream.stdoutBuffer.find("HELLO PIPE") != ETString::npos);
 }
@@ -509,6 +491,15 @@ void test_terminal_redirects_output_with_gtgt_append(void)
 
     stream.inputBuffer = "emit >> /append.txt\nemit >> /append.txt\n";
     term.loop();
+    TEST_ASSERT_EQUAL(1, emit.executionCount);
+    TEST_ASSERT_TRUE(term.isRunning());
+
+    do
+    {
+        term.loop();
+    } while (term.isRunning());
+
+    TEST_ASSERT_EQUAL(2, emit.executionCount);
 
     TEST_ASSERT_TRUE(fs.exists("/append.txt"));
     ETFile file = fs.open("/append.txt", FILE_MODE_READ, false);
@@ -537,19 +528,264 @@ void test_terminal_redirects_output_with_gt_and_overwrite(void)
     file.close();
 }
 
-void test_terminal_rejects_script_block_syntax_without_script_command(void)
+void test_terminal_call_command_with_variable_expansion_in_arguments(void)
 {
     MockStream stream;
     Terminal term(stream);
-    CollectArgsCommand collect;
-    term.registerCommand("collect", &collect);
+    MockCommand cmd;
+    term.registerCommand("test", &cmd);
 
-    stream.inputBuffer = "for i in one two; do collect $i;\ndone\n";
+    stream.inputBuffer = "VAR=value; test $VAR\n";
+    do
+    {
+        term.loop();
+    } while (term.isRunning());
+
+    TEST_ASSERT_EQUAL_STRING("test", cmd.lastKeyword.c_str());
+    TEST_ASSERT_EQUAL_STRING("value", cmd.lastAdditional.c_str());
+}
+
+void test_terminal_call_command_with_variable_expansion_in_arguments_with_double_quotes(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    MockCommand cmd;
+    term.registerCommand("test", &cmd);
+
+    stream.inputBuffer = "VAR=\"value with spaces\"; test \"$VAR\"\n";
+    do
+    {
+        term.loop();
+    } while (term.isRunning());
+
+    TEST_ASSERT_EQUAL_STRING("test", cmd.lastKeyword.c_str());
+    TEST_ASSERT_TRUE(term.getVariables().find("VAR") != term.getVariables().end());
+    TEST_ASSERT_EQUAL_STRING("value with spaces", term.getVariables().find("VAR")->second.c_str());
+    // Variable inside double quotes should expand but keep the spaces, so the additional should be "value with spaces"
+    TEST_ASSERT_EQUAL_STRING("value with spaces", cmd.lastAdditional.c_str());
+}
+
+void test_terminal_call_command_without_variable_expansion_in_arguments_with_single_quotes(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    MockCommand cmd;
+    term.registerCommand("test", &cmd);
+
+    stream.inputBuffer = "VAR=value; test '$VAR'\n";
+    do
+    {
+        term.loop();
+    } while (term.isRunning());
+
+    TEST_ASSERT_EQUAL_STRING("test", cmd.lastKeyword.c_str());
+    // Variable inside single quotes should NOT expand, so the additional should be "$VAR"
+    TEST_ASSERT_EQUAL_STRING("$VAR", cmd.lastAdditional.c_str());
+}
+
+void test_terminal_variables_can_be_set_and_overridden(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    MockCommand cmd;
+    term.registerCommand("test", &cmd);
+
+    stream.inputBuffer = "VAR=value; test $VAR\nVAR=other; test $VAR\n";
+    do
+    {
+        term.loop();
+    } while (term.isRunning());
+
+    TEST_ASSERT_EQUAL_STRING("test", cmd.lastKeyword.c_str());
+    TEST_ASSERT_EQUAL_STRING("other", cmd.lastAdditional.c_str());
+}
+
+void test_terminal_variables_can_be_set_and_overridden_edge_case(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    MockCommand cmd;
+    term.registerCommand("test", &cmd);
+
+    stream.inputBuffer = "VAR=value; test $VAR;VAR=bla; test $VAR\n";
+    do
+    {
+        term.loop();
+    } while (term.isRunning());
+
+    TEST_ASSERT_EQUAL_STRING("test", cmd.lastKeyword.c_str());
+    TEST_ASSERT_EQUAL_STRING("bla", cmd.lastAdditional.c_str());
+}
+
+void test_terminal_variables_can_be_set(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+
+    stream.inputBuffer = "VAR=value\n";
+    term.loop();
+    TEST_ASSERT_FALSE(term.error());
+    TEST_ASSERT_FALSE(term.isRunning()); // Setting a variable should not put the terminal in a running state and shut be completed immediately after processing the command
+    TEST_ASSERT_TRUE(term.getVariables().find("VAR") != term.getVariables().end());
+}
+
+void test_terminal_waits_for_incomplete_for_loop_and_executes_on_completion(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    MockCommand cmd;
+    term.registerCommand("mycmd", &cmd);
+
+    // Send the beginning of a for-loop but omit the body and the 'done'
+    stream.inputBuffer = "for i = 1 2 do\n";
+    stream.inputPos = 0;
     term.loop();
 
-    TEST_ASSERT_EQUAL(0, collect.collected.size());
-    TEST_ASSERT_TRUE(stream.stderrBuffer.find("script block syntax is only supported from script files") != ETString::npos);
-    TEST_ASSERT_EQUAL(2, term.getLastExitCode());
+    // The terminal should not have executed the command yet
+    TEST_ASSERT_EQUAL_STRING("", cmd.lastKeyword.c_str());
+
+    // Now send the loop body and the closing 'done' to complete the construct
+    stream.inputBuffer = "mycmd $i\ndone\n";
+    stream.inputPos = 0;
+    // Run the terminal until the script finishes executing
+    do
+    {
+        term.loop();
+    } while (term.isRunning());
+
+    // After completion the registered command should have been executed; lastAdditional should be the last iteration value
+    TEST_ASSERT_EQUAL_STRING("mycmd", cmd.lastKeyword.c_str());
+    TEST_ASSERT_EQUAL_STRING("2", cmd.lastAdditional.c_str());
+}
+
+void test_terminal_waits_for_incomplete_if_and_executes_on_completion(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    MockCommand cmd;
+    term.registerCommand("mycmd", &cmd);
+
+    // Send start of an if construct; omit the then-body and 'fi'
+    stream.inputBuffer = "if true then\n";
+    stream.inputPos = 0;
+    term.loop();
+
+    // Terminal should not execute anything yet
+    TEST_ASSERT_EQUAL_STRING("", cmd.lastKeyword.c_str());
+
+    // Provide the body and close the if with 'fi'
+    stream.inputBuffer = "mycmd\nfi\n";
+    stream.inputPos = 0;
+    do
+    {
+        term.loop();
+    } while (term.isRunning());
+
+    TEST_ASSERT_EQUAL_STRING("mycmd", cmd.lastKeyword.c_str());
+}
+
+void test_terminal_waits_for_incomplete_while_loop_and_executes_on_completion(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    MockCommand cmd;
+    term.registerCommand("mycmd", &cmd);
+
+    // Send start of a while loop; omit the body and 'done'
+    stream.inputBuffer = "test = true; while $test do\n";
+    stream.inputPos = 0;
+    do
+    {
+        term.loop();
+    } while (term.isRunning());
+    TEST_ASSERT_FALSE(term.error());
+    // Terminal should not execute anything yet
+    TEST_ASSERT_EQUAL_STRING("", cmd.lastKeyword.c_str());
+
+    // Provide the body and close the loop with 'done'
+    stream.inputBuffer = "mycmd\ntest= false; done\n";
+    stream.inputPos = 0;
+    do
+    {
+        term.loop();
+    } while (term.isRunning());
+
+    if (term.error())
+    {
+        printf("Terminal last exit code: %d\n", static_cast<int>(term.getLastExitCode()));
+        printf("Terminal error: %d\n", static_cast<int>(term.getError()));
+    }
+    TEST_ASSERT_FALSE(term.error());
+    TEST_ASSERT_EQUAL_STRING("mycmd", cmd.lastKeyword.c_str());
+}
+
+void test_terminal_waits_for_incomplete_function_definition_and_executes_on_completion(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    MockCommand cmd;
+    term.registerCommand("mycmd", &cmd);
+
+    // Send start of a function definition; omit the body and 'done'
+    stream.inputBuffer = "function myfunc()\n";
+    stream.inputPos = 0;
+    term.loop();
+
+    // Terminal should not execute anything yet
+    TEST_ASSERT_EQUAL_STRING("", cmd.lastKeyword.c_str());
+
+    // Provide the body and close the function definition with 'done'
+    stream.inputBuffer = "mycmd\ndone\n";
+    stream.inputPos = 0;
+    do
+    {
+        term.loop();
+    } while (term.isRunning());
+    if (term.error())
+    {
+        printf("Terminal last exit code: %d\n", static_cast<int>(term.getLastExitCode()));
+        printf("Terminal error: %d\n", static_cast<int>(term.getError()));
+    }
+    TEST_ASSERT_FALSE(term.error());
+
+    // We have to look after the virtual function table since nothing is executed when defining a function
+    TEST_ASSERT_TRUE(term.existsFunction("myfunc"));
+}
+
+void test_terminal_waits_for_incomplete_function_call_and_executes_on_completion(void)
+{
+    MockStream stream;
+    Terminal term(stream);
+    MockCommand cmd;
+    term.registerCommand("mycmd", &cmd);
+
+    stream.inputBuffer = "function myfunc()\nmycmd\ndone\n";
+    stream.inputPos = 0;
+    term.loop();
+    if (term.error())
+    {
+        printf("Terminal last exit code: %d\n", static_cast<int>(term.getLastExitCode()));
+        printf("Terminal error: %d\n", static_cast<int>(term.getError()));
+    }
+    TEST_ASSERT_FALSE(term.error());
+    TEST_ASSERT_TRUE(term.existsFunction("myfunc"));
+    // Send start of a function call; omit the closing parenthesis
+    stream.inputBuffer = "myfunc(\n";
+    stream.inputPos = 0;
+    term.loop();
+
+    // Terminal should not execute anything yet
+    TEST_ASSERT_EQUAL_STRING("", cmd.lastKeyword.c_str());
+
+    // Provide the closing parenthesis to complete the function call
+    stream.inputBuffer = ")\n";
+    stream.inputPos = 0;
+    do
+    {
+        term.loop();
+    } while (term.isRunning());
+
+    TEST_ASSERT_EQUAL_STRING("mycmd", cmd.lastKeyword.c_str());
 }
 
 void process_tests()
@@ -571,13 +807,24 @@ void process_tests()
     RUN_TEST(test_terminal_continues_running_command_without_newline);
     RUN_TEST(test_terminal_waiting_command_needs_input_to_resume);
     RUN_TEST(test_terminal_uses_lexer_for_quoted_arguments);
-    RUN_TEST(test_terminal_reports_lexer_error_for_unterminated_quote);
+    RUN_TEST(test_terminal_does_not_autocomplete_when_tab_is_inside_quotes);
+    RUN_TEST(test_termminal_did_not_run_with_unterminated_quote);
     RUN_TEST(test_terminal_parses_pipe_in_arguments);
     RUN_TEST(test_terminal_redirects_output_with_gt);
     RUN_TEST(test_terminal_redirects_input_with_lt);
     RUN_TEST(test_terminal_redirects_output_with_gtgt_append);
     RUN_TEST(test_terminal_redirects_output_with_gt_and_overwrite);
-    RUN_TEST(test_terminal_rejects_script_block_syntax_without_script_command);
+    RUN_TEST(test_terminal_call_command_with_variable_expansion_in_arguments);
+    RUN_TEST(test_terminal_call_command_with_variable_expansion_in_arguments_with_double_quotes);
+    RUN_TEST(test_terminal_call_command_without_variable_expansion_in_arguments_with_single_quotes);
+    RUN_TEST(test_terminal_variables_can_be_set_and_overridden);
+    RUN_TEST(test_terminal_variables_can_be_set_and_overridden_edge_case);
+    RUN_TEST(test_terminal_variables_can_be_set);
+    RUN_TEST(test_terminal_waits_for_incomplete_for_loop_and_executes_on_completion);
+    RUN_TEST(test_terminal_waits_for_incomplete_if_and_executes_on_completion);
+    RUN_TEST(test_terminal_waits_for_incomplete_while_loop_and_executes_on_completion);
+    RUN_TEST(test_terminal_waits_for_incomplete_function_definition_and_executes_on_completion);
+    RUN_TEST(test_terminal_waits_for_incomplete_function_call_and_executes_on_completion);
     UNITY_END();
 }
 

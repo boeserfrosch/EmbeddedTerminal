@@ -35,17 +35,18 @@ using namespace EmbeddedTerminal;
 class RebootCommand : public ICommand
 {
 public:
-    ETString trigger(const ETString &keyword, const ETString &additional) override
+    ETString usage(const ETString &keyword) const override
     {
+        return keyword + " - Reboot the system\n";
+    }
+
+    CommandResult invoke(CommandInvocation &invocation) override
+    {
+        (void)invocation;
 #if defined(ESP32)
         ESP.restart();
 #endif
-        return "Rebooting...\n";
-    }
-
-    ETString usage(const ETString &keyword) override
-    {
-        return keyword + " - Reboot the system\n";
+        return CommandResult::completed(0);
     }
 };
 

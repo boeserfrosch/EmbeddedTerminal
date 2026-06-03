@@ -2,7 +2,7 @@
 #define PWD_H
 
 #include "DirectoryNavigator.h"
-#include "Terminal.h"
+#include "interfaces/ICommand.h"
 
 namespace EmbeddedTerminal
 {
@@ -16,9 +16,9 @@ namespace EmbeddedTerminal
             pwd(DirectoryNavigator &dir) : dir_(dir)
             {
             }
-            ETString usage(const ETString &keyword);
+            ETString usage(const ETString &keyword) const override;
 
-            ETString trigger(const ETString &keyword, const ETString &additional) override;
+            CommandResult invoke(CommandInvocation &invocation) override;
 
         private:
             DirectoryNavigator &dir_;

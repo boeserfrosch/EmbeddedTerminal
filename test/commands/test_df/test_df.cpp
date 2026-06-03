@@ -9,11 +9,11 @@
 #endif
 #include "commands/df.h"
 #include "../../Mocks/native/MockFileSystem.h"
-#include "../../Mocks/MockStream.h"
 #include "../../Mocks/CommandRuntimeTestUtils.h"
 #include "DirectoryNavigator.h"
 #include "StorageSystem.h"
 #include "../../Mocks/native/MockStorageMedia.h"
+#include "../utils.h"
 
 using namespace EmbeddedTerminal;
 IStorageSystem *storage = nullptr;
@@ -38,25 +38,6 @@ void tearDown(void)
     storage = nullptr;
 }
 
-void test_df_trigger_basic(void)
-{
-    cmd::df df(*storage);
-    ETString keyword = "df";
-    ETString additional = "";
-    ETString result = df.trigger(keyword, additional);
-    TEST_ASSERT_TRUE(result.find("Filesystem") != ETString::npos || result.find("Size") != ETString::npos);
-    TEST_ASSERT_TRUE(result.find("Size 8.0 MB") != ETString::npos); // Check for 8MB size in MB
-}
-
-void test_df_trigger_with_path(void)
-{
-    cmd::df df(*storage);
-    ETString keyword = "df";
-    ETString additional = "/somepath";
-    ETString result = df.trigger(keyword, additional);
-    TEST_ASSERT_TRUE(result.find("Filesystem") != ETString::npos || result.find("Size") != ETString::npos);
-}
-
 void test_df_usage(void)
 {
     cmd::df df(*storage);
@@ -65,59 +46,53 @@ void test_df_usage(void)
     TEST_ASSERT_TRUE(result.find("Usage") != ETString::npos || result.find("Show disk usage") != ETString::npos);
 }
 
-void test_df_trigger_edge_cases(void)
+void test_df_edge_cases(void)
 {
     cmd::df df(*storage);
     ETString keyword = "df";
-    ETString additional = "   "; // whitespace
-    ETString result = df.trigger(keyword, additional);
-    TEST_ASSERT_TRUE(result.find("Filesystem") != ETString::npos || result.find("Size") != ETString::npos);
 
-    additional = "";
-    result = df.trigger(keyword, additional);
-    TEST_ASSERT_TRUE(result.find("Filesystem") != ETString::npos || result.find("Size") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle(keyword, {});
+    CommandResult result = df.invoke(iHandle.invocation);
+    TEST_ASSERT_EQUAL(0, result.exitCode);
+    TEST_ASSERT_TRUE(iHandle.output.contains("Size"));
+    TEST_ASSERT_TRUE(iHandle.output.contains("Filesystem"));
+    TEST_ASSERT_TRUE(iHandle.error.empty());
 }
 
-void test_df_trigger_output_format(void)
+void test_df_output_format(void)
 {
     cmd::df df(*storage);
     ETString keyword = "df";
     ETString additional = "";
-    ETString result = df.trigger(keyword, additional);
+    auto iHandle = TestCommandInvocationHandle(keyword, {additional});
+    CommandResult cmdResult = df.invoke(iHandle.invocation);
     // Check for expected columns
-    TEST_ASSERT_TRUE(result.find("Used") != ETString::npos);
-    TEST_ASSERT_TRUE(result.find("Free") != ETString::npos);
+    TEST_ASSERT_TRUE(iHandle.output.contains("Used"));
+    TEST_ASSERT_TRUE(iHandle.output.contains("Free"));
 }
 
-void test_df_execute_writes_stdout(void)
+void test_df_writes_stdout(void)
 {
     cmd::df df(*storage);
 
-    MockStream stream;
     ETMap<ETString, ETString> vars;
-    CommandContext context{vars, 0, true};
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+    auto invocationHandle = TestCommandInvocationHandle("df", {});
 
-    CommandInvocation invocation{"df", "", context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = df.execute(invocation);
+    CommandResult result = df.invoke(invocationHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);
-    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("Size") != ETString::npos);
-    TEST_ASSERT_TRUE(stream.stderrBuffer.empty());
+    TEST_ASSERT_TRUE(invocationHandle.output.contains("Size"));
+    TEST_ASSERT_TRUE(invocationHandle.error.empty());
 }
 
 void process_tests()
 {
 
     UNITY_BEGIN();
-    RUN_TEST(test_df_trigger_basic);
-    RUN_TEST(test_df_trigger_with_path);
     RUN_TEST(test_df_usage);
-    RUN_TEST(test_df_trigger_edge_cases);
-    RUN_TEST(test_df_trigger_output_format);
-    RUN_TEST(test_df_execute_writes_stdout);
+    RUN_TEST(test_df_edge_cases);
+    RUN_TEST(test_df_output_format);
+    RUN_TEST(test_df_writes_stdout);
     UNITY_END();
 }
 

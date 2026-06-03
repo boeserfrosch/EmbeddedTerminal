@@ -7,15 +7,12 @@
 #include <stdint.h>
 
 // ETString implementation
-ETString::ETString() : data("")
-
-{
-}
-
+ETString::ETString() : data() {}
+ETString::ETString(char c) : data(1, c) {}
 ETString::ETString(const char *s) : data(s) {}
-ETString::ETString(const unsigned char *s) : data((const char *)s) {}
 
 ETString::ETString(const ETString &other) : data(other.data) {}
+
 ETString &ETString::operator=(const ETString &other)
 {
     data = other.data;
@@ -212,6 +209,16 @@ void ETString::insert(size_t pos, char c)
     data = data.substr(0, pos) + c + data.substr(pos);
 #endif
 }
+
+void ETString::insert(size_t pos, const ETString &str)
+{
+#if defined(ARDUINO) //|| defined(ESP_PLATFORM)
+    data = data.substring(0, pos) + str.data + data.substring(pos);
+#else
+    data = data.substr(0, pos) + str.data + data.substr(pos);
+#endif
+}
+
 void ETString::remove(size_t pos)
 {
 #if defined(ARDUINO) //|| defined(ESP_PLATFORM)
@@ -220,13 +227,26 @@ void ETString::remove(size_t pos)
     data.erase(pos, 1);
 #endif
 }
-void ETString::toLowerCase()
+void ETString::replace(size_t pos, size_t len, const ETString &str)
 {
 #if defined(ARDUINO) //|| defined(ESP_PLATFORM)
-    data.toLowerCase();
+    data = data.substring(0, pos) + str.data + data.substring(pos + len);
 #else
-    for (auto &c : data)
+    data = data.substr(0, pos) + str.data + data.substr(pos + len);
+#endif
+}
+
+ETString ETString::toLowerCase() const
+{
+#if defined(ARDUINO) //|| defined(ESP_PLATFORM)
+    auto tmp = data;
+    tmp.toLowerCase();
+    return tmp;
+#else
+    ETString result = *this;
+    for (auto &c : result.data)
         c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+    return result;
 #endif
 }
 void ETString::pop_back()
@@ -250,6 +270,7 @@ void ETString::push_back(char c)
 bool ETString::operator==(const ETString &other) const { return data == other.data; }
 bool ETString::operator!=(const ETString &other) const { return data != other.data; }
 ETString ETString::operator+(const ETString &other) const { return data + other.data; }
+
 ETString &ETString::operator+=(const ETString &other)
 {
     data += other.data;
@@ -282,6 +303,8 @@ ETString ETString::cleanupString() const
     ETString cleaned;
     size_t cursor = 0;
     size_t len = data.length();
+    bool inSingleQuote = false;
+    bool inDoubleQuote = false;
     for (size_t i = 0; i < len; ++i)
     {
         char c = data[i];
@@ -320,8 +343,28 @@ ETString ETString::cleanupString() const
             cursor = cleaned.length();
             i += 2;
         }
-        // Printable ASCII (space to tilde)
-        else if (c >= 32 && c <= 126)
+        // Backslash escape: include next char literally when present
+        else if (c == '\\' && i + 1 < len)
+        {
+            ++i;
+            cleaned.insert(cursor, data[i]);
+            ++cursor;
+        }
+        // Quote handling: toggle state and include the quote
+        else if (c == '\'' && !inDoubleQuote)
+        {
+            inSingleQuote = !inSingleQuote;
+            cleaned.insert(cursor, c);
+            ++cursor;
+        }
+        else if (c == '"' && !inSingleQuote)
+        {
+            inDoubleQuote = !inDoubleQuote;
+            cleaned.insert(cursor, c);
+            ++cursor;
+        }
+        // Printable ASCII (space to tilde) or tab when inside quotes
+        else if ((c >= 32 && c <= 126) || (c == '\t' && (inSingleQuote || inDoubleQuote)))
         {
             cleaned.insert(cursor, c);
             ++cursor;
@@ -400,17 +443,27 @@ ETString string_format(const ETString &format, Args... args)
     return ETString(std::string(buf.get(), buf.get() + size - 1));
 }
 
-ETVector<ETString> split(ETString s, ETString delimiter)
+void toLower(ETString &data)
+{
+    for (size_t i = 0; i < data.length(); ++i)
+    {
+        char &c = data[i];
+        c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+    }
+}
+
+ETVector<ETString> split(const ETString &s, const ETString &delimiter)
 {
     ETVector<ETString> tokens;
+    ETString remaining = s;
     size_t pos = 0;
-    while ((pos = s.find(delimiter)) != std::string::npos)
+    while ((pos = remaining.find(delimiter)) != std::string::npos)
     {
-        tokens.push_back(s.substr(0, pos));
-        s.erase(0, pos + delimiter.length());
+        tokens.push_back(remaining.substr(0, pos));
+        remaining.erase(0, pos + delimiter.length());
     }
-    if (!s.empty())
-        tokens.push_back(s);
+    if (!remaining.empty())
+        tokens.push_back(remaining);
     return tokens;
 }
 

@@ -11,7 +11,7 @@ namespace EmbeddedTerminal
     class CompileTimeGpioAuth : public IGpioAuth
     {
     public:
-        explicit CompileTimeGpioAuth(const ETString &expectedHashHex) : expectedHashHex_(expectedHashHex.trim())
+        CompileTimeGpioAuth(const ETString &expectedHashHex) : expectedHashHex_(expectedHashHex.trim())
         {
         }
 

@@ -9,10 +9,10 @@
 #endif
 #include "../../../src/commands/cd.h"
 #include "../../Mocks/native/MockFileSystem.h"
-#include "../../Mocks/MockStream.h"
 #include "../../Mocks/CommandRuntimeTestUtils.h"
 #include "StorageSystem.h"
 #include "../../Mocks/native/MockStorageMedia.h"
+#include "../utils.h"
 
 IStorageSystem *storage = nullptr;
 
@@ -41,8 +41,9 @@ void test_cd_trigger_valid_path(void)
     cmd::cd cd(dir);
     ETString keyword = "cd";
     ETString additional = "/valid";
-    ETString result = cd.trigger(keyword, additional);
-    TEST_ASSERT_TRUE(result.find("> valid") != ETString::npos || result.find("\n") != ETString::npos);
+    auto invocationHandle = TestCommandInvocationHandle(keyword, {additional});
+    CommandResult result = cd.invoke(invocationHandle.invocation);
+    TEST_ASSERT_TRUE(invocationHandle.output.contains("> /valid"));
 }
 
 void test_cd_trigger_invalid_path(void)
@@ -51,15 +52,18 @@ void test_cd_trigger_invalid_path(void)
     cmd::cd cd(dir);
     ETString keyword = "cd";
     ETString additional = "/invalid";
-    ETString result = cd.trigger(keyword, additional);
-    TEST_MESSAGE(("Result: " + result).c_str());
-    TEST_ASSERT_TRUE(result.find("Path does not exist") != ETString::npos);
+    auto invocationHandle = TestCommandInvocationHandle(keyword, {additional});
+    CommandResult result = cd.invoke(invocationHandle.invocation);
+    TEST_ASSERT_EQUAL(cmd::cd::ErrorCode::PathDoesNotExist, result.exitCode);
+    TEST_ASSERT_TRUE(invocationHandle.error.contains("Path does not exist"));
 
     // Test with a file path that is not a directory
     storage->open("/not_a_dir.txt", "w", true).writeAll("content");
     ETString filePath = "/not_a_dir.txt";
-    ETString result2 = cd.trigger(keyword, filePath);
-    TEST_ASSERT_TRUE(result2.find("Path is not a directory") != ETString::npos);
+    auto invocationHandle2 = TestCommandInvocationHandle(keyword, {filePath});
+    CommandResult result2 = cd.invoke(invocationHandle2.invocation);
+    TEST_ASSERT_EQUAL(cmd::cd::ErrorCode::PathNotDirectory, result2.exitCode);
+    TEST_ASSERT_TRUE(invocationHandle2.error.contains("Path is not a directory"));
 }
 
 void test_cd_usage(void)
@@ -76,9 +80,9 @@ void test_cd_empty_keyword(void)
     DirectoryNavigator dir(storage);
     cmd::cd cd(dir);
     ETString keyword = "";
-    ETString additional = "";
-    ETString result = cd.trigger(keyword, additional);
-    TEST_ASSERT_TRUE(result.find("Missing required argument") != ETString::npos);
+    auto invocationHandle = TestCommandInvocationHandle(keyword, {});
+    CommandResult result = cd.invoke(invocationHandle.invocation);
+    TEST_ASSERT_TRUE(invocationHandle.output.contains(cd.usage(keyword)));
 }
 
 void test_cd_pwd_cd_back_to_pwd(void)
@@ -93,26 +97,34 @@ void test_cd_pwd_cd_back_to_pwd(void)
     // Start at root
     TEST_ASSERT_TRUE(dir.pwd() == "/");
     TEST_ASSERT_TRUE(dir.pwd().isRoot());
+
     // cd into folder
-    cd.trigger("cd", "folder");
+    auto iHandle = TestCommandInvocationHandle("cd", {"folder"});
+    CommandResult result = cd.invoke(iHandle.invocation);
     TEST_ASSERT_TRUE(dir.pwd() == "/folder");
     // cd into another
-    cd.trigger("cd", "another");
+    auto iHandle2 = TestCommandInvocationHandle("cd", {"another"});
+    CommandResult result2 = cd.invoke(iHandle2.invocation);
     TEST_ASSERT_TRUE(dir.pwd() == "/folder/another");
     // cd into deeper
-    cd.trigger("cd", "deeper");
+    auto iHandle3 = TestCommandInvocationHandle("cd", {"deeper"});
+    CommandResult result3 = cd.invoke(iHandle3.invocation);
     TEST_ASSERT_TRUE(dir.pwd() == "/folder/another/deeper");
     // cd back to another
-    cd.trigger("cd", "..");
+    auto iHandle4 = TestCommandInvocationHandle("cd", {".."});
+    CommandResult result4 = cd.invoke(iHandle4.invocation);
     TEST_ASSERT_TRUE(dir.pwd() == "/folder/another");
     // cd back to folder
-    cd.trigger("cd", "..");
+    auto iHandle5 = TestCommandInvocationHandle("cd", {".."});
+    CommandResult result5 = cd.invoke(iHandle5.invocation);
     TEST_ASSERT_TRUE(dir.pwd() == "/folder");
     // cd staying in folder
-    cd.trigger("cd", ".");
+    auto iHandle6 = TestCommandInvocationHandle("cd", {});
+    CommandResult result6 = cd.invoke(iHandle6.invocation);
     TEST_ASSERT_TRUE(dir.pwd() == "/folder");
     // cd back to root
-    cd.trigger("cd", "/");
+    auto iHandle7 = TestCommandInvocationHandle("cd", {"/"});
+    CommandResult result7 = cd.invoke(iHandle7.invocation);
     TEST_ASSERT_TRUE(dir.pwd() == "/");
     TEST_ASSERT_TRUE(dir.pwd().isRoot());
 }
@@ -164,21 +176,17 @@ void test_cd_stream_output_on_execute(void)
     storage->mkdir("/folder");
     DirectoryNavigator dir(storage);
     cmd::cd cd(dir);
-    MockStream stream;
 
     ETMap<ETString, ETString> vars;
     CommandContext context{vars, 0, true};
     ETString keyword = "cd";
-    ETString arg = "folder";
+    ETVector<ETString> arg = {"folder"};
 
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
-    CommandInvocation invocation{keyword, arg, context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = cd.execute(invocation);
+    auto invocationHandle = TestCommandInvocationHandle(keyword, arg);
+    CommandResult result = cd.invoke(invocationHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);
-    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("> /folder") != ETString::npos);
+    TEST_ASSERT_TRUE(invocationHandle.output.contains("> /folder"));
 }
 
 void test_cd_stream_output_on_execute_invalid_path(void)
@@ -186,22 +194,18 @@ void test_cd_stream_output_on_execute_invalid_path(void)
     storage->mkdir("/valid");
     DirectoryNavigator dir(storage);
     cmd::cd cd(dir);
-    MockStream stream;
 
     ETMap<ETString, ETString> vars;
     CommandContext context{vars, 0, true};
     ETString keyword = "cd";
-    ETString arg = "nonexistent";
+    ETVector<ETString> arg = {"nonexistent"};
 
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
-    CommandInvocation invocation{keyword, arg, context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = cd.execute(invocation);
+    auto iHandle = TestCommandInvocationHandle(keyword, arg);
+    CommandResult result = cd.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(1, result.exitCode);
-    TEST_MESSAGE(("Result: " + stream.stderrBuffer).c_str());
-    TEST_ASSERT_TRUE(stream.stderrBuffer.find("does not exist") != ETString::npos);
+    TEST_MESSAGE(("Result: " + iHandle.error.debugOutput).c_str());
+    TEST_ASSERT_TRUE(iHandle.error.contains("does not exist"));
 }
 
 void test_cd_stream_output_on_execute_no_parameter(void)
@@ -209,21 +213,17 @@ void test_cd_stream_output_on_execute_no_parameter(void)
     storage->mkdir("/test");
     DirectoryNavigator dir(storage);
     cmd::cd cd(dir);
-    MockStream stream;
 
     ETMap<ETString, ETString> vars;
     CommandContext context{vars, 0, true};
     ETString keyword = "cd";
-    ETString arg = "   ";
+    ETVector<ETString> arg = {}; // No argument provided
 
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
-    CommandInvocation invocation{keyword, arg, context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = cd.execute(invocation);
+    auto iHandle = TestCommandInvocationHandle(keyword, arg);
+    CommandResult result = cd.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(1, result.exitCode);
-    TEST_ASSERT_TRUE(stream.stderrBuffer.find("Missing required argument") != ETString::npos);
+    TEST_ASSERT_TRUE(iHandle.output.contains(cd.usage(keyword)));
 }
 
 void test_cd_correct_error_codes_and_messages(void)
@@ -232,43 +232,39 @@ void test_cd_correct_error_codes_and_messages(void)
     storage->open("/test/file.txt", "w", true).writeAll("content");
     DirectoryNavigator dir(storage);
     cmd::cd cd(dir);
-    MockStream stream;
 
     ETMap<ETString, ETString> vars;
     CommandContext context{vars, 0, true};
     ETString keyword = "cd";
-    ETString arg = "   ";
+    ETVector<ETString> arg = {}; // No argument provided
 
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
-    CommandInvocation invocation{keyword, arg, context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = cd.execute(invocation);
+    auto iHandle = TestCommandInvocationHandle(keyword, arg);
+    CommandResult result = cd.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(1, result.exitCode);
-    TEST_ASSERT_TRUE(stream.stderrBuffer.find("Missing required argument") != ETString::npos);
+    TEST_ASSERT_TRUE(iHandle.output.contains(cd.usage(keyword)));
 
     // Test with non-existent path
-    arg = "/nonexistent";
-    CommandInvocation invocation2{keyword, arg, context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result2 = cd.execute(invocation2);
+    arg = {"/nonexistent"};
+    auto iHandle2 = TestCommandInvocationHandle(keyword, arg);
+    CommandResult result2 = cd.invoke(iHandle2.invocation);
 
-    TEST_ASSERT_EQUAL(1, result2.exitCode);
-    TEST_ASSERT_TRUE(stream.stderrBuffer.find("does not exist") != ETString::npos);
+    TEST_ASSERT_EQUAL(cmd::cd::ErrorCode::PathDoesNotExist, result2.exitCode);
+    TEST_ASSERT_TRUE(iHandle2.error.contains("does not exist"));
 
     // Test with a file path that is not a directory
-    arg = "/test/file.txt";
-    CommandInvocation invocation3{keyword, arg, context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result3 = cd.execute(invocation3);
-    TEST_ASSERT_EQUAL(1, result3.exitCode);
-    TEST_ASSERT_TRUE(stream.stderrBuffer.find("is not a directory") != ETString::npos);
+    arg = {"/test/file.txt"};
+    auto iHandle3 = TestCommandInvocationHandle(keyword, arg);
+    CommandResult result3 = cd.invoke(iHandle3.invocation);
+    TEST_ASSERT_EQUAL(cmd::cd::ErrorCode::PathNotDirectory, result3.exitCode);
+    TEST_ASSERT_TRUE(iHandle3.error.contains("is not a directory"));
 
     // Test with valid path
-    arg = "/test";
-    CommandInvocation invocation4{keyword, arg, context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result4 = cd.execute(invocation4);
-    TEST_ASSERT_EQUAL(0, result4.exitCode);
-    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("> /test") != ETString::npos);
+    arg = {"/test"};
+    auto iHandle4 = TestCommandInvocationHandle(keyword, arg);
+    CommandResult result4 = cd.invoke(iHandle4.invocation);
+    TEST_ASSERT_EQUAL(cmd::cd::ErrorCode::None, result4.exitCode);
+    TEST_ASSERT_TRUE(iHandle4.output.contains("> /test"));
 }
 
 int process_tests_cd()

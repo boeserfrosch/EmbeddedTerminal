@@ -2,13 +2,13 @@
 
 using namespace EmbeddedTerminal::cmd;
 
-ETString pwd::trigger(const ETString &keyword, const ETString &additional)
+EmbeddedTerminal::CommandResult EmbeddedTerminal::cmd::pwd::invoke(CommandInvocation &invocation)
 {
-    // pwd takes no parameters, just return current directory
-    return dir_.pwd() + "\n";
+    invocation.streams.output.print(dir_.pwd() + "\n");
+    return CommandResult::completed(0);
 }
 
-ETString pwd::usage(const ETString &keyword)
+ETString pwd::usage(const ETString &keyword) const
 {
     return keyword + " - Print the current working directory\n";
 }

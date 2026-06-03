@@ -8,20 +8,34 @@ namespace EmbeddedTerminal
     class OptionParser
     {
     public:
+        enum class ParseErrorCode
+        {
+            None = 0,
+            UnmatchedQuote,
+            InvalidOptionFormat,
+            MissingOptionValue,
+            UnknownOption,
+            MissingRequiredOption,
+            MissingRequiredArgument,
+        };
         struct ParseResult
         {
             bool success = false;
+            ParseErrorCode error = ParseErrorCode::None;
             ETMap<ETString, ETVector<ETString>> options;
-            ETString remainingArguments;
-            ETString errorMessage;
+            ETVector<ETString> remainingArguments = {};
         };
 
         void addOption(const ETString &shortOpt, const ETString &longOpt, const ETString &description, bool requiresValue = false, bool isRequired = false);
         void addRequiredRemainingArgument(const ETString &name);
         void addOptionalRemainingArgument(const ETString &name);
         ParseResult parse(const ETString &input);
+        ParseResult parse(const ETVector<ETString> &args);
 
     private:
+        bool checkRequiredOptions(const ETMap<ETString, ETVector<ETString>> &parsedOptions);
+        bool matchRemainingArguments(const ETVector<ETString> &filteredArguments, ParseResult &result);
+
         struct OptionDefinition
         {
             ETString shortOpt;
@@ -32,6 +46,9 @@ namespace EmbeddedTerminal
         };
         ETVector<OptionDefinition> options_;
         ETVector<std::pair<ETString, bool>> remainingArguments_; // pair<name, isRequired>
+        size_t requiredRemainingArgumentsCount_ = 0;
+        bool schemaInvalid_ = false;
+        ETString schemaError_;
     };
 } // namespace EmbeddedTerminal
 

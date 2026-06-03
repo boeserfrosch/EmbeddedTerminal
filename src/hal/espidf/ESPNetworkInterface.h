@@ -19,7 +19,7 @@ namespace EmbeddedTerminal
     class ESPNetworkInterface : public INetworkInterface
     {
     public:
-        explicit ESPNetworkInterface(const ETString &name = "wlan0") : interfaceName_(name) {}
+        ESPNetworkInterface(const ETString &name = "wlan0") : interfaceName_(name) {}
         ~ESPNetworkInterface() override {}
 
         NetworkInfo info() const override

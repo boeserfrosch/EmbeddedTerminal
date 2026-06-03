@@ -2,50 +2,48 @@
 #define DOWNLOAD_H
 
 #include "DirectoryNavigator.h"
-#include "Terminal.h"
+#include "interfaces/ICommand.h"
 
 namespace EmbeddedTerminal
 {
     namespace cmd
     {
 
-        namespace errorCodes
-        {
-            enum DownloadCmdErrorCode
-            {
-                DOWNLOAD_CMD_ERROR_NONE = 0,
-                DOWNLOAD_CMD_ERROR_INVALID_PATH = 1,
-                DOWNLOAD_CMD_ERROR_FILE_NOT_FOUND = 2,
-                DOWNLOAD_CMD_ERROR_IS_DIRECTORY = 3,
-                DOWNLOAD_CMD_ERROR_FAILED_TO_OPEN_FILE = 4,
-                DOWNLOAD_CMD_ERROR_FAILED_TO_SEEK = 5,
-                DOWNLOAD_CMD_ERROR_FAILED_TO_READ = 6
-            };
-        }
-
         class download : public ICommand
         {
 
         public:
+            enum ErrorCode
+            {
+                NONE = 0,
+                INVALID_PATH = 1,
+                FILE_NOT_FOUND = 2,
+                IS_DIRECTORY = 3,
+                FAILED_TO_OPEN_FILE = 4,
+                FAILED_TO_SEEK = 5,
+                FAILED_TO_READ = 6,
+                INVALID_INVOKE = 7,
+                INVALID_INVOKE_EXPECTED_RESUME = 8
+            };
             download(DirectoryNavigator &dir) : dir_(dir)
             {
             }
-            ETString usage(const ETString &keyword);
-            CommandResult execute(CommandInvocation &invocation) override;
-            ETString trigger(const ETString &keyword, const ETString &additional) override;
-            ETVector<ETString> getSuggestions(const ETString &partial) override;
+            ETString usage(const ETString &keyword) const override;
+            CommandResult invoke(CommandInvocation &invocation) override;
+            CommandResult resume(CommandInvocation &invocation) override;
+            ETVector<ETString> getSuggestions(const ETString &partial) const override;
 
         protected:
             static constexpr const char *SESSION_KEY_PATH = "download__path";
             static constexpr const char *SESSION_KEY_POS = "download__pos";
 
         private:
-            struct downloadState
+            struct State
             {
-                ETString path;
+                Path path;
                 size_t position = 0;
+                bool initialized = false;
             };
-
             struct processChunkResult
             {
                 bool hasMore = false;
@@ -55,11 +53,13 @@ namespace EmbeddedTerminal
                 processChunkResult(bool hasMore, bool error = false, size_t errorCode = 0) : hasMore(hasMore), error(error), errorCode(errorCode) {}
             };
 
-            downloadState handleState_(CommandInvocation &invocation);
-            unsigned char checkState_(const downloadState &state, CommandInvocation &invocation);
-            processChunkResult processChunk_(ETFile &file, size_t filePos, CommandInvocation &invocation);
+            static State initState_(CommandInvocation &invocation);
+            static State getState_(CommandInvocation &invocation);
+            ErrorCode checkState_(const State &state, CommandInvocation &invocation);
+            CommandResult processDownload(CommandInvocation &invocation, const State &state);
             CommandResult error_(size_t errorCode, CommandInvocation &invocation);
             CommandResult success_(CommandInvocation &invocation);
+            void reset(CommandInvocation &invocation);
 
             DirectoryNavigator dir_;
         };

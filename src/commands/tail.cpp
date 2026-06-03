@@ -1,33 +1,7 @@
 #include "tail.h"
 using namespace EmbeddedTerminal::cmd;
-ETString tail::trigger(const ETString &keyword, const ETString &additional)
-{
-    bool truncated = false;
-    ETString fileName = additional.trim();
-    if (fileName.empty())
-    {
-        return "Expected parameter\n" + usage(keyword);
-    }
-    if (!dir_.exists(fileName.c_str()) || dir_.isDirectory(fileName.c_str()))
-    {
-        return "file " + fileName + " did not exist!\n";
-    }
-    auto file = dir_.open(fileName.c_str(), "r", false);
-    if (file.size() > 512)
-    {
-        truncated = true;
-        file.seek(file.size() - 512);
-    }
-    auto content = file.readAll();
-    file.close();
-    if (truncated)
-    {
-        return "... File truncated ... \n" + content + "\n";
-    }
-    return ETString(content.c_str()) + "\n";
-}
 
-ETString tail::usage(const ETString &keyword)
+ETString tail::usage(const ETString &keyword) const
 {
     return keyword + " [file] - Returns the last n lines of the specified file.\n" +
            "By default, n is 10, but you can specify a different number of lines by adding -n [number] before the file name.\n" +
@@ -35,90 +9,80 @@ ETString tail::usage(const ETString &keyword)
            "Or tail --lines 20 /logs/system.log\n";
 }
 
-ETVector<ETString> tail::getSuggestions(const ETString &partial)
+ETVector<ETString> tail::getSuggestions(const ETString &partial) const
 {
     return completer_.getSuggestions(partial);
 }
 
-EmbeddedTerminal::CommandResult tail::execute(CommandInvocation &invocation)
+EmbeddedTerminal::CommandResult tail::invoke(CommandInvocation &invocation)
 {
-    auto state = getState_(invocation);
-
-    switch (state)
+    auto parseResult = parseOptions_(invocation);
+    if (parseResult.state != CommandExecutionState::Running)
     {
-    case TailState::Initial:
-        return parseOptions_(invocation);
-    case TailState::FindingStartPosition:
-        return findStartPosition_(invocation);
-    case TailState::Streaming:
-        return streamFile_(invocation);
+        return parseResult;
     }
-    return CommandResult::completed(errorCodes::TAIL_CMD_ERROR_NONE);
+
+    auto findPosResult = findStartPosition_(invocation);
+    if (findPosResult.state != CommandExecutionState::Running)
+    {
+        return findPosResult;
+    }
+
+    return streamFile_(invocation);
 }
 
-tail::TailState tail::getState_(CommandInvocation &invocation)
+EmbeddedTerminal::CommandResult tail::resume(CommandInvocation &invocation)
 {
-    auto it = invocation.context.variables.find(SESSION_KEY_STATE);
-    if (it == invocation.context.variables.end())
+    if (invocation.context.variables.find(SESSION_KEY_PATH) == invocation.context.variables.end() ||
+        invocation.context.variables.find(SESSION_KEY_POS) == invocation.context.variables.end())
     {
-        return TailState::Initial;
+        return error_(ErrorCode::INVALID_RESUME, invocation);
     }
-    ETString stateStr = it->second;
-    if (stateStr == "FindingStartPosition")
-    {
-        return TailState::FindingStartPosition;
-    }
-    else if (stateStr == "Streaming")
-    {
-        return TailState::Streaming;
-    }
-    // Default to Initial if state is unrecognized
-    return TailState::Initial;
+    return streamFile_(invocation);
 }
 
 EmbeddedTerminal::CommandResult tail::parseOptions_(CommandInvocation &invocation)
 {
     OptionParser parser;
     parser.addOption("-n", "--lines", "Number of lines to display from the end of the file", true);
+    // We expect that just one file name will be provided, we could enhance this later to support multiple files
+    parser.addRequiredRemainingArgument("file");
     auto parseResult = parser.parse(invocation.arguments);
 
     if (!parseResult.success)
     {
-        return error_(errorCodes::TAIL_CMD_ERROR_INVALID_OPTIONS, invocation);
+        return error_(ErrorCode::INVALID_OPTIONS, invocation);
     }
 
-    size_t linesToFind = 10; // Default to last 10 lines
+    linesToFind_ = 10; // Default to last 10 lines, this should be configurable or at least a central constant
     if (parseResult.options.count("--lines") && !parseResult.options["--lines"].empty())
     {
-        linesToFind = std::stoi(parseResult.options["--lines"][0]);
+        linesToFind_ = std::stoi(parseResult.options["--lines"][0]);
     }
 
-    if (linesToFind <= 0)
+    if (linesToFind_ <= 0)
     {
-        return error_(errorCodes::TAIL_CMD_ERROR_INVALID_NUMBER_OF_LINES, invocation);
+        return error_(ErrorCode::INVALID_NUMBER_OF_LINES, invocation);
     }
 
-    ETString fileName = parseResult.remainingArguments.trim();
-    printf("Parsed options: linesToFind=%zu, fileName='%s'\n", linesToFind, fileName.c_str());
+    // For now we expect the file name as the first remaining argument after options, we could enhance this later to support more flexible argument ordering or multiple files
+    ETString fileName = parseResult.options["file"][0];
     if (fileName.empty())
     {
-        return error_(errorCodes::TAIL_CMD_ERROR_INVALID_OPTIONS, invocation);
+        return error_(ErrorCode::INVALID_OPTIONS, invocation);
     }
     if (!dir_.exists(fileName.c_str()) || dir_.isDirectory(fileName.c_str()))
     {
-        return error_(errorCodes::TAIL_CMD_ERROR_FILE_NOT_FOUND, invocation);
+        return error_(ErrorCode::FILE_NOT_FOUND, invocation);
     }
     auto file = dir_.open(fileName.c_str(), "r", false);
     if (!file.isOpen())
     {
-        return error_(errorCodes::TAIL_CMD_ERROR_FAILED_TO_OPEN_FILE, invocation);
+        return error_(ErrorCode::FAILED_TO_OPEN_FILE, invocation);
     }
 
     invocation.context.variables[SESSION_KEY_PATH] = fileName;
     invocation.context.variables[SESSION_KEY_POS] = "0";
-    invocation.context.variables[SESSION_KEY_STATE] = "FindingStartPosition";
-    invocation.context.variables[SESSION_KEY_LINES_TO_FIND] = toETString(linesToFind);
-    invocation.context.variables[SESSION_KEY_LINES_FOUND] = "0";
 
     return CommandResult::running(0);
 }
@@ -126,70 +90,65 @@ EmbeddedTerminal::CommandResult tail::parseOptions_(CommandInvocation &invocatio
 EmbeddedTerminal::CommandResult tail::findStartPosition_(CommandInvocation &invocation)
 {
     ETString fileName = invocation.context.variables[SESSION_KEY_PATH];
-    size_t linesToFind = ETString::toull(invocation.context.variables[SESSION_KEY_LINES_TO_FIND].c_str());
-    size_t seekOffsetPos = ETString::toull(invocation.context.variables[SESSION_KEY_POS].c_str());
-    size_t linesFound = ETString::toull(invocation.context.variables[SESSION_KEY_LINES_FOUND].c_str());
+    size_t seekOffsetPos = 0; // How far from the end of the file we have seeked while looking for the starting position to stream from
 
     auto file = dir_.open(fileName.c_str(), "r", false);
     if (!file.isOpen())
     {
-        return error_(errorCodes::TAIL_CMD_ERROR_FAILED_TO_OPEN_FILE, invocation);
+        return error_(ErrorCode::FAILED_TO_OPEN_FILE, invocation);
     }
 
     if (!file.seek(0))
     {
         file.close();
-        return error_(errorCodes::TAIL_CMD_ERROR_FAILED_TO_SEEK, invocation);
+        return error_(ErrorCode::FAILED_TO_SEEK, invocation);
     }
 
-    if (seekOffsetPos >= file.size())
-    {
-        invocation.context.variables[SESSION_KEY_POS] = toETString(file.size());
-        invocation.context.variables[SESSION_KEY_STATE] = "Streaming";
-        return CommandResult::running(errorCodes::TAIL_CMD_ERROR_NONE);
-    }
-
-    // Start from the end of the file and count newlines to find the starting position,
-    // we should do this non blocking and in chunks to support large files and large number of lines or files on slow storage or long lines that exceed the buffer size
     size_t fileSize = file.size();
-    size_t pos = fileSize - seekOffsetPos;
-
-    const size_t bufferSize = 512;
-    unsigned char buffer[bufferSize];
-
-    size_t chunkSize = (pos <= bufferSize) ? pos : bufferSize;
-    pos -= chunkSize;
-    file.seek(pos);
-    size_t bytesRead = file.read(buffer, chunkSize);
-    if (bytesRead == 0)
+    if (fileSize == 0)
     {
         file.close();
-        return error_(errorCodes::TAIL_CMD_ERROR_FAILED_TO_READ, invocation);
+        return success_(invocation); // Empty file, nothing to find but it's not an error
     }
 
-    for (ssize_t i = bytesRead - 1; i >= 0; i--)
-    {
-        if (buffer[i] == '\n')
-        {
-            linesFound++;
-            if (linesFound >= linesToFind)
-            {
-                seekOffsetPos = fileSize - (pos + i + 1); // Position after the newline
-                invocation.context.variables[SESSION_KEY_POS] = toETString(seekOffsetPos);
-                invocation.context.variables[SESSION_KEY_STATE] = "Streaming";
-                invocation.context.variables[SESSION_KEY_LINES_FOUND] = toETString(linesFound);
+    const size_t bufferSize = 512; // @todo: we could make this buffer size configurable or at least make it a central constant
+    unsigned char buffer[bufferSize];
 
-                file.close();
-                return CommandResult::running(errorCodes::TAIL_CMD_ERROR_NONE);
+    size_t linesFound = 0;
+    while (seekOffsetPos < fileSize && linesFound < linesToFind_)
+    {
+        size_t pos = fileSize - seekOffsetPos;
+        size_t chunkSize = (pos <= bufferSize) ? pos : bufferSize;
+        pos -= chunkSize;
+        file.seek(pos);
+
+        size_t bytesRead = file.read(buffer, chunkSize);
+        if (bytesRead == 0)
+        {
+            file.close();
+            return error_(ErrorCode::FAILED_TO_READ, invocation);
+        }
+        for (size_t i = bytesRead - 1; i >= 0; i--)
+        {
+            if (buffer[i] == '\n')
+            {
+                linesFound++;
+                if (linesFound >= linesToFind_)
+                {
+                    seekOffsetPos = fileSize - (pos + i + 1); // Position after the newline
+                    invocation.context.variables[SESSION_KEY_POS] = toETString(seekOffsetPos);
+                    file.close();
+                    return CommandResult::running(ErrorCode::NONE);
+                }
             }
         }
     }
 
+    // If we reached the beginning of the file, we should stream from the start
+    invocation.context.variables[SESSION_KEY_POS] = toETString(fileSize);
     file.close();
 
-    invocation.context.variables[SESSION_KEY_POS] = toETString(fileSize - pos);
-    invocation.context.variables[SESSION_KEY_LINES_FOUND] = toETString(linesFound);
-    return CommandResult::running(errorCodes::TAIL_CMD_ERROR_NONE);
+    return CommandResult::running(ErrorCode::NONE);
 }
 
 EmbeddedTerminal::CommandResult tail::streamFile_(CommandInvocation &invocation)
@@ -200,20 +159,26 @@ EmbeddedTerminal::CommandResult tail::streamFile_(CommandInvocation &invocation)
     auto file = dir_.open(fileName.c_str(), "r", false);
     if (!file.isOpen())
     {
-        return error_(errorCodes::TAIL_CMD_ERROR_FAILED_TO_OPEN_FILE, invocation);
+        return error_(ErrorCode::FAILED_TO_OPEN_FILE, invocation);
     }
 
     auto fileSize = file.size();
+    if (fileSize == 0)
+    {
+        file.close();
+        return success_(invocation); // Empty file, nothing to stream but it's not an error
+    }
+
     if (fileEndPosOffset > fileSize)
     {
         file.close();
-        return error_(errorCodes::TAIL_CMD_ERROR_FAILED_TO_SEEK, invocation);
+        return error_(ErrorCode::FAILED_TO_SEEK, invocation);
     }
 
     if (!file.seek(fileSize - fileEndPosOffset))
     {
         file.close();
-        return error_(errorCodes::TAIL_CMD_ERROR_FAILED_TO_SEEK, invocation);
+        return error_(ErrorCode::FAILED_TO_SEEK, invocation);
     }
 
     // We emit in chunks for non blocking behavior and to support large files and slow storage or long lines that exceed the buffer size
@@ -223,11 +188,11 @@ EmbeddedTerminal::CommandResult tail::streamFile_(CommandInvocation &invocation)
     if (bytesRead == 0)
     {
         file.close();
-        return error_(errorCodes::TAIL_CMD_ERROR_FAILED_TO_READ, invocation);
+        return error_(ErrorCode::FAILED_TO_READ, invocation);
     }
 
     ETString chunk(std::string(reinterpret_cast<const char *>(buffer), bytesRead));
-    invocation.stdoutChannel.print(chunk);
+    invocation.streams.output.print(chunk);
 
     size_t newPos = fileEndPosOffset - bytesRead;
     invocation.context.variables[SESSION_KEY_POS] = toETString(newPos);
@@ -240,43 +205,45 @@ EmbeddedTerminal::CommandResult tail::streamFile_(CommandInvocation &invocation)
     }
     else
     {
-        return CommandResult::running(errorCodes::TAIL_CMD_ERROR_NONE);
+        return CommandResult::running(ErrorCode::NONE);
     }
+}
+
+void EmbeddedTerminal::cmd::tail::reset(CommandInvocation &invocation)
+{
+    invocation.context.variables.erase(SESSION_KEY_PATH);
+    invocation.context.variables.erase(SESSION_KEY_POS);
 }
 
 EmbeddedTerminal::CommandResult tail::error_(size_t errorCode, CommandInvocation &invocation)
 {
-    invocation.context.variables.erase(SESSION_KEY_PATH);
-    invocation.context.variables.erase(SESSION_KEY_POS);
-    invocation.context.variables.erase(SESSION_KEY_STATE);
-    invocation.context.variables.erase(SESSION_KEY_LINES_TO_FIND);
-    invocation.context.variables.erase(SESSION_KEY_LINES_FOUND);
+    reset(invocation); // Clear any state related to the command since we're in an error state and want to avoid leaving stale state that could interfere with the next execution
 
     switch (errorCode)
     {
-    case errorCodes::TAIL_CMD_ERROR_INVALID_OPTIONS:
-        invocation.stderrChannel.print("Invalid options. Usage:\n" + usage(invocation.keyword));
+    case ErrorCode::INVALID_OPTIONS:
+        invocation.streams.error.print("Invalid options. Usage:\n" + usage(invocation.keyword));
         break;
-    case errorCodes::TAIL_CMD_ERROR_INVALID_NUMBER_OF_LINES:
-        invocation.stderrChannel.print("Invalid number of lines specified. It must be a positive integer.");
+    case ErrorCode::INVALID_NUMBER_OF_LINES:
+        invocation.streams.error.print("Invalid number of lines specified. It must be a positive integer.");
         break;
-    case errorCodes::TAIL_CMD_ERROR_FILE_NOT_FOUND:
-        invocation.stderrChannel.print("File did not exist.");
+    case ErrorCode::FILE_NOT_FOUND:
+        invocation.streams.error.print("File did not exist.");
         break;
-    case errorCodes::TAIL_CMD_ERROR_IS_DIRECTORY:
-        invocation.stderrChannel.print("Specified path is a directory, not a file.");
+    case ErrorCode::IS_DIRECTORY:
+        invocation.streams.error.print("Specified path is a directory, not a file.");
         break;
-    case errorCodes::TAIL_CMD_ERROR_FAILED_TO_OPEN_FILE:
-        invocation.stderrChannel.print("Failed to open file.");
+    case ErrorCode::FAILED_TO_OPEN_FILE:
+        invocation.streams.error.print("Failed to open file.");
         break;
-    case errorCodes::TAIL_CMD_ERROR_FAILED_TO_SEEK:
-        invocation.stderrChannel.print("Failed to seek in file.");
+    case ErrorCode::FAILED_TO_SEEK:
+        invocation.streams.error.print("Failed to seek in file.");
         break;
-    case errorCodes::TAIL_CMD_ERROR_FAILED_TO_READ:
-        invocation.stderrChannel.print("Failed to read from file.");
+    case ErrorCode::FAILED_TO_READ:
+        invocation.streams.error.print("Failed to read from file.");
         break;
     default:
-        invocation.stderrChannel.print("An unknown error occurred.");
+        invocation.streams.error.print("An unknown error occurred.");
         break;
     }
 
@@ -285,10 +252,6 @@ EmbeddedTerminal::CommandResult tail::error_(size_t errorCode, CommandInvocation
 
 EmbeddedTerminal::CommandResult tail::success_(CommandInvocation &invocation)
 {
-    invocation.context.variables.erase(SESSION_KEY_PATH);
-    invocation.context.variables.erase(SESSION_KEY_POS);
-    invocation.context.variables.erase(SESSION_KEY_STATE);
-    invocation.context.variables.erase(SESSION_KEY_LINES_TO_FIND);
-    invocation.context.variables.erase(SESSION_KEY_LINES_FOUND);
-    return CommandResult::completed(errorCodes::TAIL_CMD_ERROR_NONE);
+    reset(invocation); // Clear any state related to the command since we're done and want to avoid leaving stale state that could interfere with the next execution
+    return CommandResult::completed(ErrorCode::NONE);
 }

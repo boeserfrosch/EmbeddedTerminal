@@ -4,7 +4,7 @@
 #include "DirectoryNavigator.h"
 #include "interfaces/IAutoCompleter.h"
 #include "DefaultAutoCompleters.h"
-#include "Terminal.h"
+#include "interfaces/ICommand.h"
 
 namespace EmbeddedTerminal
 {
@@ -15,14 +15,21 @@ namespace EmbeddedTerminal
         {
 
         public:
+            enum ErrorCode
+            {
+                None = 0,
+                Missused = 1,
+                InvalidArgument = 2
+            };
+
             rmdir(DirectoryNavigator &dir) : dir_(dir), completer_(dir)
             {
             }
-            ETString usage(const ETString &keyword);
-            ETString trigger(const ETString &keyword, const ETString &additional) override;
+            ETString usage(const ETString &keyword) const override;
+            CommandResult invoke(CommandInvocation &invocation) override;
 
             // Auto completion - suggest directories to remove
-            ETVector<ETString> getSuggestions(const ETString &partial) override;
+            ETVector<ETString> getSuggestions(const ETString &partial) const override;
 
         private:
             DirectoryNavigator dir_;

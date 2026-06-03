@@ -14,6 +14,7 @@
 #include "../../Mocks/CommandRuntimeTestUtils.h"
 #include "StorageSystem.h"
 #include "../../Mocks/native/MockStorageMedia.h"
+#include "../utils.h"
 
 #include <unity.h>
 
@@ -37,7 +38,7 @@ void tearDown(void)
     storage = nullptr;
 }
 
-void test_cat_trigger_small_file(void)
+void test_cat_small_file(void)
 {
     EmbeddedTerminal::DirectoryNavigator dir(storage);
     storage->open("/file.txt", "w", true).writeAll("hello1234"); // Small file
@@ -45,11 +46,13 @@ void test_cat_trigger_small_file(void)
 
     ETString keyword = "cat";
     ETString arg = "file.txt";
-    ETString result = cat.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("hello1234") != ETString::npos);
+    auto invocationHandle = TestCommandInvocationHandle(keyword, {arg});
+    CommandResult result = cat.invoke(invocationHandle.invocation);
+    TEST_ASSERT_EQUAL(CommandExecutionState::Completed, result.state);
+    TEST_ASSERT_TRUE(invocationHandle.output.contains("hello1234") != ETString::npos);
 }
 
-void test_cat_trigger_large_file(void)
+void test_cat_large_file(void)
 {
     EmbeddedTerminal::DirectoryNavigator dir(storage);
     auto file = storage->open("/big.txt", "w", true);
@@ -60,21 +63,23 @@ void test_cat_trigger_large_file(void)
     EmbeddedTerminal::cmd::cat cat(dir);
     ETString keyword = "cat";
     ETString arg = "big.txt";
-    ETString result = cat.trigger(keyword, arg);
+    auto invocationHandle = TestCommandInvocationHandle(keyword, {arg});
+    CommandResult result = cat.invoke(invocationHandle.invocation);
     TEST_ASSERT_TRUE(dir.exists("/big.txt"));
     TEST_ASSERT_TRUE(dir.exists("big.txt"));
-    TEST_ASSERT_TRUE_MESSAGE(result.find("... File truncated ...") != ETString::npos, ("Expected truncation message for large file got: " + result).c_str());
+    TEST_ASSERT_EQUAL(CommandExecutionState::Running, result.state);
 }
 
-void test_cat_trigger_file_not_exists(void)
+void test_cat_file_not_exists(void)
 {
     EmbeddedTerminal::DirectoryNavigator dir(storage);
     EmbeddedTerminal::cmd::cat cat(dir);
 
     ETString keyword = "cat";
     ETString arg = "nofile.txt";
-    ETString result = cat.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("did not exist!") != ETString::npos);
+    auto invocationHandle = TestCommandInvocationHandle(keyword, {arg});
+    CommandResult result = cat.invoke(invocationHandle.invocation);
+    TEST_ASSERT_TRUE(invocationHandle.error.contains("did not exist!") != ETString::npos);
 }
 
 void test_cat_usage(void)
@@ -86,64 +91,52 @@ void test_cat_usage(void)
     TEST_ASSERT_TRUE(result.find("Returns the content") != ETString::npos);
 }
 
-void test_cat_trigger_edge_cases(void)
+void test_cat_edge_cases(void)
 {
     EmbeddedTerminal::DirectoryNavigator dir(storage);
     EmbeddedTerminal::cmd::cat cat(dir);
     ETString keyword = "cat";
     ETString arg = "   ";
-    ETString result = cat.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("Missing required argument") != ETString::npos);
+    auto invocationHandle = TestCommandInvocationHandle(keyword, {arg});
+    CommandResult result = cat.invoke(invocationHandle.invocation);
+    TEST_ASSERT_TRUE(invocationHandle.output.contains(cat.usage(keyword)) != ETString::npos);
     ETString arg2 = "did_not_exist.txt";
-    ETString result2 = cat.trigger(keyword, arg2);
-    TEST_ASSERT_TRUE(result2.find("did not exist!") != ETString::npos);
+    auto invocationHandle2 = TestCommandInvocationHandle(keyword, {arg2});
+    CommandResult result2 = cat.invoke(invocationHandle2.invocation);
+    TEST_ASSERT_TRUE(invocationHandle2.error.contains("did not exist!") != ETString::npos);
 }
 
-void test_cat_execute_small_file_writes_stdout(void)
+void test_cat_small_file_writes_stdout(void)
 {
     EmbeddedTerminal::DirectoryNavigator dir(storage);
     storage->open("/file.txt", "w", true).writeAll("hello1234");
     EmbeddedTerminal::cmd::cat cat(dir);
-    MockStream stream;
 
-    ETMap<ETString, ETString> vars;
-    CommandContext context{vars, 0, true};
     ETString keyword = "cat";
-    ETString arg = "file.txt";
+    ETVector<ETString> arg = {"file.txt"};
 
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
-
-    CommandInvocation invocation{keyword, arg, context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = cat.execute(invocation);
+    auto invocationHandle = TestCommandInvocationHandle(keyword, arg);
+    CommandResult result = cat.invoke(invocationHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);
-    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("hello1234") != ETString::npos);
-    TEST_ASSERT_TRUE(stream.stderrBuffer.empty());
+    TEST_ASSERT_TRUE(invocationHandle.output.contains("hello1234") != ETString::npos);
+    TEST_ASSERT_TRUE(invocationHandle.error.empty());
 }
 
-void test_cat_execute_missing_file_writes_stderr(void)
+void test_cat_missing_file_writes_stderr(void)
 {
     EmbeddedTerminal::DirectoryNavigator dir(storage);
     EmbeddedTerminal::cmd::cat cat(dir);
-    MockStream stream;
 
-    ETMap<ETString, ETString> vars;
-    CommandContext context{vars, 0, true};
     ETString keyword = "cat";
-    ETString arg = "missing.txt";
+    ETVector<ETString> arg = {"missing.txt"};
 
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
-
-    CommandInvocation invocation{keyword, arg, context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = cat.execute(invocation);
+    auto invocationHandle = TestCommandInvocationHandle(keyword, arg);
+    CommandResult result = cat.invoke(invocationHandle.invocation);
 
     TEST_ASSERT_EQUAL(2, result.exitCode);
-    TEST_ASSERT_TRUE(stream.stderrBuffer.find("did not exist") != ETString::npos);
-    TEST_ASSERT_TRUE(stream.stdoutBuffer.empty());
+    TEST_ASSERT_TRUE(invocationHandle.error.contains("did not exist") != ETString::npos);
+    TEST_ASSERT_TRUE(invocationHandle.output.empty());
 }
 
 void test_cat_manual_stream_debug(void)
@@ -184,7 +177,7 @@ void test_cat_execute_streaming_simple(void)
 {
     EmbeddedTerminal::DirectoryNavigator dir(storage);
     ETString largeContent = "";
-    for (int i = 0; i < 60; i++)
+    for (int i = 0; i < 90; i++)
     {
         largeContent += "0123456789";
     }
@@ -194,41 +187,34 @@ void test_cat_execute_streaming_simple(void)
     file.close();
 
     EmbeddedTerminal::cmd::cat cat(dir);
-    MockStream stream;
-
-    ETMap<ETString, ETString> vars;
-    CommandContext context{vars, 0, true};
-
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
     // First invocation
-    CommandInvocation invocation1{"cat", "large.txt", context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result1 = cat.execute(invocation1);
+    auto invocationHandle = TestCommandInvocationHandle("cat", {"large.txt"});
+    CommandResult result1 = cat.invoke(invocationHandle.invocation);
 
     TEST_ASSERT_EQUAL(CommandExecutionState::Running, result1.state);
     TEST_ASSERT_EQUAL(0, result1.exitCode);
-    TEST_ASSERT_TRUE(context.variables.find("cat__path") != context.variables.end());
-    TEST_ASSERT_TRUE(context.variables.find("cat__pos") != context.variables.end());
+    TEST_ASSERT_TRUE(invocationHandle.context.variables.find("cat__path") != invocationHandle.context.variables.end());
+    TEST_ASSERT_TRUE(invocationHandle.context.variables.find("cat__pos") != invocationHandle.context.variables.end());
+    TEST_ASSERT_TRUE(invocationHandle.output.debugOutput != largeContent);
 
     // Second invocation
-    CommandInvocation invocation2{"cat", "large.txt", context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result2 = cat.execute(invocation2);
+    CommandResult result2 = cat.resume(invocationHandle.invocation);
 
     TEST_ASSERT_EQUAL(CommandExecutionState::Completed, result2.state);
     TEST_ASSERT_EQUAL(0, result2.exitCode);
+    TEST_ASSERT_TRUE(invocationHandle.output.contains(largeContent));
 }
 
 int process_tests_cat()
 {
     UNITY_BEGIN();
-    RUN_TEST(test_cat_trigger_small_file);
-    RUN_TEST(test_cat_trigger_large_file);
-    RUN_TEST(test_cat_trigger_file_not_exists);
+    RUN_TEST(test_cat_small_file);
+    RUN_TEST(test_cat_large_file);
+    RUN_TEST(test_cat_file_not_exists);
     RUN_TEST(test_cat_usage);
-    RUN_TEST(test_cat_trigger_edge_cases);
-    RUN_TEST(test_cat_execute_small_file_writes_stdout);
-    RUN_TEST(test_cat_execute_missing_file_writes_stderr);
+    RUN_TEST(test_cat_edge_cases);
+    RUN_TEST(test_cat_small_file_writes_stdout);
+    RUN_TEST(test_cat_missing_file_writes_stderr);
     RUN_TEST(test_cat_manual_stream_debug);
     RUN_TEST(test_cat_execute_streaming_simple);
     UNITY_END();

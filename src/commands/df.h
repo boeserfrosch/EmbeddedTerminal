@@ -1,7 +1,7 @@
 #ifndef DF_H
 #define DF_H
 
-#include "Terminal.h"
+#include "interfaces/ICommand.h"
 #include "interfaces/ICommand.h"
 #include "interfaces/IStorage.h"
 
@@ -14,14 +14,20 @@ namespace EmbeddedTerminal
         {
 
         public:
+            enum ErrorCode
+            {
+                None = 0,
+                FailedToRetrieveMedia = 1
+            };
+
             df(IStorageSystem &storage) : storage_(storage)
             {
             }
-            ETString usage(const ETString &keyword);
-            ETString trigger(const ETString &keyword, const ETString &additional) override;
+            ETString usage(const ETString &keyword) const override;
+            CommandResult invoke(CommandInvocation &invocation) override;
 
         private:
-            IStorageSystem& storage_;
+            IStorageSystem &storage_;
         };
     };
 };

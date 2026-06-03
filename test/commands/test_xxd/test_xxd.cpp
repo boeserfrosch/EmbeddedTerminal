@@ -9,8 +9,7 @@
 #endif
 #include "commands/xxd.h"
 #include "../../../src/DirectoryNavigator.h"
-#include "../../Mocks/MockStream.h"
-#include "../../Mocks/CommandRuntimeTestUtils.h"
+#include "../utils.h"
 #include "StorageSystem.h"
 #include "../../Mocks/native/MockStorageMedia.h"
 
@@ -47,8 +46,9 @@ void test_xxd_trigger_small_file(void)
 
     ETString keyword = "xxd";
     ETString arg = "file.txt";
-    ETString result = xxd.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("68 65 6C 6C 6F 31 32 33 34") != ETString::npos); // Hex for "hello123"
+    auto iHandle = TestCommandInvocationHandle(keyword, {arg});
+    CommandResult result = xxd.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains("68 65 6C 6C 6F 31 32 33 34")); // Hex for "hello123"
 }
 
 void test_xxd_trigger_large_file(void)
@@ -67,11 +67,24 @@ void test_xxd_trigger_large_file(void)
     EmbeddedTerminal::cmd::xxd xxd(*dir);
     ETString keyword = "xxd";
     ETString arg = "big.txt";
-    ETString result = xxd.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("41 42 43") != ETString::npos);             // Hex for "ABC"
-    TEST_ASSERT_TRUE(result.length() > 1000);                                // Should be large since we read 512 bytes and not truncate
-    TEST_ASSERT_TRUE(result.find("00000200:") == ETString::npos);            // Should have at most 512 bytes, so offset 200 should not be present
-    TEST_ASSERT_TRUE(result.find("... output truncated") != ETString::npos); // Should not be truncated since we read 512 bytes
+    auto iHandle = TestCommandInvocationHandle(keyword, {arg});
+
+    CommandResult result = xxd.invoke(iHandle.invocation);
+    TEST_ASSERT_EQUAL(CommandExecutionState::Running, result.state); // Should be running since we read 512 bytes and not truncate
+    iHandle.input.print("n");                                        // Simulate user pressing 'n' for next chunk
+    result = xxd.resume(iHandle.invocation);
+
+    TEST_ASSERT_EQUAL(CommandExecutionState::Running, result.state);
+
+    iHandle.input.print("q"); // Simulate user pressing 'q' to quit
+    result = xxd.resume(iHandle.invocation);
+
+    TEST_ASSERT_EQUAL(CommandExecutionState::Completed, result.state);
+
+    TEST_ASSERT_TRUE(iHandle.output.contains("41 42 43")); // Hex for "ABC"
+    TEST_ASSERT_TRUE(iHandle.output.length() > 1000);      // Should be large since we read 512 bytes and not truncate
+    TEST_ASSERT_TRUE(iHandle.output.contains("0000020:"));
+    TEST_ASSERT_FALSE(iHandle.output.contains("00000200:")); // The dump should stop before offset 200 for this data set
 }
 
 void test_xxd_trigger_file_not_exists(void)
@@ -80,8 +93,9 @@ void test_xxd_trigger_file_not_exists(void)
 
     ETString keyword = "xxd";
     ETString arg = "nofile.txt";
-    ETString result = xxd.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("did not exist!") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle(keyword, {arg});
+    CommandResult result = xxd.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.error.contains("file not found"));
 }
 
 void test_xxd_usage(void)
@@ -98,13 +112,15 @@ void test_xxd_trigger_edge_cases(void)
     EmbeddedTerminal::cmd::xxd xxd(*dir);
 
     // Test empty path
-    ETString result = xxd.trigger("xxd", "   ");
-    TEST_ASSERT_TRUE(result.find("Missing required argument: file") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("xxd");
+    CommandResult result = xxd.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains(xxd.usage("xxd")));
 
     // Test directory instead of file
     storage->mkdir("/dir");
-    result = xxd.trigger("xxd", "dir");
-    TEST_ASSERT_TRUE(result.find("did not exist!") != ETString::npos);
+    auto iHandle2 = TestCommandInvocationHandle("xxd", {"dir"});
+    CommandResult result2 = xxd.invoke(iHandle2.invocation);
+    TEST_ASSERT_TRUE(iHandle2.error.contains("path points to a directory"));
 }
 
 void test_xxd_get_suggestions(void)
@@ -128,12 +144,12 @@ void test_xxd_execute_writes_stdout(void)
     MockStream stream;
     ETMap<ETString, ETString> vars;
     CommandContext context{vars, 0, true};
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+    EmptyInputChannel input;
+    StreamBackedOutputChannel output(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel error(stream, TerminalChannel::StdErr);
 
-    CommandInvocation invocation{"xxd", "file.txt", context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = xxd.execute(invocation);
+    CommandInvocation invocation{"xxd", {"file.txt"}, context, input, output, error};
+    CommandResult result = xxd.invoke(invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);
     TEST_ASSERT_TRUE(stream.stdoutBuffer.find("00000000") != ETString::npos);
@@ -145,19 +161,12 @@ void test_xxd_execute_missing_file_writes_stderr(void)
 {
     EmbeddedTerminal::cmd::xxd xxd(*dir);
 
-    MockStream stream;
-    ETMap<ETString, ETString> vars;
-    CommandContext context{vars, 0, true};
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+    auto iHandle = TestCommandInvocationHandle("xxd", {"nofile.txt"});
+    CommandResult result = xxd.invoke(iHandle.invocation);
 
-    CommandInvocation invocation{"xxd", "missing.bin", context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = xxd.execute(invocation);
-
-    TEST_ASSERT_EQUAL(EmbeddedTerminal::cmd::errorCodes::XXD_CMD_ERROR_FILE_NOT_FOUND, result.exitCode);
-    TEST_ASSERT_TRUE(stream.stderrBuffer.find("file not found") != ETString::npos);
-    TEST_ASSERT_TRUE(stream.stdoutBuffer.empty());
+    TEST_ASSERT_EQUAL(EmbeddedTerminal::cmd::xxd::ErrorCode::FILE_NOT_FOUND, result.exitCode);
+    TEST_ASSERT_TRUE(iHandle.error.contains("file not found"));
+    TEST_ASSERT_TRUE(iHandle.output.empty());
 }
 
 void test_xxd_execute_navigates_on_next_key(void)
@@ -167,24 +176,26 @@ void test_xxd_execute_navigates_on_next_key(void)
     {
         content += "0123456789";
     }
-    storage->open("/big.bin", "w", true).writeAll(content.c_str());
+    auto file = storage->open("/big.bin", "w", true);
+    file.writeAll(content.c_str());
+    file.close();
 
     EmbeddedTerminal::cmd::xxd xxd(*dir);
     MockStream stream;
     ETMap<ETString, ETString> vars;
     CommandContext context{vars, 0, true};
-    BufferedInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+    BufferedInputChannel input;
+    StreamBackedOutputChannel output(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel error(stream, TerminalChannel::StdErr);
 
-    CommandInvocation invocation{"xxd", "big.bin", context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult first = xxd.execute(invocation);
+    CommandInvocation invocation{"xxd", {"big.bin"}, context, input, output, error};
+    CommandResult first = xxd.invoke(invocation);
     TEST_ASSERT_EQUAL(0, first.exitCode);
     TEST_ASSERT_TRUE(stream.stdoutBuffer.find("00000000") != ETString::npos);
 
     stream.stdoutBuffer = "";
-    stdinChannel.buffer = "n";
-    CommandResult second = xxd.execute(invocation);
+    input.buffer = "n";
+    CommandResult second = xxd.invoke(invocation);
     TEST_ASSERT_EQUAL(0, second.exitCode);
     TEST_ASSERT_TRUE(stream.stdoutBuffer.find("00000010") != ETString::npos);
 }
@@ -196,25 +207,27 @@ void test_xxd_execute_navigates_on_previous_key(void)
     {
         content += "0123456789";
     }
-    storage->open("/big_prev.bin", "w", true).writeAll(content.c_str());
+    auto file = storage->open("/big_prev.bin", "w", true);
+    file.writeAll(content.c_str());
+    file.close();
 
     EmbeddedTerminal::cmd::xxd xxd(*dir);
     MockStream stream;
     ETMap<ETString, ETString> vars;
     CommandContext context{vars, 0, true};
-    BufferedInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+    BufferedInputChannel input;
+    StreamBackedOutputChannel output(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel error(stream, TerminalChannel::StdErr);
 
-    CommandInvocation invocation{"xxd", "big_prev.bin", context, stdinChannel, stdoutChannel, stderrChannel};
-    xxd.execute(invocation);
+    CommandInvocation invocation{"xxd", {"big_prev.bin"}, context, input, output, error};
+    xxd.invoke(invocation);
 
-    stdinChannel.buffer = "n";
-    xxd.execute(invocation);
+    input.buffer = "n";
+    xxd.invoke(invocation);
 
     stream.stdoutBuffer = "";
-    stdinChannel.buffer = "p";
-    CommandResult result = xxd.execute(invocation);
+    input.buffer = "p";
+    CommandResult result = xxd.invoke(invocation);
     TEST_ASSERT_EQUAL(0, result.exitCode);
     TEST_ASSERT_TRUE(stream.stdoutBuffer.find("00000000") != ETString::npos);
 }
@@ -232,22 +245,22 @@ void test_xxd_execute_navigates_with_go_begin_and_end(void)
     MockStream stream;
     ETMap<ETString, ETString> vars;
     CommandContext context{vars, 0, true};
-    BufferedInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+    BufferedInputChannel input;
+    StreamBackedOutputChannel output(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel error(stream, TerminalChannel::StdErr);
 
-    CommandInvocation invocation{"xxd", "big_go.bin", context, stdinChannel, stdoutChannel, stderrChannel};
-    xxd.execute(invocation);
+    CommandInvocation invocation{"xxd", {"big_go.bin"}, context, input, output, error};
+    xxd.invoke(invocation);
 
     stream.stdoutBuffer = "";
-    stdinChannel.buffer = "G";
-    xxd.execute(invocation);
+    input.buffer = "G";
+    xxd.resume(invocation);
     TEST_ASSERT_TRUE(vars.find("xxd__pos") != vars.end());
     TEST_ASSERT_TRUE(std::stoull(vars["xxd__pos"].c_str()) > 0);
 
     stream.stdoutBuffer = "";
-    stdinChannel.buffer = "g";
-    CommandResult result = xxd.execute(invocation);
+    input.buffer = "g";
+    CommandResult result = xxd.resume(invocation);
     TEST_ASSERT_EQUAL(0, result.exitCode);
     TEST_ASSERT_TRUE(stream.stdoutBuffer.find("00000000") != ETString::npos);
 }
@@ -255,7 +268,7 @@ void test_xxd_execute_navigates_with_go_begin_and_end(void)
 void test_xxd_execute_navigates_to_hex_offset(void)
 {
     ETString content = "";
-    for (int i = 0; i < 80; i++)
+    for (int i = 0; i < 800; i++)
     {
         content += "0123456789";
     }
@@ -265,18 +278,53 @@ void test_xxd_execute_navigates_to_hex_offset(void)
     MockStream stream;
     ETMap<ETString, ETString> vars;
     CommandContext context{vars, 0, true};
-    BufferedInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+    BufferedInputChannel input;
+    StreamBackedOutputChannel output(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel error(stream, TerminalChannel::StdErr);
 
-    CommandInvocation invocation{"xxd", "big_offset.bin", context, stdinChannel, stdoutChannel, stderrChannel};
-    xxd.execute(invocation);
+    CommandInvocation invocation{"xxd", {"big_offset.bin"}, context, input, output, error};
+    xxd.invoke(invocation);
 
     stream.stdoutBuffer = "";
-    stdinChannel.buffer = "o20";
-    CommandResult result = xxd.execute(invocation);
+    input.buffer = "o200\n";
+    CommandResult result = xxd.resume(invocation);
     TEST_ASSERT_EQUAL(0, result.exitCode);
-    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("00000020") != ETString::npos);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("00000200") != ETString::npos);
+}
+
+void test_xxd_execute_navigates_to_hex_offset_in_chunks(void)
+{
+    ETString content = "";
+    for (int i = 0; i < 800; i++)
+    {
+        content += "0123456789";
+    }
+    storage->open("/big_offset_chunked.bin", "w", true).writeAll(content.c_str());
+
+    EmbeddedTerminal::cmd::xxd xxd(*dir);
+    MockStream stream;
+    ETMap<ETString, ETString> vars;
+    CommandContext context{vars, 0, true};
+    BufferedInputChannel input;
+    StreamBackedOutputChannel output(stream, TerminalChannel::StdOut);
+    StreamBackedOutputChannel error(stream, TerminalChannel::StdErr);
+
+    CommandInvocation invocation{"xxd", {"big_offset_chunked.bin"}, context, input, output, error};
+    xxd.invoke(invocation);
+
+    ETString initialPos = vars["xxd__pos"];
+    stream.stdoutBuffer = "";
+    input.buffer = "o";
+    CommandResult partial = xxd.resume(invocation);
+    TEST_ASSERT_EQUAL(CommandExecutionState::Running, partial.state);
+    TEST_ASSERT_EQUAL_STRING(initialPos.c_str(), vars["xxd__pos"].c_str());
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.empty());
+
+    stream.stdoutBuffer = "";
+    input.buffer = "200\n";
+    CommandResult result = xxd.resume(invocation);
+    TEST_ASSERT_EQUAL(0, result.exitCode);
+    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("00000200") != ETString::npos);
 }
 
 void test_xxd_execute_quit_key_completes(void)
@@ -284,18 +332,11 @@ void test_xxd_execute_quit_key_completes(void)
     storage->open("/quit.bin", "w", true).writeAll("0123456789ABCDEF");
     EmbeddedTerminal::cmd::xxd xxd(*dir);
 
-    MockStream stream;
-    ETMap<ETString, ETString> vars;
-    CommandContext context{vars, 0, true};
-    BufferedInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
+    auto iHandle = TestCommandInvocationHandle("xxd", {"quit.bin"});
+    xxd.invoke(iHandle.invocation);
 
-    CommandInvocation invocation{"xxd", "quit.bin", context, stdinChannel, stdoutChannel, stderrChannel};
-    xxd.execute(invocation);
-
-    stdinChannel.buffer = "q";
-    CommandResult result = xxd.execute(invocation);
+    iHandle.input.print("q");
+    CommandResult result = xxd.resume(iHandle.invocation);
     TEST_ASSERT_EQUAL(CommandExecutionState::Completed, result.state);
     TEST_ASSERT_EQUAL(0, result.exitCode);
 }
@@ -315,6 +356,7 @@ int process_tests()
     RUN_TEST(test_xxd_execute_navigates_on_previous_key);
     RUN_TEST(test_xxd_execute_navigates_with_go_begin_and_end);
     RUN_TEST(test_xxd_execute_navigates_to_hex_offset);
+    RUN_TEST(test_xxd_execute_navigates_to_hex_offset_in_chunks);
     RUN_TEST(test_xxd_execute_quit_key_completes);
     UNITY_END();
     return 0;

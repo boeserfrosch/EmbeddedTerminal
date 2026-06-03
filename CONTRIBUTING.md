@@ -115,32 +115,24 @@ class MockNetworkInterface : public INetworkInterface {
 };
 
 // In commands/ping.cpp - Clean, platform-agnostic (runtime v2 path)
-CommandResult ping::execute(CommandInvocation &invocation) {
+CommandResult ping::invoke(CommandInvocation &invocation) {
     ETString target = invocation.arguments.trim();
-    invocation.stdoutChannel.print(_net.ping(target));
+    invocation.streams.output.print(_net.ping(target));
     return CommandResult::completed(0);
 }
 ```
 
 See the actual implementation in `src/commands/ping.cpp` and `src/interfaces/INetworkInterface.h` for a production example.
 
-### Command Runtime (v2)
+### Command Runtime
 
-For new commands, prefer implementing `ICommand::execute(CommandInvocation&)`.
+For new commands, implement `ICommand::invoke(CommandInvocation&)`.
 
-- `execute()` gives you channel-based IO (`stdin`, `stdout`, `stderr`)
-- it returns a `CommandResult` (`completed`, `running`, `waitingForInput`)
-- it supports stateful commands through `invocation.context.variables`
-
-Legacy `trigger(keyword, additional)` remains supported through the default adapter in `ICommand` for backwards compatibility.
+Older `trigger(keyword, additional)` examples are no longer representative of the current API. Use `CommandInvocation.arguments` instead of parsing a trailing string manually.
 
 ### String Handling Example
 
 ```cpp
-// Good: Platform-independent
-ETString processInput(const ETString &input) {
-    ETString result = input.trim();
-    return result;
 }
 
 // Avoid: Direct platform-specific strings
@@ -172,7 +164,7 @@ EmbeddedTerminal supports TAB-based auto completion. To add auto completion to y
 2. **Implement the `getSuggestions()` method**:
 
    ```cpp
-   ETVector<ETString> getSuggestions(const ETString &partial) override {
+   ETVector<ETString> getSuggestions(const ETString &partial) const override {
        ETVector<ETString> suggestions;
        
        // Get your data (files, options, etc.)

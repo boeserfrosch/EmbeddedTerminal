@@ -1,16 +1,20 @@
 // Platform conditional includes
-#if defined(ARDUINO) //|| defined(ESP_PLATFORM)
+#if defined(ARDUINO)
 #include <Arduino.h>
 #endif
 #if defined(ESP_PLATFORM) || defined(ESP_32)
-#include <freertos/FreeRTOS.h>
-#include <freertos/timers.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/timers.h"
 #endif
+
 #include "OptionParser.h"
+#include "ETTypes.h"
 #include "../../Mocks/native/MockFileSystem.h"
 #include "../../Mocks/CommandRuntimeTestUtils.h"
 #include "DirectoryNavigator.h"
 #include <unity.h>
+
+using namespace EmbeddedTerminal;
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -25,7 +29,7 @@ void test_option_parser_simple(void)
     TEST_ASSERT_TRUE(result.options.find("--lines") != result.options.end());
     TEST_ASSERT_TRUE(result.options.find("-n") != result.options.end());
     TEST_ASSERT_EQUAL_STRING("5", result.options["--lines"][0].c_str());
-    TEST_ASSERT_EQUAL_STRING("file.txt", result.remainingArguments.c_str());
+    TEST_ASSERT_EQUAL_STRING("file.txt", join(result.remainingArguments, " ").c_str());
 }
 
 void test_option_parser_with_multiple_options(void)
@@ -40,7 +44,7 @@ void test_option_parser_with_multiple_options(void)
     TEST_ASSERT_TRUE(result.options.find("--force") != result.options.end());
     TEST_ASSERT_EQUAL_STRING("5", result.options["--lines"][0].c_str());
     TEST_ASSERT_EQUAL_STRING("true", result.options["--force"][0].c_str());
-    TEST_ASSERT_EQUAL_STRING("file.txt", result.remainingArguments.c_str());
+    TEST_ASSERT_EQUAL_STRING("file.txt", join(result.remainingArguments, " ").c_str());
 }
 
 void test_option_parser_with_invalid_options(void)
@@ -51,7 +55,7 @@ void test_option_parser_with_invalid_options(void)
     auto result = parser.parse("-x 5 file.txt");
     TEST_ASSERT_TRUE(result.success);
     TEST_ASSERT_TRUE(result.options.find("--lines") == result.options.end());
-    TEST_ASSERT_EQUAL_STRING("-x 5 file.txt", result.remainingArguments.c_str());
+    TEST_ASSERT_EQUAL_STRING("-x 5 file.txt", join(result.remainingArguments, " ").c_str());
 }
 
 void test_option_parser_with_missing_required_options(void)
@@ -62,7 +66,7 @@ void test_option_parser_with_missing_required_options(void)
 
     auto result = parser.parse("file.txt -n");
     TEST_ASSERT_FALSE(result.success);
-    TEST_ASSERT_TRUE(result.errorMessage.find("requires a value") != ETString::npos);
+    TEST_ASSERT_EQUAL(OptionParser::ParseErrorCode::MissingOptionValue, result.error);
 }
 
 void test_option_parser_with_required_option_missing(void)
@@ -72,7 +76,7 @@ void test_option_parser_with_required_option_missing(void)
 
     auto result = parser.parse("input.txt");
     TEST_ASSERT_FALSE(result.success);
-    TEST_ASSERT_TRUE(result.errorMessage.find("Missing required option") != ETString::npos);
+    TEST_ASSERT_EQUAL(OptionParser::ParseErrorCode::MissingRequiredOption, result.error);
 }
 
 void test_option_parser_with_required_option_present(void)
@@ -84,7 +88,7 @@ void test_option_parser_with_required_option_present(void)
     TEST_ASSERT_TRUE(result.success);
     TEST_ASSERT_TRUE(result.options.find("--file") != result.options.end());
     TEST_ASSERT_EQUAL_STRING("script.txt", result.options["--file"][0].c_str());
-    TEST_ASSERT_EQUAL_STRING("input.txt", result.remainingArguments.c_str());
+    TEST_ASSERT_EQUAL_STRING("input.txt", join(result.remainingArguments, " ").c_str());
 }
 
 void test_option_parser_with_extra_arguments(void)
@@ -96,7 +100,7 @@ void test_option_parser_with_extra_arguments(void)
     TEST_ASSERT_TRUE(result.success);
     TEST_ASSERT_TRUE(result.options.find("--lines") != result.options.end());
     TEST_ASSERT_EQUAL_STRING("5", result.options["--lines"][0].c_str());
-    TEST_ASSERT_EQUAL_STRING("file.txt extra_arg", result.remainingArguments.c_str());
+    TEST_ASSERT_EQUAL_STRING("file.txt extra_arg", join(result.remainingArguments, " ").c_str());
 }
 
 void test_option_parser_with_quoted_value(void)
@@ -108,7 +112,7 @@ void test_option_parser_with_quoted_value(void)
     TEST_ASSERT_TRUE(result.success);
     TEST_ASSERT_TRUE(result.options.find("--name") != result.options.end());
     TEST_ASSERT_EQUAL_STRING("John Doe", result.options["--name"][0].c_str());
-    TEST_ASSERT_EQUAL_STRING("file.txt", result.remainingArguments.c_str());
+    TEST_ASSERT_EQUAL_STRING("file.txt", join(result.remainingArguments, " ").c_str());
 }
 
 void test_option_parser_with_unmatched_quote(void)
@@ -118,7 +122,7 @@ void test_option_parser_with_unmatched_quote(void)
 
     auto result = parser.parse("--name \"John Doe file.txt");
     TEST_ASSERT_FALSE(result.success);
-    TEST_ASSERT_TRUE(result.errorMessage.find("Unmatched quote") != ETString::npos);
+    TEST_ASSERT_EQUAL(OptionParser::ParseErrorCode::UnmatchedQuote, result.error);
 }
 
 void test_option_parser_with_required_remaining_arguments(void)
@@ -129,7 +133,7 @@ void test_option_parser_with_required_remaining_arguments(void)
 
     auto result = parser.parse("-n 5");
     TEST_ASSERT_FALSE(result.success);
-    TEST_ASSERT_TRUE(result.errorMessage.find("Missing required argument") != ETString::npos);
+    TEST_ASSERT_EQUAL(OptionParser::ParseErrorCode::MissingRequiredArgument, result.error);
 }
 
 void test_option_parser_with_optional_remaining_argument_before_required(void)
@@ -139,19 +143,27 @@ void test_option_parser_with_optional_remaining_argument_before_required(void)
     parser.addRequiredRemainingArgument("file");
 
     auto withOptional = parser.parse("fast input.txt");
-    TEST_ASSERT_TRUE(withOptional.success);
-    TEST_ASSERT_TRUE(withOptional.options.find("mode") != withOptional.options.end());
-    TEST_ASSERT_TRUE(withOptional.options.find("file") != withOptional.options.end());
-    TEST_ASSERT_EQUAL_STRING("fast", withOptional.options["mode"][0].c_str());
-    TEST_ASSERT_EQUAL_STRING("input.txt", withOptional.options["file"][0].c_str());
-    TEST_ASSERT_EQUAL_STRING("", withOptional.remainingArguments.c_str());
+    TEST_ASSERT_FALSE(withOptional.success);
+    TEST_ASSERT_EQUAL(OptionParser::ParseErrorCode::InvalidOptionFormat, withOptional.error);
 
     auto withoutOptional = parser.parse("input.txt");
-    TEST_ASSERT_TRUE(withoutOptional.success);
-    TEST_ASSERT_TRUE(withoutOptional.options.find("mode") == withoutOptional.options.end());
-    TEST_ASSERT_TRUE(withoutOptional.options.find("file") != withoutOptional.options.end());
-    TEST_ASSERT_EQUAL_STRING("input.txt", withoutOptional.options["file"][0].c_str());
-    TEST_ASSERT_EQUAL_STRING("", withoutOptional.remainingArguments.c_str());
+    TEST_ASSERT_FALSE(withoutOptional.success);
+    TEST_ASSERT_EQUAL(OptionParser::ParseErrorCode::InvalidOptionFormat, withoutOptional.error);
+}
+
+void test_option_parser_similar_to_tail_command(void)
+{
+    EmbeddedTerminal::OptionParser parser;
+    parser.addOption("-n", "--lines", "Number of lines to display from the end of the file", true);
+    parser.addRequiredRemainingArgument("file");
+
+    ETVector<ETString> args = {"-n", "5", "file.txt"};
+    auto result = parser.parse(args);
+    TEST_ASSERT_TRUE(result.success);
+    TEST_ASSERT_TRUE(result.options.find("--lines") != result.options.end());
+    TEST_ASSERT_EQUAL_STRING("5", result.options["--lines"][0].c_str());
+    TEST_ASSERT_TRUE(result.options.find("file") != result.options.end());
+    TEST_ASSERT_EQUAL_STRING("file.txt", result.options["file"][0].c_str());
 }
 
 void process_tests()
@@ -168,6 +180,7 @@ void process_tests()
     RUN_TEST(test_option_parser_with_unmatched_quote);
     RUN_TEST(test_option_parser_with_required_remaining_arguments);
     RUN_TEST(test_option_parser_with_optional_remaining_argument_before_required);
+    RUN_TEST(test_option_parser_similar_to_tail_command);
     UNITY_END();
 }
 

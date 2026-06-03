@@ -11,7 +11,7 @@ namespace EmbeddedTerminal
     class ArduinoSDMMCStorageMedia : public IStorageMedia
     {
     public:
-        explicit ArduinoSDMMCStorageMedia(const ETString &name = "sdmmc")
+        ArduinoSDMMCStorageMedia(const ETString &name = "sdmmc")
             : name_(name),
               fileSystem_(SD_MMC)
         {

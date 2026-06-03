@@ -4,7 +4,8 @@
 
 ## Disclaimer
 
-The Readme is partially generated using AI but was proven to be inaccurate in some places. Please refer to the source code and documentation for the most accurate information.
+The Readme is mostly generated using AI. It was reviewed for accuracy. If you find any mistakes or inconsistencies, please open an issue or submit a PR with corrections. Thanks!
+For the most accurate and up-to-date information, please refer to the source code and documentation in this repository.
 
 ## Features
 
@@ -240,12 +241,14 @@ private:
 
 class MyCommand : public ICommand {
 public:
-    ETString trigger(const ETString &keyword, const ETString &additional) override {
-        return "Hello from custom command!";
+    ETString usage(const ETString &keyword) const override {
+        return keyword + " [name] - Custom command example";
     }
-    
-    ETString usage(const ETString &keyword) override {
-        return "mycmd - Custom command example";
+
+    CommandResult invoke(CommandInvocation &invocation) override {
+        ETString name = invocation.arguments.empty() ? "world" : invocation.arguments[0];
+        invocation.streams.output.print("Hello from custom command, " + name + "!\n");
+        return CommandResult::completed(0);
     }
 };
 
@@ -273,19 +276,23 @@ void loop() {
 
 > **See also:** [examples/CustomCommand/CustomCommand.ino](examples/CustomCommand/CustomCommand.ino) for more advanced custom command examples (echo, uptime, LED control)
 
-### Command Runtime v2 (Preview)
+### Command Runtime
 
-EmbeddedTerminal now includes a new `execute()` command path designed for streaming and scripting use-cases:
+EmbeddedTerminal's command API is stream-based:
 
-- `ICommand::execute(CommandInvocation&)` receives `stdin`, `stdout`, `stderr`, and command context
+- `ICommand::invoke(CommandInvocation&)` receives `input`, `output`, `error`, and command context
 - `CommandResult` carries command `exitCode` and execution state
-- Existing `trigger(keyword, additional)` commands continue to work via the default adapter implementation
+- `ICommand::resume(CommandInvocation&)` continues commands that returned `Running` or `WaitingForInput`
 
-This allows incremental migration of commands from string-return APIs to stream-first execution without breaking existing command implementations.
+This allows for:
+
+- Long-running commands that can yield and resume
+- Interactive commands that can wait for user input
+- Commands that can return specific exit codes for scripting and control flow
 
 ### Auto Completion
 
-EmbeddedTerminal supports TAB-based auto completion for commands and file paths. When the user presses TAB while typing, the terminal:
+EmbeddedTerminal supports TAB-based auto completion for commands and file paths and any other input that supports it. When the user presses TAB while typing, the terminal:
 
 1. Looks up the command being typed
 2. Asks that command for completion suggestions
@@ -331,16 +338,18 @@ class MyAutocompleteCommand : public ICommand {
 public:
     MyAutocompleteCommand(DirectoryNavigator &nav) : nav_(nav) {}
     
-    ETString trigger(const ETString &keyword, const ETString &additional) override {
-        return "Command: " + additional;
+    ETString usage(const ETString &keyword) const override {
+        return keyword + " [argument] - Command with auto completion";
     }
-    
-    ETString usage(const ETString &keyword) override {
-        return "myautocmd [argument] - Command with auto completion";
+
+    CommandResult invoke(CommandInvocation &invocation) override {
+        ETString argument = invocation.arguments.empty() ? "" : invocation.arguments[0];
+        invocation.streams.output.print("Command: " + argument + "\n");
+        return CommandResult::completed(0);
     }
     
     // Provide auto completion suggestions
-    ETVector<ETString> getSuggestions(const ETString &partial) override {
+    ETVector<ETString> getSuggestions(const ETString &partial) const override {
         ETVector<ETString> suggestions;
         
         // Return suggestions that match the partial input
@@ -376,7 +385,7 @@ You can use these in your own commands:
 class MyCommand : public ICommand {
     DirectoryNavigator &nav_;
     
-    ETVector<ETString> getSuggestions(const ETString &partial) override {
+    ETVector<ETString> getSuggestions(const ETString &partial) const override {
         // Use DirectoryCompleter to suggest directories
         DirectoryCompleter completer(nav_);
         return completer.getSuggestions(partial);
@@ -418,6 +427,24 @@ class MyCommand : public ICommand {
 | `gpio` | Control GPIO pins with security policies | `gpio read 2`, `gpio mode 5 output` |
 | `gpio` | Control GPIO pins with security policies | `gpio read 2`, `gpio mode 5 output` |
 
+### Pipe Support
+
+Commands that support streaming can be piped together using `|`:
+
+```txt
+cat file.txt | xxd
+cat file.txt | tail
+```
+
+Also redirection operators `>` and `<` are supported for commands that support streaming:
+
+```txt
+cat file.txt > output.txt
+cat < input.txt
+echo "Hello" > greeting.txt
+echo "Hello" >> greeting.txt  # Append to file 
+```
+
 ### Script Command Syntax
 
 Use the `script` command to run inline scripts or script files.
@@ -436,8 +463,19 @@ for i in 1 2 3; do echo $i; done
 # while-loop
 while true; do gpio read 10; delay 50; done
 
+# variable assignment
+value = 5
+
+# variable usage
+echo "The value is $value"
+
+- variables will be expanded in double quotes but not single quotes, similar to bash
+
 # if / elif / else
-if gpio read 11; then echo fault; elif gpio read 10; then echo button; else echo idle; fi
+
+read11 = gpio read 11
+read10 = gpio read 10
+if $read11; then echo fault; elif $read10; then echo button; else echo idle; fi
 
 # function definition + call
 function blink; do gpio write 20 1; delay 100; gpio write 20 0; delay 100; done
@@ -448,7 +486,15 @@ Notes:
 
 - Terminators are `done` for loops/functions and `fi` for `if` blocks.
 - `delay <ms>` is cooperative and non-blocking for the terminal loop.
-- Conditions are command chains; branch selection uses exit code (`0` = true, non-zero = false).
+- In conditions are commands/pipelines not allowed. The returned value can be saved in variables and so used. The last return code is available in `$?` for use in conditions as well.
+- Conditions can contain:
+  - Literal values (non-empty strings are true, empty string is false, `0` and `false` is also considered false for convenience)
+  - Boolean literals: `true` and `false`
+  - Variables (e.g. `$value`, `$read10`, etc.)
+  - Boolean operators: `&&` (and), `||` (or), `!` (not)
+  - Parentheses for grouping: `if (condition) && (condition); then ...`
+  - Comparison operators: `==`, `!=`. For example: `if $read10 == "5"; then ...`. They perform a text comparison
+  - Note: Command substitution (e.g. `$(command)`) is not supported in conditions, but you can achieve similar results by saving command output to variables and using those variables in conditions. This is because commands shall be responsive and cooperative with the terminal loop, and allowing command substitution in conditions could lead to blocking behavior if the substituted command takes a long time to execute.
 
 > **See also:**
 >
@@ -461,7 +507,7 @@ The `gpio` command family provides secure, policy-driven access to GPIO pins wit
 
 **Key Features:**
 
-- **Board Pin Discovery + Policy Gate**: Detect board pins and apply compile-time policy restrictions
+- **Board Pin Discovery + Policy Gate**: Detect board pins (Using compile-time flags) and apply compile-time policy restrictions
 - **Password Protection**: Optional admin authentication using FNV-1a hash (no plaintext storage)
 - **Forced Exclusions**: Immutable pin restrictions that cannot be overridden
 - **Per-Operation Flags**: Control read/write/mode/exclude/include separately for each pin
@@ -756,15 +802,48 @@ factory.registerNetworkCommands(term, networkSystem);
 ```cpp
 class ICommand {
 public:
-    virtual ETString usage(const ETString &keyword) = 0;
-    virtual CommandResult execute(CommandInvocation &invocation);
-
-protected:
-    virtual ETString trigger(const ETString &keyword, const ETString &additional) = 0;
+    virtual ETString usage(const ETString &keyword) const = 0;
+    virtual CommandResult invoke(CommandInvocation &invocation) = 0;
+    virtual CommandResult resume(CommandInvocation &invocation) { return CommandResult::completed(0); }
 };
 ```
 
-`execute()` is the preferred runtime-v2 path. Existing commands can still implement `trigger()` and rely on the default adapter.
+`invoke()` is the primary entry point. Override `resume()` only for commands that can pause and continue later.
+
+### Migration From `trigger()`
+
+Version 0.* used a `trigger(keyword, additional)` pattern. The current API uses `CommandInvocation` instead.
+
+| Old pattern | New pattern |
+| --- | --- |
+| `ETString trigger(const ETString &keyword, const ETString &additional)` | `CommandResult invoke(CommandInvocation &invocation)` |
+| Return a string directly | Print to `invocation.streams.output` or `invocation.streams.error` |
+| Parse the trailing text yourself | Read `invocation.arguments` directly |
+| No pause/resume support | Return `CommandResult::running(...)` or `waitingForInput(...)` and override `resume(...)` if needed |
+
+Minimal migration example:
+
+```cpp
+class MyCommand : public ICommand {
+public:
+    ETString usage(const ETString &keyword) const override {
+        return keyword + " [text] - Example command";
+    }
+
+    ETString trigger(const ETString &keyword, const ETString &additional) {
+        return "You entered: " + additional;
+    }
+
+    CommandResult invoke(CommandInvocation &invocation) override {
+        ETString text = join(invocation.arguments, " ");
+        ETString result = trigger(invocation.keyword, text);
+        invocation.streams.output.print(result + "\n");
+        return CommandResult::completed(0);
+    }
+};
+```
+
+If a command needs multiple steps, store state in `invocation.context.variables` and implement `resume(...)`.
 
 ### ETString Class
 
@@ -912,11 +991,10 @@ Contributions are welcome! Please:
 
 ## What's Next
 
-- Add more built-in commands (grep, find, chmod, etc.)
-- Implement command history and auto-completion
-- Add scripting support for command sequences
+- Add more built-in commands (grep, find, etc.)
+- Implement command history
 - Improve documentation with more examples
-- Add GUI terminal emulation support
+- Add redirecting for error streams
 
 ## License
 

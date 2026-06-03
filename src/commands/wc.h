@@ -2,8 +2,8 @@
 #define WC_H
 
 #include "DirectoryNavigator.h"
+#include "interfaces/ICommand.h"
 #include "DefaultAutoCompleters.h"
-#include "Terminal.h"
 
 namespace EmbeddedTerminal
 {
@@ -16,10 +16,9 @@ namespace EmbeddedTerminal
             {
             }
 
-            ETString usage(const ETString &keyword) override;
-            ETString trigger(const ETString &keyword, const ETString &additional) override;
-            CommandResult execute(CommandInvocation &invocation) override;
-            ETVector<ETString> getSuggestions(const ETString &partial) override;
+            ETString usage(const ETString &keyword) const override;
+            CommandResult invoke(CommandInvocation &invocation) override;
+            ETVector<ETString> getSuggestions(const ETString &partial) const override;
 
         private:
             struct Counts
@@ -29,8 +28,9 @@ namespace EmbeddedTerminal
                 size_t bytes = 0;
             };
 
+            CommandResult countWordsInStdin_(CommandInvocation &invocation);
+            CommandResult countWordsInFile_(const ETString &path, CommandInvocation &invocation, Counts &counts);
             Counts countText_(const ETString &text) const;
-            ETString formatCounts_(const Counts &counts, const ETString &path = "") const;
 
             DirectoryNavigator dir_;
             FilePathCompleter completer_;

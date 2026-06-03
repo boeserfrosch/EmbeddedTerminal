@@ -1,190 +1,204 @@
 #include "script.h"
 #include "OptionParser.h"
+#include "lang/LangAPI.h"
+#include "scripting/Runner.h"
 
 using namespace EmbeddedTerminal;
 
-namespace
+namespace EmbeddedTerminal::cmd
 {
-    ETString replaceAll_(const ETString &input, const ETString &needle, const ETString &replacement)
+
+    ETString script::usage(const ETString &keyword) const
     {
-        if (needle.empty())
+        return keyword + " <path> - Execute script from file\n";
+    }
+
+    CommandResult script::invoke(CommandInvocation &invocation)
+    {
+        if (runner_.isInitialized())
         {
-            return input;
+            invocation.streams.error.print("A script is already running. Please wait for it to finish or interrupt it before starting a new one.\n");
+            return CommandResult::completed(ErrorCode::RuntimeError);
         }
 
-        ETString result = input;
-        size_t pos = 0;
-        while ((pos = result.find(needle, pos)) != ETString::npos)
+        tryFetchAndParseScript(invocation);
+        if (error())
         {
-            ETString left = result.substr(0, pos);
-            ETString right = result.substr(pos + needle.length());
-            result = left + replacement + right;
-            pos += replacement.length();
+            return CommandResult::completed(error_);
         }
 
-        return result;
+        return executeRunner_(invocation);
     }
-}
-
-ETString cmd::script::usage(const ETString &keyword)
-{
-    return keyword + " <path> - Execute script from file\n";
-}
-
-CommandResult cmd::script::execute(CommandInvocation &invocation)
-{
-
-    if (!hasStarted_)
+    CommandResult script::executeRunner_(CommandInvocation &invocation)
     {
-        ETString errorMessage;
-        if (!startScript_(invocation.arguments, errorMessage))
+        EmbeddedTerminal::Scripting::Runner::State state = runner_.execute(scriptAst_, runnerVariables_);
+
+        if (runner_.error())
         {
-            invocation.stderrChannel.print(errorMessage + "\n");
-            return CommandResult::completed(2);
+            invocation.streams.error.print("script error: runtime error\n");
+            reset();
+            return CommandResult::completed(ErrorCode::RuntimeError);
         }
 
-        hasStarted_ = true;
-    }
-
-    if (hasActiveSubcommand_)
-    {
-        if (activeSubcommandState_ == CommandExecutionState::WaitingForInput && !invocation.stdinChannel.available())
+        if (state == EmbeddedTerminal::Scripting::Runner::State::Completed)
         {
-            return CommandResult::waitingForInput(terminal_.getLastExitCode());
+            reset();
+            return CommandResult::completed(0);
         }
 
-        lastDispatchResult_ = terminal_.resumeCommandForScript(activeSubcommand_, activeKeyword_, activeArguments_);
-        activeSubcommandState_ = lastDispatchResult_.state;
-        if (lastDispatchResult_.state != CommandExecutionState::Completed)
+        // Runner reported running; map last pause state to waiting/running
+        if (runner_.getLastPauseState() == CommandExecutionState::WaitingForInput)
         {
-            return lastDispatchResult_;
+            return CommandResult::waitingForInput(0);
         }
 
-        hasActiveSubcommand_ = false;
-        activeSubcommand_ = nullptr;
-        activeKeyword_ = "";
-        activeArguments_ = "";
-        return CommandResult::running(terminal_.getLastExitCode());
+        return CommandResult::running(0);
     }
 
-    tick_();
-
-    if (hasActiveSubcommand_)
+    CommandResult script::resume(CommandInvocation &invocation)
     {
-        return lastDispatchResult_;
-    }
-
-    if (runner_.isActive())
-    {
-        return CommandResult::running(terminal_.getLastExitCode());
-    }
-
-    hasStarted_ = false;
-    return CommandResult::completed(terminal_.getLastExitCode());
-}
-
-void cmd::script::onInterrupt()
-{
-    if (hasActiveSubcommand_ && activeSubcommand_ != nullptr)
-    {
-        activeSubcommand_->onInterrupt();
-    }
-
-    runner_.reset();
-    hasStarted_ = false;
-    hasActiveSubcommand_ = false;
-    activeSubcommand_ = nullptr;
-    activeKeyword_ = "";
-    activeArguments_ = "";
-    activeSubcommandState_ = CommandExecutionState::Completed;
-    lastDispatchResult_ = CommandResult::completed(130);
-}
-
-ETString cmd::script::trigger(const ETString &keyword, const ETString &additional)
-{
-    OptionParser parser;
-    return usage(keyword);
-}
-
-bool cmd::script::startScript_(const ETString &arguments, ETString &errorMessage)
-{
-    OptionParser parser;
-    parser.addOption("-f", "--file", "Path to script file", true);
-    parser.addOptionalRemainingArgument("file");
-
-    auto parseResult = parser.parse(arguments);
-    if (!parseResult.success)
-    {
-        errorMessage = "script error: " + parseResult.errorMessage;
-        return false;
-    }
-
-    ETString scriptPath;
-    auto fileOpt = parseResult.options.find("--file");
-    if (fileOpt != parseResult.options.end() && !fileOpt->second.empty())
-    {
-        scriptPath = fileOpt->second[0];
-    }
-    else
-    {
-        auto positionalFile = parseResult.options.find("file");
-        if (positionalFile != parseResult.options.end() && !positionalFile->second.empty())
+        if (!runner_.isInitialized())
         {
-            scriptPath = positionalFile->second[0];
+            invocation.streams.error.print("No script is currently running\n");
+            return CommandResult::completed(ErrorCode::RuntimeError);
+        }
+
+        return executeRunner_(invocation);
+    }
+
+    void script::onInterrupt()
+    {
+        if (runner_.isInitialized())
+        {
+            runner_.interrupt();
+            reset();
         }
     }
 
-    if (scriptPath.empty())
+    ETString script::getErrorMessage_(ErrorCode errorCode) const
     {
-        errorMessage = "script error: Missing required argument: file";
-        return false;
+        switch (errorCode)
+        {
+        case ErrorCode::None:
+            return "No error";
+        case ErrorCode::InvalidArguments:
+            return "Invalid arguments";
+        case ErrorCode::FileNotFound:
+            return "File not found";
+        case ErrorCode::FilesystemNotAvailable:
+            return "Filesystem not available";
+        case ErrorCode::FileError:
+            return "File error";
+        case ErrorCode::ParseError:
+            return "Parse error";
+        case ErrorCode::RuntimeError:
+            return "Runtime error";
+        default:
+            return "Unknown error";
+        }
     }
 
-    return startScriptFile_(scriptPath, errorMessage);
-}
-
-bool cmd::script::startScriptFile_(const ETString &path, ETString &errorMessage)
-{
-    IFileSystem *fileSystem = terminal_.getFileSystem();
-    if (fileSystem == nullptr)
+    void script::tryFetchAndParseScript(CommandInvocation &invocation)
     {
-        errorMessage = "script error: filesystem not configured";
-        return false;
+        ETString scriptPath = tryFetchScriptPathFromArguments(invocation);
+        if (error())
+        {
+            return;
+        }
+
+        tryFetchScriptFromPath(scriptPath, invocation);
+        if (error())
+        {
+            return;
+        }
+
+        tryTokenizeAndParseScript(invocation);
+        if (error())
+        {
+            return;
+        }
+
+        // Persist invocation variables so runner can resume without restarting
+        runnerVariables_ = invocation.context.variables;
+        scriptLoaded_ = true;
+        return;
     }
 
-    ETFile scriptFile = fileSystem->open(path, FILE_MODE_READ, false);
-    if (!scriptFile.isOpen())
+    void script::tryTokenizeAndParseScript(CommandInvocation &invocation)
     {
-        errorMessage = "script error: failed to open script file: " + path;
-        return false;
+        EmbeddedTerminal::Lexer lexer;
+        token_list_t tokens = lexer.tokenize(scriptContent_);
+        for (const auto &token : tokens)
+        {
+            if ((token.type == TokenType::DOUBLE_QUOTE_STRING_LITERAL || token.type == TokenType::SINGLE_QUOTE_STRING_LITERAL) && !token.terminated)
+            {
+                invocation.streams.error.print("script error: unterminated quote\n");
+                scriptContent_ = "";
+                error_ = ErrorCode::ParseError;
+                return;
+            }
+        }
+
+        EmbeddedTerminal::Scripting::ScriptParser scriptParser;
+        scriptAst_ = scriptParser.parse(tokens);
+        if (scriptParser.error())
+        {
+            invocation.streams.error.print("script error: parse error\n");
+            scriptContent_ = "";
+            error_ = ErrorCode::ParseError;
+            return;
+        }
     }
 
-    ETString content = scriptFile.readAll();
-    scriptFile.close();
-
-    if (content.empty())
+    ETString script::tryFetchScriptPathFromArguments(CommandInvocation &invocation)
     {
-        errorMessage = "script error: script file is empty: " + path;
-        return false;
+        OptionParser parser;
+        parser.addRequiredRemainingArgument("file");
+        auto parseResult = parser.parse(invocation.arguments);
+        if (!parseResult.success)
+        {
+            invocation.streams.error.print(usage(invocation.keyword));
+            error_ = ErrorCode::InvalidArguments;
+            return "";
+        }
+        return parseResult.options["file"][0];
     }
 
-    if (!runner_.enqueueScript(content, errorMessage))
+    void script::tryFetchScriptFromPath(const ETString &path, CommandInvocation &invocation)
     {
-        errorMessage = errorMessage + " [file: " + path + "]";
-        return false;
+        IFileSystem *fileSystem = terminal_.getFileSystem();
+        if (fileSystem == nullptr)
+        {
+            invocation.streams.error.print("script error: File system not available\n");
+            error_ = ErrorCode::FilesystemNotAvailable;
+            return;
+        }
+
+        if (!fileSystem->exists(path))
+        {
+            invocation.streams.error.print("script error: File not found: " + path + "\n");
+            error_ = ErrorCode::FileNotFound;
+            return;
+        }
+
+        auto file = fileSystem->open(path, FILE_MODE_READ, false);
+        if (!file || !file.isOpen())
+        {
+            invocation.streams.error.print("script error: Failed to open file: " + path + "\n");
+            error_ = ErrorCode::FileError;
+            return;
+        }
+
+        scriptContent_ = file.readAll();
+        file.close();
     }
-    return true;
-}
 
-void cmd::script::tick_()
-{
-    runner_.tick();
-}
-
-ETString cmd::script::substitute_(const ETString &input, const ETString &variableName, const ETString &value) const
-{
-    ETString result = input;
-    result = replaceAll_(result, "${" + variableName + "}", value);
-    result = replaceAll_(result, "$" + variableName, value);
-    return result;
+    void script::reset()
+    {
+        scriptContent_ = "";
+        scriptAst_ = EmbeddedTerminal::Scripting::ExpressionChain();
+        runnerVariables_.clear();
+        runner_.reset();
+        scriptLoaded_ = false;
+    }
 }

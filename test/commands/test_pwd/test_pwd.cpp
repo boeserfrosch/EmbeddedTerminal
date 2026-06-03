@@ -9,8 +9,7 @@
 #endif
 #include "../../../src/commands/pwd.h"
 #include "../../Mocks/native/MockFileSystem.h"
-#include "../../Mocks/MockStream.h"
-#include "../../Mocks/CommandRuntimeTestUtils.h"
+#include "../utils.h"
 #include "StorageSystem.h"
 #include "../../Mocks/native/MockStorageMedia.h"
 
@@ -42,9 +41,9 @@ void test_pwd_returns_root_directory(void)
 {
     cmd::pwd pwd(*dir);
     ETString keyword = "pwd";
-    ETString additional = "";
-    ETString result = pwd.trigger(keyword, additional);
-    TEST_ASSERT_TRUE(result.find("/") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("pwd");
+    CommandResult result = pwd.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains("/"));
 }
 
 void test_pwd_returns_changed_directory(void)
@@ -56,8 +55,9 @@ void test_pwd_returns_changed_directory(void)
     dir->cd("/home");
     ETString keyword = "pwd";
     ETString additional = "";
-    ETString result = pwd.trigger(keyword, additional);
-    TEST_ASSERT_TRUE(result.find("home") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("pwd");
+    CommandResult result = pwd.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains("home"));
 }
 
 void test_pwd_ignores_additional_parameters(void)
@@ -68,8 +68,9 @@ void test_pwd_ignores_additional_parameters(void)
     dir->cd("/test");
     ETString keyword = "pwd";
     ETString additional = "extra params that should be ignored";
-    ETString result = pwd.trigger(keyword, additional);
-    TEST_ASSERT_TRUE(result.find("test") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("pwd");
+    CommandResult result = pwd.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains("test"));
 }
 
 void test_pwd_usage(void)
@@ -92,36 +93,30 @@ void test_pwd_with_nested_directories(void)
     dir->cd("bin");
     ETString keyword = "pwd";
     ETString additional = "";
-    ETString result = pwd.trigger(keyword, additional);
-    TEST_ASSERT_TRUE(result.find("bin") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("pwd");
+    CommandResult result = pwd.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains("bin"));
 }
 
 void test_pwd_returns_string_ending_with_newline(void)
 {
     cmd::pwd pwd(*dir);
     ETString keyword = "pwd";
-    ETString additional = "";
-    ETString result = pwd.trigger(keyword, additional);
-    TEST_ASSERT_EQUAL('\n', result[result.length() - 1]);
+    auto iHandle = TestCommandInvocationHandle("pwd");
+    CommandResult result = pwd.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.endsWith("\n"));
 }
 
 void test_pwd_execute_writes_stdout(void)
 {
     cmd::pwd pwd(*dir);
 
-    MockStream stream;
-    ETMap<ETString, ETString> vars;
-    CommandContext context{vars, 0, true};
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
-
-    CommandInvocation invocation{"pwd", "", context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = pwd.execute(invocation);
+    auto iHandle = TestCommandInvocationHandle("pwd");
+    CommandResult result = pwd.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);
-    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("/") != ETString::npos);
-    TEST_ASSERT_TRUE(stream.stderrBuffer.empty());
+    TEST_ASSERT_TRUE(iHandle.output.contains("/"));
+    TEST_ASSERT_TRUE(iHandle.error.empty());
 }
 
 int process_tests_pwd()

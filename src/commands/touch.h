@@ -2,8 +2,8 @@
 #define TOUCH_H
 
 #include "DirectoryNavigator.h"
+#include "interfaces/ICommand.h"
 #include "DefaultAutoCompleters.h"
-#include "Terminal.h"
 
 namespace EmbeddedTerminal
 {
@@ -16,9 +16,9 @@ namespace EmbeddedTerminal
             {
             }
 
-            ETString usage(const ETString &keyword) override;
-            ETString trigger(const ETString &keyword, const ETString &additional) override;
-            ETVector<ETString> getSuggestions(const ETString &partial) override;
+            ETString usage(const ETString &keyword) const override;
+            ETVector<ETString> getSuggestions(const ETString &partial) const override;
+            CommandResult invoke(CommandInvocation &invocation) override;
 
         private:
             DirectoryNavigator dir_;

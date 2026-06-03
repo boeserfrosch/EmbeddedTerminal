@@ -17,7 +17,7 @@ namespace EmbeddedTerminal
         CommandCompleter(const ETMap<ETString, ICommand *> &commands)
             : commands_(commands) {}
 
-        ETVector<ETString> getSuggestions(const ETString &partial) override
+        ETVector<ETString> getSuggestions(const ETString &partial) const override
         {
             ETVector<ETString> suggestions;
 
@@ -48,10 +48,10 @@ namespace EmbeddedTerminal
     class FilePathCompleter : public IAutoCompleter
     {
     public:
-        FilePathCompleter(DirectoryNavigator &navigator)
+        FilePathCompleter(const DirectoryNavigator &navigator)
             : navigator_(navigator) {}
 
-        ETVector<ETString> getSuggestions(const ETString &partial) override
+        ETVector<ETString> getSuggestions(const ETString &partial) const override
         {
             // Cleanup partial path, change windows backslashes to slashes
             Path cleanedPartial = Path(partial);
@@ -83,7 +83,7 @@ namespace EmbeddedTerminal
         }
 
     private:
-        DirectoryNavigator &navigator_;
+        const DirectoryNavigator &navigator_;
     };
 
     /// @brief Auto completer for directory paths only
@@ -91,10 +91,10 @@ namespace EmbeddedTerminal
     class DirectoryCompleter : public IAutoCompleter
     {
     public:
-        DirectoryCompleter(DirectoryNavigator &navigator)
+        DirectoryCompleter(const DirectoryNavigator &navigator)
             : navigator_(navigator) {}
 
-        ETVector<ETString> getSuggestions(const ETString &partial) override
+        ETVector<ETString> getSuggestions(const ETString &partial) const override
         {
             ETVector<ETString> stringSuggestions;
 
@@ -120,7 +120,7 @@ namespace EmbeddedTerminal
         }
 
     private:
-        DirectoryNavigator &navigator_;
+        const DirectoryNavigator &navigator_;
     };
 
 } // namespace EmbeddedTerminal

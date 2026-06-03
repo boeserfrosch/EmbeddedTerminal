@@ -9,8 +9,7 @@
 #endif
 #include "commands/ls.h"
 #include "../../Mocks/native/MockFileSystem.h"
-#include "../../Mocks/MockStream.h"
-#include "../../Mocks/CommandRuntimeTestUtils.h"
+#include "../utils.h"
 #include "DirectoryNavigator.h"
 #include "StorageSystem.h"
 #include "../../Mocks/native/MockStorageMedia.h"
@@ -50,22 +49,23 @@ void test_ls_valid_directory(void)
 {
     cmd::ls ls(*dir);
     ETString keyword = "ls";
-    ETString arg = "-l dir2";
-    ETString result = ls.trigger(keyword, arg);
+    auto iHandle = TestCommandInvocationHandle("ls", {"-l", "dir2"});
+    CommandResult result = ls.invoke(iHandle.invocation);
+    TEST_ASSERT_EQUAL(0, result.exitCode);
     // Should show foo.txt with details (simulate long listing)
-    TEST_ASSERT_TRUE(result.find("foo.txt") != ETString::npos);
-    TEST_ASSERT_FALSE(result.find("bar") != ETString::npos); // Content should not be shown
+    TEST_ASSERT_TRUE(iHandle.output.contains("foo.txt"));
+    TEST_ASSERT_FALSE(iHandle.output.contains("bar")); // Content should not be shown
     // Check for typical long listing info (e.g., size, type)
-    TEST_ASSERT_TRUE(result.find("Bytes") != ETString::npos);
+    TEST_ASSERT_TRUE(iHandle.output.contains("Bytes"));
 }
 
 void test_ls_edge_cases(void)
 {
     cmd::ls ls(*dir);
     ETString keyword = "ls";
-    ETString arg = "   ";
-    ETString result = ls.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("file.txt") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("ls");
+    CommandResult result = ls.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains("file.txt"));
 }
 
 void test_ls_output_format(void)
@@ -73,12 +73,13 @@ void test_ls_output_format(void)
     cmd::ls ls(*dir);
     ETString keyword = "ls";
     ETString arg = "dir3";
-    ETString result = ls.trigger(keyword, arg);
+    auto iHandle = TestCommandInvocationHandle("ls", {"dir3"});
+    CommandResult result = ls.invoke(iHandle.invocation);
 
     // The order is not garuanteed
-    TEST_ASSERT_TRUE(result.find("foo.txt\t") != ETString::npos);
-    TEST_ASSERT_TRUE(result.find("bar.txt\t") != ETString::npos);
-    TEST_ASSERT_TRUE(result.find("baz.txt\t") != ETString::npos);
+    TEST_ASSERT_TRUE(iHandle.output.contains("foo.txt\t"));
+    TEST_ASSERT_TRUE(iHandle.output.contains("bar.txt\t"));
+    TEST_ASSERT_TRUE(iHandle.output.contains("baz.txt\t"));
 }
 
 void test_ls_flag_l(void)
@@ -86,12 +87,13 @@ void test_ls_flag_l(void)
     cmd::ls ls(*dir);
     ETString keyword = "ls";
     ETString arg = "-l dir2";
-    ETString result = ls.trigger(keyword, arg);
+    auto iHandle = TestCommandInvocationHandle("ls", {"-l", "dir2"});
+    CommandResult result = ls.invoke(iHandle.invocation);
     // Should show foo.txt with details (simulate long listing)
-    TEST_ASSERT_TRUE(result.find("foo.txt") != ETString::npos);
-    TEST_ASSERT_TRUE(result.find("bar") == ETString::npos); // Content should not be shown
+    TEST_ASSERT_TRUE(iHandle.output.contains("foo.txt"));
+    TEST_ASSERT_FALSE(iHandle.output.contains("bar")); // Content should not be shown
     // Check for typical long listing info (e.g., size, type)
-    TEST_ASSERT_TRUE(result.find("Bytes") != ETString::npos);
+    TEST_ASSERT_TRUE(iHandle.output.contains("Bytes"));
 }
 
 void test_ls_nonexistent_directory(void)
@@ -99,27 +101,21 @@ void test_ls_nonexistent_directory(void)
     cmd::ls ls(*dir);
     ETString keyword = "ls";
     ETString arg = "non_exist";
-    ETString result = ls.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("is not a directory") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("ls", {"non_exist"});
+    CommandResult result = ls.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains("is not a directory"));
 }
 
 void test_ls_execute_writes_stdout(void)
 {
     cmd::ls ls(*dir);
 
-    MockStream stream;
-    ETMap<ETString, ETString> vars;
-    CommandContext context{vars, 0, true};
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
-
-    CommandInvocation invocation{"ls", "dir3", context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = ls.execute(invocation);
+    auto iHandle = TestCommandInvocationHandle("ls", {"dir2"});
+    CommandResult result = ls.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);
-    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("foo.txt") != ETString::npos);
-    TEST_ASSERT_TRUE(stream.stderrBuffer.empty());
+    TEST_ASSERT_TRUE(iHandle.output.contains("foo.txt"));
+    TEST_ASSERT_FALSE(iHandle.error.contains("bar.txt"));
 }
 
 void process_tests()

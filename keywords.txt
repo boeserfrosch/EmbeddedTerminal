@@ -30,7 +30,6 @@ loop					KEYWORD2
 registerCommand			KEYWORD2
 call					KEYWORD2
 getCommands				KEYWORD2
-trigger					KEYWORD2
 usage					KEYWORD2
 exists					KEYWORD2
 mkdir					KEYWORD2

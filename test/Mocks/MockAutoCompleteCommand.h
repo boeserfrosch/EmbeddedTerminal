@@ -14,20 +14,23 @@ public:
     // Store test suggestions
     ETVector<ETString> testSuggestions;
 
-    ETString usage(const ETString &keyword) override
+    ETString usage(const ETString &keyword) const override
     {
-        lastKeyword = keyword;
         return "Usage: " + keyword;
     }
 
-    ETString trigger(const ETString &keyword, const ETString &additional) override
+    CommandResult invoke(EmbeddedTerminal::CommandInvocation &invocation) override
     {
-        lastKeyword = keyword;
-        lastAdditional = additional;
-        return "Triggered: " + keyword + " " + additional;
+        lastKeyword = invocation.keyword;
+        if (!invocation.arguments.empty())
+        {
+            lastAdditional = invocation.arguments[0];
+        }
+        invocation.streams.output.print("Invoked with keyword: " + lastKeyword + ", additional: " + lastAdditional + "\n");
+        return CommandResult::completed(0);
     }
 
-    ETVector<ETString> getSuggestions(const ETString &partial) override
+    ETVector<ETString> getSuggestions(const ETString &partial) const override
     {
         ETVector<ETString> results;
 

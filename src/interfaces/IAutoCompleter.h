@@ -20,7 +20,7 @@ namespace EmbeddedTerminal
          * @param partial The current user input string.
          * @return A sorted list of possible completions.
          */
-        virtual ETVector<ETString> getSuggestions(const ETString &partial) = 0;
+        virtual ETVector<ETString> getSuggestions(const ETString &partial) const = 0;
     };
 } // namespace EmbeddedTerminal
 #endif // IAUTOCOPMLETER_H

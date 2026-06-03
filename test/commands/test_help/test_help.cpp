@@ -8,29 +8,37 @@
 #include <freertos/timers.h>
 #endif
 #include "commands/help.h"
-#include "../../Mocks/MockStream.h"
-#include "../../Mocks/CommandRuntimeTestUtils.h"
+#include "Terminal.h"
+#include "../utils.h"
 
 using namespace EmbeddedTerminal;
 
 void setUp(void) {}
 void tearDown(void) {}
 
+MockStream stream;
+Terminal terminal(stream);
+
 class DummyCommand : public ICommand
 {
 public:
-    ETString trigger(const ETString &keyword, const ETString &additional) override
+    ETString usage(const ETString &keyword) const override
     {
-        return "Dummy command triggered";
+        return "Dummy usage: dummy [options]";
     }
-    ETString usage(const ETString &keyword) override
+
+    CommandResult invoke(CommandInvocation &invocation) override
     {
-        return "Dummy usage";
+        invocation.streams.output.print("Dummy command executed with arguments: ");
+        for (const auto &arg : invocation.arguments)
+        {
+            invocation.streams.output.print(arg + " ");
+        }
+        invocation.streams.output.print("\n");
+        return CommandResult::completed(0);
     }
 };
 
-MockStream stream;
-Terminal terminal(stream);
 class TestHelp : public cmd::help
 {
 
@@ -46,8 +54,9 @@ void test_help_valid_command(void)
     TestHelp help;
     ETString keyword = "help";
     ETString arg = "dummy";
-    ETString result = help.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("Dummy usage") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle(keyword, {arg});
+    CommandResult result = help.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains("Dummy usage"));
 }
 
 void test_help_invalid_command(void)
@@ -55,9 +64,10 @@ void test_help_invalid_command(void)
     TestHelp help;
     ETString keyword = "help";
     ETString arg = "unknown";
-    ETString result = help.trigger(keyword, arg);
-    TEST_MESSAGE(("Result: " + result).c_str());
-    TEST_ASSERT_EQUAL_CHAR_ARRAY_MESSAGE("Unknown command: unknown\n", result.c_str(), result.length(), "Expected error message for unknown command");
+
+    auto iHandle = TestCommandInvocationHandle(keyword, {arg});
+    CommandResult result = help.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE_MESSAGE(iHandle.output.contains("Unknown command: 'unknown'"), iHandle.output.c_str());
 }
 
 void test_help_usage(void)
@@ -65,16 +75,16 @@ void test_help_usage(void)
     TestHelp help;
     ETString keyword = "help";
     ETString result = help.usage(keyword);
-    TEST_ASSERT_TRUE(result.find("Returns all available commands") != ETString::npos);
+    TEST_ASSERT_TRUE_MESSAGE(result.find("Returns all available commands") != ETString::npos, result.c_str());
 }
 
 void test_help_edge_cases(void)
 {
     TestHelp help;
     ETString keyword = "help";
-    ETString arg = "   ";
-    ETString result = help.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("Available commands") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle(keyword, {});
+    CommandResult result = help.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE_MESSAGE(iHandle.output.contains("Available commands"), iHandle.output.c_str());
 }
 
 void test_help_output_format(void)
@@ -82,8 +92,9 @@ void test_help_output_format(void)
     TestHelp help;
     ETString keyword = "help";
     ETString arg = "dummy";
-    ETString result = help.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("Dummy usage") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle(keyword, {arg});
+    CommandResult result = help.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE_MESSAGE(iHandle.output.contains("Dummy usage"), iHandle.output.c_str());
 }
 
 void test_help_auto_completion_command_suggestions(void)
@@ -97,22 +108,13 @@ void test_help_auto_completion_command_suggestions(void)
 void test_help_execute_writes_stdout(void)
 {
     TestHelp help;
-    ETMap<ETString, ETString> vars;
-    CommandContext context{vars, 0, true};
 
-    ETString keyword = "help";
-    ETString arg = "dummy";
-
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
-
-    CommandInvocation invocation{keyword, arg, context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = help.execute(invocation);
+    auto iHandle = TestCommandInvocationHandle("help", {"dummy"});
+    CommandResult result = help.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);
-    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("Dummy usage") != ETString::npos);
-    TEST_ASSERT_TRUE(stream.stderrBuffer.find("Dummy usage") == ETString::npos);
+    TEST_ASSERT_TRUE(iHandle.output.contains("Dummy usage"));
+    TEST_ASSERT_FALSE(iHandle.error.contains("Dummy usage"));
 }
 
 void process_tests()

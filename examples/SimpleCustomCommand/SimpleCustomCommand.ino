@@ -15,9 +15,9 @@
  *
  * Example session:
  *   > mycmd
- *   Hello from custom command!
+ *   Hello from custom command, world!
  *   > mycmd test
- *   Hello from custom command!
+ *   Hello from custom command, test!
  */
 
 #include <Arduino.h>
@@ -42,14 +42,16 @@ using namespace EmbeddedTerminal;
 class MyCommand : public ICommand
 {
 public:
-    ETString trigger(const ETString &keyword, const ETString &additional) override
+    ETString usage(const ETString &keyword) const override
     {
-        return "Hello from custom command!";
+        return keyword + " [name] - Custom command example";
     }
 
-    ETString usage(const ETString &keyword) override
+    CommandResult invoke(CommandInvocation &invocation) override
     {
-        return "mycmd - Custom command example";
+        ETString name = invocation.arguments.empty() ? "world" : invocation.arguments[0];
+        invocation.streams.output.print("Hello from custom command, " + name + "!\n");
+        return CommandResult::completed(0);
     }
 };
 

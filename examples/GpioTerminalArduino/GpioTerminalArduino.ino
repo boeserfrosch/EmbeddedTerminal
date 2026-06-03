@@ -122,13 +122,16 @@ void setup()
 
     static cmd::help helpCommand(term);
     static cmd::script scriptCommand(term);
+    static cmd::echo echoCommand;
+    term.registerCommand("echo", &echoCommand);
     term.registerCommand("help", &helpCommand);
     term.registerCommand("script", &scriptCommand);
 
     // Show usage instructions
     Serial.println("Terminal ready! Available commands:");
     Serial.println("  help         - List all commands");
-    Serial.println("  script ...   - Run scripting expressions and script files");
+    Serial.println("  script ...   - Run script files");
+    Serial.println("  echo ...     - Print text to the terminal");
 #if ET_GPIO_ENABLE
     Serial.println("  gpio list    - Show board pins and policy status");
     Serial.println("  gpio policy  - Show security policy");

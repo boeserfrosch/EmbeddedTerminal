@@ -2,62 +2,46 @@
 
 using namespace EmbeddedTerminal;
 
-ETString cmd::help::buildHelpOutput(const ETString &additional)
+CommandResult cmd::help::invoke(CommandInvocation &invocation)
 {
     OptionParser parser;
     parser.addOptionalRemainingArgument("command");
-    auto parseResult = parser.parse(additional);
+    auto parseResult = parser.parse(invocation.arguments);
     if (!parseResult.success)
     {
-        return "help error: " + parseResult.errorMessage + "\n" + usage("help");
+        invocation.streams.output.print(usage(invocation.keyword));
+        return CommandResult::completed(ErrorCode::Missused);
     }
 
-    auto commands = terminal_.getCommands();
-    if (parseResult.options.find("command") != parseResult.options.end() && !parseResult.options["command"].empty())
+    if (parseResult.options.find("command") != parseResult.options.end() && !parseResult.options["command"][0].empty())
     {
         ETString cmdName = parseResult.options["command"][0].trim();
-        auto cmdIt = commands.find(cmdName);
-        if (cmdIt == commands.end())
+        if (!terminal_.existsCommand(cmdName))
         {
-            return "Unknown command: " + cmdName + "\n";
+            invocation.streams.output.print("Unknown command: '" + cmdName + "'\n");
+            return CommandResult::completed(ErrorCode::InvalidArgument);
         }
-        return cmdIt->second->usage(cmdIt->first);
+        invocation.streams.output.print(terminal_.getCommand(cmdName)->usage(cmdName));
+        return CommandResult::completed(ErrorCode::None);
     }
 
-    ETString result = "Available commands\n";
-
+    invocation.streams.output.print("Available commands:\n");
+    auto commands = terminal_.getCommands();
     for (const auto &command : commands)
     {
-        result += command.first + "\n";
+        invocation.streams.output.print(command.first + "\n");
     }
-    result += "\n";
-    return result;
+    invocation.streams.output.print("\n");
+    return CommandResult::completed(ErrorCode::None);
 }
 
-CommandResult cmd::help::execute(CommandInvocation &invocation)
-{
-    ETString output = buildHelpOutput(invocation.arguments);
-    if (!output.empty())
-    {
-        invocation.stdoutChannel.print(output);
-    }
-
-    return CommandResult::completed(0);
-}
-
-ETString cmd::help::trigger(const ETString &keyword, const ETString &additional)
-{
-    (void)keyword;
-    return buildHelpOutput(additional);
-}
-
-ETString cmd::help::usage(const ETString &keyword)
+ETString cmd::help::usage(const ETString &keyword) const
 {
     return keyword + " - Returns all available commands\n" +
            keyword + " <command> - Returns the usage for the specific command\n";
 }
 
-ETVector<ETString> cmd::help::getSuggestions(const ETString &partial)
+ETVector<ETString> cmd::help::getSuggestions(const ETString &partial) const
 {
     CommandCompleter completer(terminal_.getCommands());
     return completer.getSuggestions(partial);

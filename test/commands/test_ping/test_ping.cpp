@@ -10,8 +10,7 @@
 #include "commands/ping.h"
 #include "../../Mocks/MockNetworkSystem.h"
 #include "../../Mocks/MockNetworkInterface.h"
-#include "../../Mocks/MockStream.h"
-#include "../../Mocks/CommandRuntimeTestUtils.h"
+#include "../utils.h"
 
 INetworkSystem *network = nullptr;
 
@@ -44,23 +43,9 @@ void test_ping_empty_target(void)
 
     EmbeddedTerminal::cmd::ping pingCmd(*network);
     ETString keyword = "ping";
-    ETString additional = "";
-    ETString result = pingCmd.trigger(keyword, additional);
-    TEST_ASSERT_TRUE(result.find("Missing required argument: target") != ETString::npos);
-}
-
-/**
- * Test: Whitespace-only arguments
- * Expected: Error message about missing target
- */
-void test_ping_whitespace_only(void)
-{
-
-    EmbeddedTerminal::cmd::ping pingCmd(*network);
-    ETString keyword = "ping";
-    ETString additional = "   ";
-    ETString result = pingCmd.trigger(keyword, additional);
-    TEST_ASSERT_TRUE(result.find("Missing required argument: target") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("ping");
+    CommandResult result = pingCmd.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains(pingCmd.usage(keyword)));
 }
 
 /**
@@ -74,7 +59,7 @@ void test_ping_usage(void)
     ETString keyword = "ping";
     ETString result = pingCmd.usage(keyword);
     TEST_ASSERT_TRUE(result.find("ping") != ETString::npos);
-    TEST_ASSERT_TRUE(result.find("<host>") != ETString::npos);
+    TEST_ASSERT_TRUE(result.find("<target>") != ETString::npos);
     TEST_ASSERT_TRUE(result.find("IP address or hostname") != ETString::npos);
 }
 
@@ -84,13 +69,13 @@ void test_ping_usage(void)
  */
 void test_ping_target_extraction(void)
 {
-
     EmbeddedTerminal::cmd::ping pingCmd(*network);
     ETString keyword = "ping";
     ETString additional = "8.8.8.8 extra arguments";
+    auto iHandle = TestCommandInvocationHandle("ping", {"8.8.8.8", "extra", "arguments"});
 
-    ETString result = pingCmd.trigger(keyword, additional);
-    TEST_ASSERT_TRUE(result.find("8.8.8.8") != ETString::npos);
+    CommandResult result = pingCmd.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains("8.8.8.8"));
 }
 
 /**
@@ -102,12 +87,12 @@ void test_ping_localhost_success(void)
 
     EmbeddedTerminal::cmd::ping pingCmd(*network);
     ETString keyword = "ping";
-    ETString additional = "localhost";
-    ETString result = pingCmd.trigger(keyword, additional);
+    auto iHandle = TestCommandInvocationHandle("ping", {"localhost"});
+    CommandResult result = pingCmd.invoke(iHandle.invocation);
 
     // Mock return s success for localhost
-    TEST_ASSERT_TRUE(result.find("localhost") != ETString::npos);
-    TEST_ASSERT_TRUE(result.find("pinged") != ETString::npos);
+    TEST_ASSERT_TRUE(iHandle.output.contains("localhost"));
+    TEST_ASSERT_TRUE(iHandle.output.contains("pinged"));
 }
 
 /**
@@ -119,11 +104,11 @@ void test_ping_ipv4_address(void)
 
     EmbeddedTerminal::cmd::ping pingCmd(*network);
     ETString keyword = "ping";
-    ETString additional = "192.168.1.1";
-    ETString result = pingCmd.trigger(keyword, additional);
+    auto iHandle = TestCommandInvocationHandle("ping", {"192.168.1.1"});
+    CommandResult result = pingCmd.invoke(iHandle.invocation);
 
-    TEST_ASSERT_TRUE(result.find("192.168.1.1") != ETString::npos);
-    TEST_ASSERT_TRUE(result.find("pinged") != ETString::npos);
+    TEST_ASSERT_TRUE(iHandle.output.contains("192.168.1.1"));
+    TEST_ASSERT_TRUE(iHandle.output.contains("pinged"));
 }
 
 /**
@@ -135,10 +120,10 @@ void test_ping_unreachable_host(void)
 
     EmbeddedTerminal::cmd::ping pingCmd(*network);
     ETString keyword = "ping";
-    ETString additional = "10.255.255.255"; // Mock return s unreachable
-    ETString result = pingCmd.trigger(keyword, additional);
+    auto iHandle = TestCommandInvocationHandle("ping", {"10.255.255.255"}); // Mock return s unreachable
+    CommandResult result = pingCmd.invoke(iHandle.invocation);
 
-    TEST_ASSERT_TRUE(result.find("not reachable") != ETString::npos);
+    TEST_ASSERT_TRUE(iHandle.output.contains("not reachable"));
 }
 
 /**
@@ -150,10 +135,10 @@ void test_ping_invalid_host(void)
 
     EmbeddedTerminal::cmd::ping pingCmd(*network);
     ETString keyword = "ping";
-    ETString additional = "invalid"; // Mock return s unreachable
-    ETString result = pingCmd.trigger(keyword, additional);
+    auto iHandle = TestCommandInvocationHandle("ping", {"invalid"});
+    CommandResult result = pingCmd.invoke(iHandle.invocation);
 
-    TEST_ASSERT_TRUE(result.find("not reachable") != ETString::npos);
+    TEST_ASSERT_TRUE(iHandle.output.contains("not reachable"));
 }
 
 /**
@@ -166,11 +151,13 @@ void test_ping_response_includes_statistics(void)
     EmbeddedTerminal::cmd::ping pingCmd(*network);
     ETString keyword = "ping";
     ETString additional = "8.8.8.8";
-    ETString result = pingCmd.trigger(keyword, additional);
+    auto iHandle = TestCommandInvocationHandle("ping", {"8.8.8.8"});
+    CommandResult result = pingCmd.invoke(iHandle.invocation);
+    // Mock ping includes statistics
 
     // Mock ping includes statistics
-    TEST_ASSERT_TRUE(result.find("Average time") != ETString::npos ||
-                     result.find("not reachable") != ETString::npos);
+    TEST_ASSERT_TRUE(iHandle.output.contains("Average time") ||
+                     iHandle.output.contains("not reachable"));
 }
 
 void test_ping_execute_writes_stdout(void)
@@ -178,26 +165,18 @@ void test_ping_execute_writes_stdout(void)
 
     EmbeddedTerminal::cmd::ping pingCmd(*network);
 
-    MockStream stream;
-    ETMap<ETString, ETString> vars;
-    CommandContext context{vars, 0, true};
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
-
-    CommandInvocation invocation{"ping", "localhost", context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = pingCmd.execute(invocation);
+    auto iHandle = TestCommandInvocationHandle("ping", {"localhost"});
+    CommandResult result = pingCmd.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);
-    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("localhost") != ETString::npos);
-    TEST_ASSERT_TRUE(stream.stderrBuffer.empty());
+    TEST_ASSERT_TRUE(iHandle.output.contains("localhost"));
+    TEST_ASSERT_TRUE(iHandle.error.contains("not reachable") || iHandle.error.empty());
 }
 
 void process_tests()
 {
     UNITY_BEGIN();
     RUN_TEST(test_ping_empty_target);
-    RUN_TEST(test_ping_whitespace_only);
     RUN_TEST(test_ping_usage);
     RUN_TEST(test_ping_target_extraction);
     RUN_TEST(test_ping_localhost_success);

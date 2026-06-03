@@ -1,7 +1,7 @@
 #ifndef GPIO_H
 #define GPIO_H
 
-#include "Terminal.h"
+#include "interfaces/ICommand.h"
 #include "interfaces/IGpioInterface.h"
 #include "interfaces/IGpioPolicy.h"
 #include "interfaces/IGpioAuth.h"
@@ -17,15 +17,13 @@ namespace EmbeddedTerminal
             {
             }
 
-            ETString usage(const ETString &keyword) override;
-            ETString trigger(const ETString &keyword, const ETString &additional) override;
-            CommandResult execute(CommandInvocation &invocation) override;
+            ETString usage(const ETString &keyword) const override;
+            CommandResult invoke(CommandInvocation &invocation) override;
 
         private:
-            ETString run_(const ETString &arguments, CommandContext *context, int &exitCode);
+            ETString run_(const ETVector<ETString> &arguments, CommandContext *context, int &exitCode);
             bool isAuthenticated_(CommandContext *context) const;
             bool requiresAuthentication_(const GpioExclusionRule &rule) const;
-            ETVector<ETString> tokenize_(const ETString &arguments) const;
             ETString parseOperationTokens_(const ETVector<ETString> &tokens, size_t startIndex, GpioExclusionRule &rule);
             bool resolveAndAuthorize_(const ETString &inputPin, GpioOperation operation, ETString &resolvedPin, ETString &error);
             ETString formatRule_(const GpioExclusionRule &rule) const;

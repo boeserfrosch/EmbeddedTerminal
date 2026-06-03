@@ -11,7 +11,7 @@ namespace EmbeddedTerminal
     class NativeSuggestedStorageMedia : public IStorageMedia
     {
     public:
-        explicit NativeSuggestedStorageMedia(const ETString &name = "native", const Path &rootPath = ".")
+        NativeSuggestedStorageMedia(const ETString &name = "native", const Path &rootPath = ".")
             : name_(name),
               rootPath_(rootPath)
         {

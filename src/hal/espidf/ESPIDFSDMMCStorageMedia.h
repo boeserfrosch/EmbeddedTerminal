@@ -12,7 +12,7 @@ namespace EmbeddedTerminal
     class ESPIDFSDMMCStorageMedia : public IStorageMedia
     {
     public:
-        explicit ESPIDFSDMMCStorageMedia(const ETString &name = "sdmmc", const Path &mountPoint = "/sdcard")
+        ESPIDFSDMMCStorageMedia(const ETString &name = "sdmmc", const Path &mountPoint = "/sdcard")
             : name_(name),
               mountPoint_(mountPoint),
               fileSystem_(mountPoint)

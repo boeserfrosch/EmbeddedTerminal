@@ -1,8 +1,9 @@
 #ifndef SCRIPT_H
 #define SCRIPT_H
 
-#include "ScriptRunner.h"
-#include "Terminal.h"
+#include "interfaces/IExecutionContext.h"
+#include "scripting/Runner.h"
+#include <memory>
 
 namespace EmbeddedTerminal
 {
@@ -11,74 +12,53 @@ namespace EmbeddedTerminal
         class script : public ICommand
         {
         public:
-            explicit script(Terminal &terminal) : terminal_(terminal), runner_{
-                                                                           [this](const ParsedCommand &command)
-                                                                           {
-                                                                               activeParsedCommand_ = command;
-                                                                               lastDispatchResult_ = terminal_.executeParsedCommandForScript(command);
+            enum ErrorCode
+            {
+                None = 0,
+                InvalidArguments,
+                FileNotFound,
+                FilesystemNotAvailable,
+                FileError,
+                ParseError,
+                RuntimeError
+            };
 
-                                                                               bool singleCommand = (command.keywords.size() == 1) &&
-                                                                                                    command.redirectOutPath.empty() &&
-                                                                                                    command.redirectInPath.empty();
-                                                                               if (singleCommand && lastDispatchResult_.state != CommandExecutionState::Completed)
-                                                                               {
-                                                                                   ETString keyword = command.keywords[0];
-                                                                                   keyword.trim();
-                                                                                   const auto &commands = terminal_.getCommands();
-                                                                                   auto it = commands.find(keyword);
-                                                                                   if (it != commands.end())
-                                                                                   {
-                                                                                       activeSubcommand_ = it->second;
-                                                                                       activeKeyword_ = keyword;
-                                                                                       activeArguments_ = command.arguments[0];
-                                                                                       activeSubcommandState_ = lastDispatchResult_.state;
-                                                                                       hasActiveSubcommand_ = true;
-                                                                                   }
-                                                                               }
-                                                                           },
-                                                                           [this]()
-                                                                           {
-                                                                               return terminal_.getLastExitCode();
-                                                                           },
-                                                                           [this]()
-                                                                           {
-                                                                               return hasActiveSubcommand_;
-                                                                           },
-                                                                           [this]()
-                                                                           {
-                                                                               return terminal_.currentTimeMs();
-                                                                           },
-                                                                           [this](const ETString &input, const ETString &variableName, const ETString &value)
-                                                                           {
-                                                                               return substitute_(input, variableName, value);
-                                                                           }}
+            script(IExecutionContext &terminal) : runner_(terminal), terminal_(terminal)
             {
             }
 
-            ETString usage(const ETString &keyword) override;
-            CommandResult execute(CommandInvocation &invocation) override;
+            ETString usage(const ETString &keyword) const override;
+            CommandResult invoke(CommandInvocation &invocation) override;
+            CommandResult resume(CommandInvocation &invocation) override;
             void onInterrupt() override;
 
+            bool error() const
+            {
+                return error_ != ErrorCode::None;
+            }
+
         protected:
-            ETString trigger(const ETString &keyword, const ETString &additional) override;
+            // ETString trigger(const ETString &keyword, const ETString &additional) override;
+
+            ETString getErrorMessage_(ErrorCode errorCode) const;
+            void tryFetchAndParseScript(CommandInvocation &invocation);
+            ETString tryFetchScriptPathFromArguments(CommandInvocation &invocation);
+            void tryFetchScriptFromPath(const ETString &path, CommandInvocation &invocation);
+            void tryTokenizeAndParseScript(CommandInvocation &invocation);
+            void reset();
+            CommandResult executeRunner_(CommandInvocation &invocation);
 
         private:
-            bool startScript_(const ETString &arguments, ETString &errorMessage);
-            bool startScriptFile_(const ETString &path, ETString &errorMessage);
-            void tick_();
-            ETString substitute_(const ETString &input, const ETString &variableName, const ETString &value) const;
+            ETString scriptContent_;
+            Scripting::ExpressionChain scriptAst_;
+            ETMap<ETString, ETString> runnerVariables_;
+            EmbeddedTerminal::Scripting::Runner runner_;
+            bool scriptLoaded_ = false;
 
-            Terminal &terminal_;
-            ScriptRunner runner_;
-            bool hasStarted_ = false;
-            bool hasActiveSubcommand_ = false;
-            ICommand *activeSubcommand_ = nullptr;
-            ETString activeKeyword_;
-            ETString activeArguments_;
-            ParsedCommand activeParsedCommand_;
-            CommandExecutionState activeSubcommandState_ = CommandExecutionState::Completed;
-            CommandResult lastDispatchResult_ = CommandResult::completed(0);
+            IExecutionContext &terminal_;
+            ErrorCode error_ = ErrorCode::None;
         };
+
     }
 }
 

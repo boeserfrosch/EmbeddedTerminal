@@ -33,19 +33,22 @@ Terminal term(Serial);
 class EchoCommand : public ICommand
 {
 public:
-  ETString trigger(const ETString &keyword, const ETString &additional) override
+  ETString usage(const ETString &keyword) const override
   {
-    if (additional.empty())
-    {
-      return "Usage: echo <text>";
-    }
-    return additional;
+    return keyword + " <text> - Echo back the input text";
   }
 
-  ETString usage(const ETString &keyword) override
+  CommandResult invoke(CommandInvocation &invocation) override
   {
-    return "Usage: " + keyword + " <text>\n"
-                                 "Echo back the provided text.";
+    ETString text = join(invocation.arguments, " ");
+    if (text.empty())
+    {
+      invocation.streams.error.print("Usage: echo <text>\n");
+      return CommandResult::completed(1);
+    }
+
+    invocation.streams.output.print(text + "\n");
+    return CommandResult::completed(0);
   }
 };
 
@@ -53,8 +56,14 @@ public:
 class UptimeCommand : public ICommand
 {
 public:
-  ETString trigger(const ETString &keyword, const ETString &additional) override
+  ETString usage(const ETString &keyword) const override
   {
+    return keyword + " - Show system uptime";
+  }
+
+  CommandResult invoke(CommandInvocation &invocation) override
+  {
+    (void)invocation;
     unsigned long seconds = millis() / 1000;
     unsigned long minutes = seconds / 60;
     unsigned long hours = minutes / 60;
@@ -73,13 +82,8 @@ public:
       result += toETString(static_cast<size_t>(minutes)) + "m ";
     result += toETString(static_cast<size_t>(seconds)) + "s";
 
-    return result;
-  }
-
-  ETString usage(const ETString &keyword) override
-  {
-    return "Usage: " + keyword + "\n"
-                                 "Display system uptime since boot.";
+    invocation.streams.output.print(result + "\n");
+    return CommandResult::completed(0);
   }
 };
 
@@ -95,38 +99,39 @@ public:
     digitalWrite(LED_PIN, LOW);
   }
 
-  ETString trigger(const ETString &keyword, const ETString &additional) override
+  ETString usage(const ETString &keyword) const override
   {
-    ETString arg = additional;
+    return keyword + " <on|off> - Control the built-in LED";
+  }
+
+  CommandResult invoke(CommandInvocation &invocation) override
+  {
+    ETString arg = join(invocation.arguments, " ");
     arg.toLowerCase();
 
     if (arg.empty())
     {
-      return "Usage: led <on|off>";
+      invocation.streams.error.print("Usage: led <on|off>\n");
+      return CommandResult::completed(1);
     }
 
     if (arg.find("on") != ETString::npos)
     {
       digitalWrite(LED_PIN, HIGH);
-      return "LED turned ON";
+      invocation.streams.output.print("LED turned ON\n");
+      return CommandResult::completed(0);
     }
     else if (arg.find("off") != ETString::npos)
     {
       digitalWrite(LED_PIN, LOW);
-      return "LED turned OFF";
+      invocation.streams.output.print("LED turned OFF\n");
+      return CommandResult::completed(0);
     }
     else
     {
-      return "Invalid argument. Use 'on' or 'off'";
+      invocation.streams.error.print("Invalid argument. Use 'on' or 'off'\n");
+      return CommandResult::completed(1);
     }
-  }
-
-  ETString usage(const ETString &keyword) override
-  {
-    return "Usage: " + keyword + " <on|off>\n"
-                                 "Control the built-in LED.\n"
-                                 "  on  - Turn LED on\n"
-                                 "  off - Turn LED off";
   }
 };
 
@@ -134,8 +139,14 @@ public:
 class InfoCommand : public ICommand
 {
 public:
-  ETString trigger(const ETString &keyword, const ETString &additional) override
+  ETString usage(const ETString &keyword) const override
   {
+    return keyword + " - Display system information";
+  }
+
+  CommandResult invoke(CommandInvocation &invocation) override
+  {
+    (void)invocation;
     ETString info;
 
     info += "System Information:\n";
@@ -153,17 +164,12 @@ public:
     info += "Free RAM: " + toETString(freeMemory()) + " bytes\n";
 #endif
 
-    return info;
-  }
-
-  ETString usage(const ETString &keyword) override
-  {
-    return "Usage: " + keyword + "\n"
-                                 "Display system information.";
+    invocation.streams.output.print(info);
+    return CommandResult::completed(0);
   }
 
 private:
-#if !defined(ESP32)
+#if !defined(ESP32) && defined(ARDUINO)
   // Simple free memory calculation for Arduino
   int freeMemory()
   {

@@ -11,7 +11,7 @@ namespace EmbeddedTerminal
     class ArduinoGpioInterface : public IGpioInterface
     {
     public:
-        explicit ArduinoGpioInterface(const ETVector<int> &pins)
+        ArduinoGpioInterface(const ETVector<int> &pins)
         {
             for (auto pin : pins)
             {

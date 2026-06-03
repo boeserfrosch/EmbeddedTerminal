@@ -10,8 +10,7 @@
 
 #include "commands/touch.h"
 #include "../../Mocks/native/MockFileSystem.h"
-#include "../../Mocks/MockStream.h"
-#include "../../Mocks/CommandRuntimeTestUtils.h"
+#include "../utils.h"
 #include "StorageSystem.h"
 #include "../../Mocks/native/MockStorageMedia.h"
 
@@ -45,9 +44,12 @@ void tearDown(void)
 void test_touch_creates_missing_file(void)
 {
     cmd::touch touchCmd(*dir);
-    ETString result = touchCmd.trigger("touch", "new.txt");
+    auto iHandle = TestCommandInvocationHandle("touch", {"new.txt"});
+    CommandResult result = touchCmd.invoke(iHandle.invocation);
 
-    TEST_ASSERT_TRUE(result.find("touched") != ETString::npos);
+    TEST_ASSERT_TRUE(result.state == CommandExecutionState::Completed);
+    TEST_ASSERT_EQUAL(0, result.exitCode);
+    TEST_ASSERT_TRUE(iHandle.output.contains("touched"));
     TEST_ASSERT_TRUE(storage->exists("/new.txt"));
 }
 
@@ -56,9 +58,11 @@ void test_touch_existing_file(void)
     storage->open("/existing.txt", FILE_MODE_WRITE, true).close();
 
     cmd::touch touchCmd(*dir);
-    ETString result = touchCmd.trigger("touch", "existing.txt");
+    auto iHandle = TestCommandInvocationHandle("touch", {"existing.txt"});
+    CommandResult result = touchCmd.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(result.state == CommandExecutionState::Completed);
+    TEST_ASSERT_TRUE(iHandle.output.contains("touched"));
 
-    TEST_ASSERT_TRUE(result.find("touched") != ETString::npos);
     TEST_ASSERT_TRUE(storage->exists("/existing.txt"));
 }
 
@@ -69,9 +73,11 @@ void test_touch_existing_file_keeps_content(void)
     file.close();
 
     cmd::touch touchCmd(*dir);
-    ETString result = touchCmd.trigger("touch", "content.txt");
+    auto iHandle = TestCommandInvocationHandle("touch", {"content.txt"});
+    CommandResult result = touchCmd.invoke(iHandle.invocation);
 
-    TEST_ASSERT_TRUE(result.find("touched") != ETString::npos);
+    TEST_ASSERT_TRUE(result.state == CommandExecutionState::Completed);
+    TEST_ASSERT_TRUE(iHandle.output.contains("touched"));
     auto readFile = storage->open("/content.txt", FILE_MODE_READ, false);
     TEST_ASSERT_EQUAL_STRING("abc123", readFile.readAll().c_str());
     readFile.close();
@@ -82,16 +88,20 @@ void test_touch_rejects_directory(void)
     storage->mkdir("/dir");
 
     cmd::touch touchCmd(*dir);
-    ETString result = touchCmd.trigger("touch", "dir");
+    auto iHandle = TestCommandInvocationHandle("touch", {"dir"});
+    CommandResult result = touchCmd.invoke(iHandle.invocation);
 
-    TEST_ASSERT_TRUE(result.find("directory") != ETString::npos);
+    TEST_ASSERT_TRUE(result.state == CommandExecutionState::Completed);
+    TEST_ASSERT_TRUE(iHandle.output.contains("directory"));
 }
 
 void test_touch_empty_path(void)
 {
     cmd::touch touchCmd(*dir);
-    ETString result = touchCmd.trigger("touch", "   ");
-    TEST_ASSERT_TRUE(result.find("Missing required argument: file") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("touch");
+    CommandResult result = touchCmd.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(result.state == CommandExecutionState::Completed);
+    TEST_ASSERT_TRUE(iHandle.output.contains(touchCmd.usage("touch")));
 }
 
 void test_touch_usage(void)
@@ -105,19 +115,11 @@ void test_touch_execute_writes_stdout(void)
 {
     cmd::touch touchCmd(*dir);
 
-    MockStream stream;
-    ETMap<ETString, ETString> vars;
-    CommandContext context{vars, 0, true};
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
-
-    CommandInvocation invocation{"touch", "runtime.txt", context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = touchCmd.execute(invocation);
+    auto iHandle = TestCommandInvocationHandle("touch", {"runtime.txt"});
+    CommandResult result = touchCmd.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);
-    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("touched") != ETString::npos);
-    TEST_ASSERT_TRUE(stream.stderrBuffer.empty());
+    TEST_ASSERT_TRUE(iHandle.output.contains("touched"));
     TEST_ASSERT_TRUE(storage->exists("/runtime.txt"));
 }
 

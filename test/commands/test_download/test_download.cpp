@@ -8,6 +8,7 @@
 #include "commands/download.h"
 #include "StorageSystem.h"
 #include "../../Mocks/native/MockStorageMedia.h"
+#include "../utils.h"
 
 IStorageSystem *storage = nullptr;
 
@@ -35,27 +36,32 @@ void test_download_basic(void)
     storage->open("/file.txt", "w", true).writeAll("hello1234"); // Small file
     EmbeddedTerminal::cmd::download download(dir);
 
-    TEST_ASSERT_TRUE(true);
-    auto result = download.trigger("download", "file.txt");
-    TEST_ASSERT_TRUE(result.find("SIZE 9") != ETString::npos);
-    TEST_ASSERT_TRUE(result.find("aGVsbG8xMjM0") != ETString::npos);
-    TEST_ASSERT_TRUE(result.find("EOF") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("download", {"file.txt"});
+    CommandResult result = download.invoke(iHandle.invocation);
+    TEST_ASSERT_EQUAL(CommandExecutionState::Completed, result.state);
+
+    TEST_ASSERT_TRUE(iHandle.output.contains("SIZE 9"));
+    TEST_ASSERT_TRUE(iHandle.output.contains("aGVsbG8xMjM0"));
+    TEST_ASSERT_TRUE(iHandle.output.contains("EOF"));
 }
 
 void test_download_invalid_path(void)
 {
     EmbeddedTerminal::DirectoryNavigator dir(storage);
     EmbeddedTerminal::cmd::download download(dir);
-    auto result = download.trigger("download", "   ");
-    TEST_ASSERT_TRUE(result.find("Missing required argument") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("download", {});
+    CommandResult result = download.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains(download.usage("download")));
 }
 
 void test_download_file_not_found(void)
 {
     EmbeddedTerminal::DirectoryNavigator dir(storage);
     EmbeddedTerminal::cmd::download download(dir);
-    auto result = download.trigger("download", "nofile.txt");
-    TEST_ASSERT_TRUE(result.find("did not exist") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("download", {"nofile.txt"});
+    CommandResult result = download.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.error.contains("did not exist"));
+    TEST_ASSERT_TRUE(iHandle.output.empty());
 }
 
 void test_download_is_directory(void)
@@ -63,8 +69,10 @@ void test_download_is_directory(void)
     EmbeddedTerminal::DirectoryNavigator dir(storage);
     storage->mkdir("/mydir");
     EmbeddedTerminal::cmd::download download(dir);
-    auto result = download.trigger("download", "mydir");
-    TEST_ASSERT_TRUE(result.find("is a directory") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("download", {"mydir"});
+    CommandResult result = download.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.error.contains("is a directory"));
+    TEST_ASSERT_TRUE(iHandle.output.empty());
 }
 
 void test_download_streaming(void)
@@ -79,68 +87,60 @@ void test_download_streaming(void)
 
     EmbeddedTerminal::cmd::download download(dir);
 
-    MockStream stream;
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
-    ETMap<ETString, ETString> vars;
-    CommandContext context{vars, 0, true};
+    auto iHandle = TestCommandInvocationHandle("download", {"bigfile.txt"});
+    CommandResult result = download.invoke(iHandle.invocation);
 
-    CommandInvocation invocation{"download", "bigfile.txt", context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = download.execute(invocation);
-
-    TEST_ASSERT_MESSAGE(stream.stdoutBuffer.find("SIZE 6000") != ETString::npos, "Expected SIZE header with file size");
-    TEST_ASSERT_MESSAGE(stream.stdoutBuffer.find("CHUNK 0/15") != ETString::npos, "Expected first chunk header");
-    TEST_ASSERT_MESSAGE(stream.stdoutBuffer.find("QUJDREVGR0hJSkFCQ0RFRkdISUpBQkNERUZHS") != ETString::npos, "Expected base64 content in the response");
+    TEST_ASSERT_MESSAGE(iHandle.output.contains("SIZE 6000"), "Expected SIZE header with file size");
+    TEST_ASSERT_MESSAGE(iHandle.output.contains("CHUNK 1/16"), "Expected first chunk header");
+    TEST_ASSERT_MESSAGE(iHandle.output.contains("QUJDREVGR0hJSkFCQ0RFRkdISUpBQkNERUZHS"), "Expected base64 content in the response");
     TEST_ASSERT_EQUAL(CommandExecutionState::Running, result.state);
 
     // Simulate subsequent calls to complete the streaming
-    size_t chunkCount = 0;
+    size_t chunkCount = 1;
     while (result.state == CommandExecutionState::Running)
     {
 
         chunkCount++;
-        result = download.execute(invocation);
+        if (chunkCount > 20)
+        {
+            TEST_FAIL_MESSAGE("Too many chunks, possible infinite loop");
+            break;
+        }
+
+        result = download.resume(iHandle.invocation);
+        TEST_ASSERT_EQUAL(0, result.exitCode);
         if (chunkCount < 16)
         {
+            TEST_ASSERT_EQUAL_STRING(toETString(chunkCount * 384).c_str(), iHandle.invocation.context.variables["download__pos"].c_str());
             TEST_ASSERT_MESSAGE(result.state == CommandExecutionState::Running || result.state == CommandExecutionState::Completed, "Expected state to be Running or Completed");
             // Test chunk headers and content in each response
-            size_t chunkIndex = stream.stdoutBuffer.find("CHUNK " + toETString(chunkCount) + "/15");
-            TEST_ASSERT_MESSAGE(chunkIndex != ETString::npos, "Expected chunk header in streaming response");
-            size_t chunkEnd = stream.stdoutBuffer.find("\n", chunkIndex);
-            TEST_ASSERT_MESSAGE(chunkEnd != ETString::npos, "Expected newline after chunk header");
+            TEST_ASSERT_TRUE_MESSAGE(iHandle.output.contains("CHUNK " + toETString(chunkCount) + "/16"), "Expected chunk header in streaming response");
             if (result.state == CommandExecutionState::Running)
             {
                 // No EOF yet
-                TEST_ASSERT_MESSAGE(stream.stdoutBuffer.find("EOF", chunkEnd) == ETString::npos, "Should not find EOF before the last chunk");
+                TEST_ASSERT_FALSE_MESSAGE(iHandle.output.contains("EOF"), "Should not find EOF before the last chunk");
             }
         }
-        if (chunkCount == 16)
+        if (chunkCount == 17)
         {
             TEST_ASSERT_MESSAGE(result.state == CommandExecutionState::Completed, "Expected final state to be Completed after last chunk");
-            TEST_ASSERT_MESSAGE(stream.stdoutBuffer.find("EOF") != ETString::npos, "Expected EOF in the final response");
+            TEST_ASSERT_MESSAGE(iHandle.output.contains("EOF"), "Expected EOF in the final response");
         }
     }
-    TEST_ASSERT_MESSAGE(stream.stdoutBuffer.find("EOF") != ETString::npos, "Should be complete yet"); // Should not be complete yet
+    TEST_ASSERT_MESSAGE(iHandle.output.contains("EOF"), "Should be complete yet"); // Should not be complete yet
 }
 
 void test_download_streaming_error(void)
 {
     EmbeddedTerminal::DirectoryNavigator dir(storage);
     EmbeddedTerminal::cmd::download download(dir);
-    MockStream stream;
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
-    ETMap<ETString, ETString> vars;
-    CommandContext context{vars, 0, true};
-    CommandInvocation invocation{"download", "nonexistent.txt", context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = download.execute(invocation);
+    auto iHandle = TestCommandInvocationHandle("download", {"nofile.txt"});
+    CommandResult result = download.invoke(iHandle.invocation);
     TEST_ASSERT_MESSAGE(result.state == CommandExecutionState::Completed, "Expected state to be Completed on error");
     TEST_ASSERT_MESSAGE(result.exitCode != 0, "Expected non-zero exit code on error");
-    TEST_ASSERT_MESSAGE(result.exitCode == EmbeddedTerminal::cmd::errorCodes::DOWNLOAD_CMD_ERROR_FILE_NOT_FOUND, "Expected specific error code for failed file open");
-    TEST_ASSERT_MESSAGE(stream.stderrBuffer.find("did not exist") != ETString::npos, "Expected error message about file not existing");
-    TEST_ASSERT_MESSAGE(stream.stdoutBuffer.find("EOF") == ETString::npos, "Should not find EOF in error case");
+    TEST_ASSERT_MESSAGE(result.exitCode == EmbeddedTerminal::cmd::download::ErrorCode::FILE_NOT_FOUND, "Expected specific error code for failed file open");
+    TEST_ASSERT_MESSAGE(iHandle.error.contains("did not exist"), "Expected error message about file not existing");
+    TEST_ASSERT_FALSE_MESSAGE(iHandle.output.contains("EOF"), "Should not find EOF in error case");
     TEST_ASSERT_TRUE(true);
 }
 

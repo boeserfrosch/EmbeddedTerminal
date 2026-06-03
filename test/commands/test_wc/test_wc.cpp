@@ -12,8 +12,7 @@
 #include "StorageSystem.h"
 #include "../../Mocks/native/MockFileSystem.h"
 #include "../../Mocks/native/MockStorageMedia.h"
-#include "../../Mocks/MockStream.h"
-#include "../../Mocks/CommandRuntimeTestUtils.h"
+#include "../utils.h"
 
 using namespace EmbeddedTerminal;
 
@@ -50,17 +49,20 @@ void test_wc_trigger_file_counts(void)
     file.close();
 
     cmd::wc wcCmd(*dir);
-    ETString result = wcCmd.trigger("wc", "sample.txt");
-
-    TEST_ASSERT_EQUAL_STRING("2 3 14 sample.txt\n", result.c_str());
+    auto iHandle = TestCommandInvocationHandle("wc", {"sample.txt"});
+    CommandResult result = wcCmd.invoke(iHandle.invocation);
+    TEST_ASSERT_EQUAL(0, result.exitCode);
+    TEST_ASSERT_TRUE(iHandle.output.contains("sample.txt:\t2\t3\t14\n"));
 }
 
 void test_wc_trigger_missing_file(void)
 {
     cmd::wc wcCmd(*dir);
-    ETString result = wcCmd.trigger("wc", "missing.txt");
+    auto iHandle = TestCommandInvocationHandle("wc", {"missing.txt"});
+    CommandResult result = wcCmd.invoke(iHandle.invocation);
+    TEST_ASSERT_EQUAL(1, result.exitCode);
 
-    TEST_ASSERT_TRUE(result.find("did not exist") != ETString::npos);
+    TEST_ASSERT_TRUE(iHandle.error.contains("did not exist"));
 }
 
 void test_wc_usage(void)
@@ -74,21 +76,15 @@ void test_wc_execute_reads_stdin_when_no_file(void)
 {
     cmd::wc wcCmd(*dir);
 
-    MockStream stream;
-    ETMap<ETString, ETString> vars;
-    CommandContext context{vars, 0, true};
-    BufferedInputChannel stdinChannel;
-    stdinChannel.buffer = "a b\nc\n";
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
-
-    CommandInvocation invocation{"wc", "", context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = wcCmd.execute(invocation);
+    auto iHandle = TestCommandInvocationHandle("wc");
+    iHandle.input.print("hello world\nthis is a test\n");
+    CommandResult result = wcCmd.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);
     TEST_ASSERT_EQUAL(CommandExecutionState::Completed, result.state);
-    TEST_ASSERT_EQUAL_STRING("2 3 6\n", stream.stdoutBuffer.c_str());
-    TEST_ASSERT_TRUE(stream.stderrBuffer.empty());
+    TEST_ASSERT_TRUE(iHandle.output.contains("Lines\tWords\tBytes\n")); // Check if header is printed
+    TEST_ASSERT_TRUE(iHandle.output.contains("2\t6\t27\n"));
+    TEST_ASSERT_TRUE(iHandle.error.empty());
 }
 
 void test_wc_execute_file_counts(void)
@@ -100,20 +96,15 @@ void test_wc_execute_file_counts(void)
 
     cmd::wc wcCmd(*dir);
 
-    MockStream stream;
-    ETMap<ETString, ETString> vars;
-    CommandContext context{vars, 0, true};
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
-
-    CommandInvocation invocation{"wc", "file.txt", context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = wcCmd.execute(invocation);
+    auto iHandle = TestCommandInvocationHandle("wc", {"file.txt"});
+    CommandResult result = wcCmd.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);
     TEST_ASSERT_EQUAL(CommandExecutionState::Completed, result.state);
-    TEST_ASSERT_EQUAL_STRING("1 2 12 file.txt\n", stream.stdoutBuffer.c_str());
-    TEST_ASSERT_TRUE(stream.stderrBuffer.empty());
+    // Check if header is printed
+    TEST_ASSERT_TRUE(iHandle.output.contains("File\tLines\tWords\tBytes\n"));
+    TEST_ASSERT_TRUE(iHandle.output.contains("file.txt:\t1\t2\t12\n"));
+    TEST_ASSERT_TRUE(iHandle.error.empty());
 }
 
 void process_tests()

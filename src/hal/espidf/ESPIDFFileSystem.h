@@ -13,7 +13,7 @@ namespace EmbeddedTerminal
     class ESPIDFFileSystem : public IFileSystem
     {
     public:
-        explicit ESPIDFFileSystem(const Path &mount_point) : mount_point_(mount_point) {}
+        ESPIDFFileSystem(const Path &mount_point) : mount_point_(mount_point) {}
         virtual ~ESPIDFFileSystem() = default;
 
         ETFile open(const Path &path, const char *mode = FILE_MODE_READ, const bool create = false) override

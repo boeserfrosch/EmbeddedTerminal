@@ -2,9 +2,9 @@
 #define MKDIR_H
 
 #include "DirectoryNavigator.h"
+#include "interfaces/ICommand.h"
 #include "interfaces/IAutoCompleter.h"
 #include "DefaultAutoCompleters.h"
-#include "Terminal.h"
 namespace EmbeddedTerminal
 {
     namespace cmd
@@ -14,15 +14,21 @@ namespace EmbeddedTerminal
         {
 
         public:
+            enum ErrorCode
+            {
+                NONE = 0,
+                Missused = 1,
+                FolderAlreadyExists = 2,
+                FailedToCreateFolder = 3
+            };
             mkdir(DirectoryNavigator &dir) : dir_(dir), completer_(dir)
             {
             }
-            ETString usage(const ETString &keyword);
-
-            ETString trigger(const ETString &keyword, const ETString &additional) override;
+            ETString usage(const ETString &keyword) const override;
+            CommandResult invoke(CommandInvocation &invocation) override;
 
             // Auto completion - suggest directory paths for parent directory
-            ETVector<ETString> getSuggestions(const ETString &partial) override;
+            ETVector<ETString> getSuggestions(const ETString &partial) const override;
 
         private:
             DirectoryNavigator dir_;

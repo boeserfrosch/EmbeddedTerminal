@@ -1,7 +1,8 @@
 #ifndef ECHO_H
 #define ECHO_H
 
-#include "Terminal.h"
+#include "interfaces/ICommand.h"
+#include "DefaultAutoCompleters.h"
 
 namespace EmbeddedTerminal
 {
@@ -10,8 +11,8 @@ namespace EmbeddedTerminal
         class echo : public ICommand
         {
         public:
-            ETString usage(const ETString &keyword) override;
-            ETString trigger(const ETString &keyword, const ETString &additional) override;
+            ETString usage(const ETString &keyword) const override;
+            CommandResult invoke(CommandInvocation &invocation) override;
         };
     };
 };

@@ -9,8 +9,7 @@
 #endif
 #include "commands/rm.h"
 #include "../../Mocks/native/MockFileSystem.h"
-#include "../../Mocks/MockStream.h"
-#include "../../Mocks/CommandRuntimeTestUtils.h"
+#include "../utils.h"
 #include "StorageSystem.h"
 #include "../../Mocks/native/MockStorageMedia.h"
 
@@ -47,8 +46,9 @@ void test_rm_valid_file(void)
     cmd::rm rm(*dir);
     ETString keyword = "rm";
     ETString arg = "file.txt";
-    ETString result = rm.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("removed") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("rm", {arg});
+    CommandResult result = rm.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains("removed"));
 }
 
 void test_rm_nonexistent_file(void)
@@ -56,8 +56,9 @@ void test_rm_nonexistent_file(void)
     cmd::rm rm(*dir);
     ETString keyword = "rm";
     ETString arg = "no_file.txt";
-    ETString result = rm.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("did not exist") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("rm", {arg});
+    CommandResult result = rm.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains("did not exist"));
 }
 
 void test_rm_directory_instead_of_file(void)
@@ -65,8 +66,9 @@ void test_rm_directory_instead_of_file(void)
     cmd::rm rm(*dir);
     ETString keyword = "rm";
     ETString arg = "dir1";
-    ETString result = rm.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("not a file") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("rm", {arg});
+    CommandResult result = rm.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains("not a file"));
 }
 
 void test_rm_usage(void)
@@ -81,9 +83,9 @@ void test_rm_edge_cases(void)
 {
     cmd::rm rm(*dir);
     ETString keyword = "rm";
-    ETString arg = "   ";
-    ETString result = rm.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("Missing required argument: file") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("rm");
+    CommandResult result = rm.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains(rm.usage(keyword)));
 }
 
 void test_rm_auto_completion_file_suggestions(void)
@@ -106,19 +108,12 @@ void test_rm_execute_writes_stdout(void)
 {
     cmd::rm rm(*dir);
 
-    MockStream stream;
-    ETMap<ETString, ETString> vars;
-    CommandContext context{vars, 0, true};
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
-
-    CommandInvocation invocation{"rm", "file.txt", context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = rm.execute(invocation);
+    auto iHandle = TestCommandInvocationHandle("rm", {"file.txt"});
+    CommandResult result = rm.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);
-    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("removed") != ETString::npos);
-    TEST_ASSERT_TRUE(stream.stderrBuffer.empty());
+    TEST_ASSERT_TRUE(iHandle.output.contains("removed"));
+    TEST_ASSERT_TRUE(iHandle.error.empty());
 }
 
 void process_tests()

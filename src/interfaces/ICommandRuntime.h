@@ -24,7 +24,7 @@ namespace EmbeddedTerminal
      */
     struct CommandResult
     {
-        int exitCode = 0;
+        int32_t exitCode = 0;
         CommandExecutionState state = CommandExecutionState::Completed;
 
         /**
@@ -32,7 +32,7 @@ namespace EmbeddedTerminal
          * @param code The exit code for the completed command.
          * @return A CommandResult with the specified exit code and Completed state.
          */
-        static CommandResult completed(int code = 0)
+        static CommandResult completed(int32_t code = 0)
         {
             CommandResult result;
             result.exitCode = code;
@@ -45,7 +45,7 @@ namespace EmbeddedTerminal
          * @param code The exit code for the running command (default is 0).
          * @return A CommandResult with the specified exit code and Running state.
          */
-        static CommandResult running(int code = 0)
+        static CommandResult running(int32_t code = 0)
         {
             CommandResult result;
             result.exitCode = code;
@@ -58,7 +58,7 @@ namespace EmbeddedTerminal
          * @param code The exit code for the waiting command (default is 0).
          * @return A CommandResult with the specified exit code and WaitingForInput state.
          */
-        static CommandResult waitingForInput(int code = 0)
+        static CommandResult waitingForInput(int32_t code = 0)
         {
             CommandResult result;
             result.exitCode = code;
@@ -103,6 +103,101 @@ namespace EmbeddedTerminal
         virtual void print(const ETString &s) = 0;
     };
 
+    struct StreamBundle
+    {
+        struct InputHandle
+        {
+            IInputChannel *channel = nullptr;
+
+            InputHandle() = default;
+            InputHandle(IInputChannel *ptr) : channel(ptr) {}
+
+            bool available() const { return channel != nullptr && channel->available(); }
+            ETString readAll() const { return channel != nullptr ? channel->readAll() : ETString(); }
+            IInputChannel *get() const { return channel; }
+        };
+
+        struct OutputHandle
+        {
+            IOutputChannel *channel = nullptr;
+
+            OutputHandle() = default;
+            OutputHandle(IOutputChannel *ptr) : channel(ptr) {}
+
+            void print(const ETString &s) const
+            {
+                if (channel != nullptr)
+                {
+                    channel->print(s);
+                }
+            }
+
+            IOutputChannel *get() const { return channel; }
+        };
+
+        std::unique_ptr<IInputChannel> ownedInput;
+        std::unique_ptr<IOutputChannel> ownedOutput;
+        std::unique_ptr<IOutputChannel> ownedError;
+
+        InputHandle input;
+        OutputHandle output;
+        OutputHandle error;
+
+        StreamBundle() = delete;
+
+        StreamBundle(std::unique_ptr<IInputChannel> in, std::unique_ptr<IOutputChannel> out, std::unique_ptr<IOutputChannel> err)
+            : ownedInput(std::move(in)), ownedOutput(std::move(out)), ownedError(std::move(err)), input(ownedInput.get()), output(ownedOutput.get()), error(ownedError.get())
+        {
+        }
+
+        StreamBundle(IInputChannel &in, IOutputChannel &out, IOutputChannel &err)
+            : input(&in), output(&out), error(&err)
+        {
+        }
+
+        StreamBundle(const StreamBundle &other) = delete;
+        StreamBundle &operator=(const StreamBundle &other) = delete;
+
+        StreamBundle(StreamBundle &other)
+            : ownedInput(nullptr), ownedOutput(nullptr), ownedError(nullptr), input(nullptr), output(nullptr), error(nullptr)
+        {
+            ownedInput.swap(other.ownedInput);
+            ownedOutput.swap(other.ownedOutput);
+            ownedError.swap(other.ownedError);
+            input.channel = ownedInput.get();
+            output.channel = ownedOutput.get();
+            error.channel = ownedError.get();
+            other.input.channel = other.ownedInput.get();
+            other.output.channel = other.ownedOutput.get();
+            other.error.channel = other.ownedError.get();
+        }
+
+        StreamBundle(StreamBundle &&other) noexcept
+            : ownedInput(std::move(other.ownedInput)), ownedOutput(std::move(other.ownedOutput)), ownedError(std::move(other.ownedError)), input(other.input), output(other.output), error(other.error)
+        {
+            input.channel = ownedInput ? ownedInput.get() : input.channel;
+            output.channel = ownedOutput ? ownedOutput.get() : output.channel;
+            error.channel = ownedError ? ownedError.get() : error.channel;
+        }
+
+        StreamBundle &operator=(StreamBundle &&other) noexcept
+        {
+            if (this != &other)
+            {
+                ownedInput = std::move(other.ownedInput);
+                ownedOutput = std::move(other.ownedOutput);
+                ownedError = std::move(other.ownedError);
+                input = other.input;
+                output = other.output;
+                error = other.error;
+                input.channel = ownedInput ? ownedInput.get() : input.channel;
+                output.channel = ownedOutput ? ownedOutput.get() : output.channel;
+                error.channel = ownedError ? ownedError.get() : error.channel;
+            }
+            return *this;
+        }
+    };
+
     /**
      * @brief Struct to represent the context of a command execution
      */
@@ -117,14 +212,14 @@ namespace EmbeddedTerminal
         /**
          * @brief The exit code of the last executed command
          */
-        int lastExitCode = 0;
+        int32_t lastExitCode = 0;
 
         /**
          *  @brief Whether the command is running in interactive mode
          * */
         bool interactive = false;
 
-        CommandContext(ETMap<ETString, ETString> &vars, int exitCode = 0, bool isInteractive = false)
+        CommandContext(ETMap<ETString, ETString> &vars, int32_t exitCode = 0, bool isInteractive = false)
             : variables(vars), lastExitCode(exitCode), interactive(isInteractive)
         {
         }
@@ -132,12 +227,20 @@ namespace EmbeddedTerminal
 
     struct CommandInvocation
     {
-        const ETString &keyword;
-        const ETString &arguments;
-        CommandContext &context;
-        IInputChannel &stdinChannel;
-        IOutputChannel &stdoutChannel;
-        IOutputChannel &stderrChannel;
+        const ETString keyword;
+        const ETVector<ETString> arguments;
+        CommandContext context;
+        StreamBundle streams;
+
+        CommandInvocation(const ETString &kw, const ETVector<ETString> &args, const CommandContext &ctx, const StreamBundle &bundle)
+            : keyword(kw), arguments(args), context(ctx), streams(*bundle.input.get(), *bundle.output.get(), *bundle.error.get())
+        {
+        }
+
+        CommandInvocation(const ETString &kw, const ETVector<ETString> &args, const CommandContext &ctx, IInputChannel &input, IOutputChannel &output, IOutputChannel &error)
+            : keyword(kw), arguments(args), context(ctx), streams(input, output, error)
+        {
+        }
     };
 }
 

@@ -24,13 +24,14 @@ class ETString
 #endif
 public:
     ETString();
+    ETString(char c);
     ETString(const char *s);
-    ETString(const unsigned char *s);
+    ETString(const ETString &other);
     ETString(const std::string &s);
 #if defined(ARDUINO) //|| defined(ESP_PLATFORM)
     ETString(const String &s);
 #endif
-    ETString(const ETString &other);
+
     ETString &operator=(const ETString &other);
     ETString &operator=(const char *s);
     ETString &operator=(char *s);
@@ -65,8 +66,10 @@ public:
     bool startsWith(const ETString &prefix) const;
     void erase(size_t pos, size_t len = npos);
     void insert(size_t pos, char c);
+    void insert(size_t pos, const ETString &str);
     void remove(size_t pos);
-    void toLowerCase();
+    void replace(size_t pos, size_t len, const ETString &str);
+    ETString toLowerCase() const;
     void pop_back();
     void push_back(char c);
     bool operator==(const ETString &other) const;
@@ -108,11 +111,28 @@ inline ETString operator+(const char *lhs, const ETString &rhs)
 
 template <typename T>
 using ETVector = std::vector<T>;
+
+template <typename T, typename U>
+using ETPair = std::pair<T, U>;
+
 template <typename K, typename V>
 using ETMap = std::map<K, V>;
 
 // ETString trim(const ETString &str);
 // ETString cleanupLine(const ETString &line);
+
+template <typename T>
+size_t findFirstIndexOf(const ETVector<T> &vec, const T &value, size_t start = 0)
+{
+    for (size_t i = start; i < vec.size(); ++i)
+    {
+        if (vec[i] == value)
+        {
+            return i;
+        }
+    }
+    return ETString::npos;
+}
 
 inline ETVector<ETString> operator+(const ETVector<ETString> &lhs, const ETVector<ETString> &rhs)
 {
@@ -132,7 +152,7 @@ ETString string_format(const ETString &format, Args... args);
 
 void toLower(ETString &data);
 
-ETVector<ETString> split(ETString s, ETString delimiter);
+ETVector<ETString> split(const ETString &s, const ETString &delimiter);
 ETVector<ETString> sort(const ETVector<ETString> &input);
 ETString join(const ETVector<ETString> &elements, const ETString &delimiter);
 

@@ -1,25 +1,33 @@
 #include "ip.h"
 
 using namespace EmbeddedTerminal::cmd;
-ETString ip::trigger(const ETString &keyword, const ETString &additional)
+
+ETString ip::usage(const ETString &keyword) const
+{
+    return keyword + " - Returns info for all network interfaces\n" + keyword + " -i|--interface <interface> - Returns info for the specified interface\n";
+}
+
+EmbeddedTerminal::CommandResult ip::invoke(CommandInvocation &invocation)
 {
     ETString result;
     auto interfaces = net_.interfaces();
     if (interfaces.empty())
     {
-        return "No interface available\n";
+        invocation.streams.output.print("No interface available\n");
+        return CommandResult::completed(NO_INTERFACES);
     }
 
     OptionParser parser;
     parser.addOption("-i", "--interface", "Show info for the specified interface", true);
-    auto parseResult = parser.parse(additional);
+    auto parseResult = parser.parse(invocation.arguments);
     if (!parseResult.success)
     {
-        return "ip error: " + parseResult.errorMessage + "\n" + usage(keyword);
+        invocation.streams.output.print(usage(invocation.keyword));
+        return CommandResult::completed(MISSUSED);
     }
 
     // Collect interface names to display
-    ETVector<ETString> interfaceNames;
+    ETVector<INetworkInterface *> selectedInterfaces;
 
     // Check if --interface option was specified
     auto it = parseResult.options.find("--interface");
@@ -28,47 +36,29 @@ ETString ip::trigger(const ETString &keyword, const ETString &additional)
         // Add all interface names specified with -i/--interface
         for (const auto &name : it->second)
         {
-            interfaceNames.push_back(name);
+            if (!net_.getInterface(name) || net_.getInterface(name)->info().name.empty())
+            {
+                invocation.streams.output.print("Unknown interface: " + name + "\n");
+                continue;
+            }
+            selectedInterfaces.push_back(net_.getInterface(name));
         }
     }
-
-    // If no specific interfaces requested, show all
-    if (interfaceNames.empty())
+    else
     {
-        for (const auto &iface : interfaces)
-        {
-            result += iface->info().name + ": ";
-            result += iface->info().ip + " ";
-            result += iface->info().mac + " ";
-            result += iface->info().netmask + " ";
-            result += iface->info().gateway + " ";
-            result += (iface->info().isUp ? "UP" : "DOWN");
-            result += "\n";
-        }
-        return result;
+        selectedInterfaces = interfaces;
     }
 
-    // Show specific interfaces
-    for (const auto &name : interfaceNames)
+    for (const auto &iface : selectedInterfaces)
     {
-        auto iface = net_.getInterface(name);
-        if (!iface || iface->info().name.empty())
-        {
-            result += "Unknown interface: " + name + "\n";
-            continue;
-        }
-        result += iface->info().name + ": ";
-        result += iface->info().ip + " ";
-        result += iface->info().mac + " ";
-        result += iface->info().netmask + " ";
-        result += iface->info().gateway + " ";
-        result += (iface->info().isUp ? "UP" : "DOWN");
-        result += "\n";
+        invocation.streams.output.print(
+            iface->info().name + ": " +
+            iface->info().ip + " " +
+            iface->info().mac + " " +
+            iface->info().netmask + " " +
+            iface->info().gateway + " " +
+            (iface->info().isUp ? "UP" : "DOWN") +
+            "\n");
     }
-    return result;
-}
-
-ETString ip::usage(const ETString &keyword)
-{
-    return keyword + " - Returns info for all network interfaces\n" + keyword + " -i|--interface <interface> - Returns info for the specified interface\n";
+    return CommandResult::completed(0);
 }

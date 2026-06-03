@@ -2,24 +2,27 @@
 
 using namespace EmbeddedTerminal::cmd;
 
-ETString ping::trigger(const ETString &keyword, const ETString &additional)
+ETString ping::usage(const ETString &keyword) const
+{
+    return keyword + " <target> - Ping a host (IP address or hostname)\n";
+}
+
+EmbeddedTerminal::CommandResult EmbeddedTerminal::cmd::ping::invoke(CommandInvocation &invocation)
 {
     OptionParser parser;
     parser.addRequiredRemainingArgument("target");
-    auto parseResult = parser.parse(additional);
+    auto parseResult = parser.parse(invocation.arguments);
 
     if (!parseResult.success)
     {
-        return parseResult.errorMessage + "\n" + usage(keyword);
+        invocation.streams.output.print(usage(invocation.keyword));
+        return CommandResult::completed(Missused);
     }
 
     // Extract the target (first argument)
     ETString target = parseResult.options["target"][0];
 
     // Delegate to network interface implementation
-    return net_.ping(target);
-}
-ETString ping::usage(const ETString &keyword)
-{
-    return keyword + " <host> - Ping a host (IP address or hostname)\n";
+    invocation.streams.output.print(net_.ping(target));
+    return CommandResult::completed(ErrorCode::None);
 }

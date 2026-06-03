@@ -1,5 +1,6 @@
 #include "gpio.h"
 #include "OptionParser.h"
+#include "lang/LangAPI.h"
 
 #include <chrono>
 
@@ -16,7 +17,7 @@ extern "C"
 
 using namespace EmbeddedTerminal::cmd;
 
-ETString gpio::usage(const ETString &keyword)
+ETString gpio::usage(const ETString &keyword) const
 {
     return keyword + " list - Lists available GPIO pins\n" +
            keyword + " policy - Shows active GPIO policy\n" +
@@ -29,14 +30,7 @@ ETString gpio::usage(const ETString &keyword)
            keyword + " auth [password|status] - Authenticate or show auth status/remaining time\n";
 }
 
-ETString gpio::trigger(const ETString &keyword, const ETString &additional)
-{
-    (void)keyword;
-    int exitCode = 0;
-    return run_(additional, nullptr, exitCode);
-}
-
-EmbeddedTerminal::CommandResult gpio::execute(CommandInvocation &invocation)
+EmbeddedTerminal::CommandResult gpio::invoke(CommandInvocation &invocation)
 {
     int exitCode = 0;
     ETString response = run_(invocation.arguments, &invocation.context, exitCode);
@@ -44,17 +38,17 @@ EmbeddedTerminal::CommandResult gpio::execute(CommandInvocation &invocation)
     {
         if (exitCode == 0)
         {
-            invocation.stdoutChannel.print(response);
+            invocation.streams.output.print(response);
         }
         else
         {
-            invocation.stderrChannel.print(response);
+            invocation.streams.error.print(response);
         }
     }
     return CommandResult::completed(exitCode);
 }
 
-ETString gpio::run_(const ETString &arguments, CommandContext *context, int &exitCode)
+ETString gpio::run_(const ETVector<ETString> &arguments, CommandContext *context, int &exitCode)
 {
     exitCode = 0;
     OptionParser parser;
@@ -64,17 +58,16 @@ ETString gpio::run_(const ETString &arguments, CommandContext *context, int &exi
     if (!parseResult.success)
     {
         exitCode = 1;
-        return parseResult.errorMessage;
+        return usage("gpio");
     }
 
     const bool protectedRequested = parseResult.options.find("--protected") != parseResult.options.end() && !parseResult.options["--protected"].empty();
-    auto tokens = tokenize_(parseResult.remainingArguments);
-    if (tokens.empty())
+    if (parseResult.remainingArguments.empty())
     {
         return usage("gpio");
     }
 
-    ETString command = tokens[0];
+    ETString command = parseResult.remainingArguments[0];
 
     if (command == "list")
     {
@@ -138,7 +131,7 @@ ETString gpio::run_(const ETString &arguments, CommandContext *context, int &exi
             exitCode = 1;
             return "Authentication requires interactive command runtime\n";
         }
-        if (tokens.size() >= 2 && tokens[1] == "status")
+        if (parseResult.remainingArguments.size() >= 2 && parseResult.remainingArguments[1] == "status")
         {
             if (!isAuthenticated_(context))
             {
@@ -163,13 +156,13 @@ ETString gpio::run_(const ETString &arguments, CommandContext *context, int &exi
             uint64_t remainingSec = remainingMs / 1000ULL;
             return "Authenticated, expires in " + toETString(static_cast<size_t>(remainingSec)) + "s\n";
         }
-        if (tokens.size() < 2)
+        if (parseResult.remainingArguments.size() < 2)
         {
             exitCode = 1;
             return "Usage: gpio auth [password|status]\n";
         }
 
-        if (auth_->verifyPassword(tokens[1]))
+        if (auth_->verifyPassword(parseResult.remainingArguments[1]))
         {
             context->variables[SESSION_KEY_AUTHENTICATED] = "1";
             const uint64_t ttlMs = static_cast<uint64_t>(ET_GPIO_AUTH_TTL_MS);
@@ -189,12 +182,12 @@ ETString gpio::run_(const ETString &arguments, CommandContext *context, int &exi
 
     if (command == "read")
     {
-        if (tokens.size() < 2)
+        if (parseResult.remainingArguments.size() < 2)
         {
             exitCode = 1;
             return "Usage: gpio read [pin[,pin...]]\n";
         }
-        auto inputPins = parsePins_(tokens[1]);
+        auto inputPins = parsePins_(parseResult.remainingArguments[1]);
         ETString result;
         for (const auto &pinInput : inputPins)
         {
@@ -218,20 +211,20 @@ ETString gpio::run_(const ETString &arguments, CommandContext *context, int &exi
 
     if (command == "write")
     {
-        if (tokens.size() < 3)
+        if (parseResult.remainingArguments.size() < 3)
         {
             exitCode = 1;
             return "Usage: gpio write [pin[,pin...]] [0|1]\n";
         }
 
-        bool high = (tokens[2] == "1" || tokens[2] == "high");
-        if (!(tokens[2] == "0" || tokens[2] == "1" || tokens[2] == "low" || tokens[2] == "high"))
+        bool high = (parseResult.remainingArguments[2] == "1" || parseResult.remainingArguments[2] == "high");
+        if (!(parseResult.remainingArguments[2] == "0" || parseResult.remainingArguments[2] == "1" || parseResult.remainingArguments[2] == "low" || parseResult.remainingArguments[2] == "high"))
         {
             exitCode = 1;
             return "Invalid level. Use 0/1/low/high\n";
         }
 
-        auto inputPins = parsePins_(tokens[1]);
+        auto inputPins = parsePins_(parseResult.remainingArguments[1]);
         for (const auto &pinInput : inputPins)
         {
             ETString resolved;
@@ -253,18 +246,18 @@ ETString gpio::run_(const ETString &arguments, CommandContext *context, int &exi
 
     if (command == "mode")
     {
-        if (tokens.size() < 3)
+        if (parseResult.remainingArguments.size() < 3)
         {
             exitCode = 1;
             return "Usage: gpio mode [pin[,pin...]] [input|output]\n";
         }
 
         GpioMode mode;
-        if (tokens[2] == "input")
+        if (parseResult.remainingArguments[2] == "input")
         {
             mode = GpioMode::Input;
         }
-        else if (tokens[2] == "output")
+        else if (parseResult.remainingArguments[2] == "output")
         {
             mode = GpioMode::Output;
         }
@@ -274,7 +267,7 @@ ETString gpio::run_(const ETString &arguments, CommandContext *context, int &exi
             return "Invalid mode. Use input|output\n";
         }
 
-        auto inputPins = parsePins_(tokens[1]);
+        auto inputPins = parsePins_(parseResult.remainingArguments[1]);
         for (const auto &pinInput : inputPins)
         {
             ETString resolved;
@@ -296,7 +289,7 @@ ETString gpio::run_(const ETString &arguments, CommandContext *context, int &exi
 
     if (command == "deny")
     {
-        if (tokens.size() < 2)
+        if (parseResult.remainingArguments.size() < 2)
         {
             exitCode = 1;
             return "Usage: gpio deny [pin[,pin...]] [read|write|mode|include|exclude ...] [--protected]\n";
@@ -308,7 +301,7 @@ ETString gpio::run_(const ETString &arguments, CommandContext *context, int &exi
         opMask.denyMode = false;
         opMask.denyInclude = false;
         opMask.denyExclude = false;
-        ETString parseError = parseOperationTokens_(tokens, 2, opMask);
+        ETString parseError = parseOperationTokens_(parseResult.remainingArguments, 2, opMask);
         if (!parseError.empty())
         {
             exitCode = 1;
@@ -321,7 +314,7 @@ ETString gpio::run_(const ETString &arguments, CommandContext *context, int &exi
             opMask.denyMode = true;
         }
 
-        auto inputPins = parsePins_(tokens[1]);
+        auto inputPins = parsePins_(parseResult.remainingArguments[1]);
         for (const auto &pinInput : inputPins)
         {
             ETString resolved;
@@ -374,7 +367,7 @@ ETString gpio::run_(const ETString &arguments, CommandContext *context, int &exi
 
     if (command == "allow")
     {
-        if (tokens.size() < 2)
+        if (parseResult.remainingArguments.size() < 2)
         {
             exitCode = 1;
             return "Usage: gpio allow [pin[,pin...]] [read|write|mode|include|exclude ...]\n";
@@ -386,7 +379,7 @@ ETString gpio::run_(const ETString &arguments, CommandContext *context, int &exi
         opMask.denyMode = false;
         opMask.denyInclude = false;
         opMask.denyExclude = false;
-        ETString parseError = parseOperationTokens_(tokens, 2, opMask);
+        ETString parseError = parseOperationTokens_(parseResult.remainingArguments, 2, opMask);
         if (!parseError.empty())
         {
             exitCode = 1;
@@ -394,9 +387,9 @@ ETString gpio::run_(const ETString &arguments, CommandContext *context, int &exi
         }
 
         bool hasExplicitOps = false;
-        for (size_t i = 2; i < tokens.size(); i++)
+        for (size_t i = 2; i < parseResult.remainingArguments.size(); i++)
         {
-            if (tokens[i] != "--protected")
+            if (parseResult.remainingArguments[i] != "--protected")
             {
                 hasExplicitOps = true;
                 break;
@@ -409,7 +402,7 @@ ETString gpio::run_(const ETString &arguments, CommandContext *context, int &exi
             opMask.denyMode = true;
         }
 
-        auto inputPins = parsePins_(tokens[1]);
+        auto inputPins = parsePins_(parseResult.remainingArguments[1]);
         for (const auto &pinInput : inputPins)
         {
             ETString resolved;
@@ -550,20 +543,6 @@ bool gpio::isAuthenticated_(CommandContext *context) const
 bool gpio::requiresAuthentication_(const GpioExclusionRule &rule) const
 {
     return auth_ != nullptr && rule.passwordProtected;
-}
-
-ETVector<ETString> gpio::tokenize_(const ETString &arguments) const
-{
-    auto tokens = split(arguments.trim(), " ");
-    ETVector<ETString> filtered;
-    for (const auto &token : tokens)
-    {
-        if (!token.trim().empty())
-        {
-            filtered.push_back(token.trim());
-        }
-    }
-    return filtered;
 }
 
 ETString gpio::parseOperationTokens_(const ETVector<ETString> &tokens, size_t startIndex, GpioExclusionRule &rule)

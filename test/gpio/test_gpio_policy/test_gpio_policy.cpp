@@ -89,6 +89,121 @@ void test_policy_runtime_include_overrides_allowlist(void)
     TEST_ASSERT_TRUE(reason.find("allowlist") != ETString::npos);
 }
 
+void test_policy_allows_all_by_default(void)
+{
+    ConfigurableGpioPolicy policy("test", true, "", "");
+    ETString reason;
+
+    TEST_ASSERT_TRUE(policy.isOperationAllowed("GPIO1", GpioOperation::Read, reason));
+    TEST_ASSERT_TRUE(policy.isOperationAllowed("GPIO2", GpioOperation::Write, reason));
+    TEST_ASSERT_TRUE(policy.isOperationAllowed("GPIO3", GpioOperation::Mode, reason));
+    TEST_ASSERT_TRUE(policy.isOperationAllowed("PA0", GpioOperation::InterruptMode, reason));
+}
+
+void test_policy_selective_operation_denial(void)
+{
+    ConfigurableGpioPolicy policy("test", true, "", "");
+    ETString reason;
+
+    GpioExclusionRule denyReadRule;
+    denyReadRule.pinId = "GPIO5";
+    denyReadRule.denyRead = true;
+    denyReadRule.denyWrite = false;
+    denyReadRule.denyMode = false;
+
+    ETString addReason;
+    TEST_ASSERT_TRUE(policy.addExclusion(denyReadRule, addReason));
+
+    TEST_ASSERT_FALSE(policy.isOperationAllowed("GPIO5", GpioOperation::Read, reason));
+    TEST_ASSERT_TRUE(reason.find("denied") != ETString::npos);
+
+    TEST_ASSERT_TRUE(policy.isOperationAllowed("GPIO5", GpioOperation::Write, reason));
+    TEST_ASSERT_TRUE(policy.isOperationAllowed("GPIO5", GpioOperation::Mode, reason));
+}
+
+void test_policy_multiple_exclusions(void)
+{
+    ConfigurableGpioPolicy policy("test", true, "", "");
+    ETString reason;
+
+    GpioExclusionRule rule1;
+    rule1.pinId = "GPIO1";
+    rule1.denyWrite = true;
+
+    GpioExclusionRule rule2;
+    rule2.pinId = "GPIO2";
+    rule2.denyRead = true;
+
+    ETString reason1, reason2;
+    TEST_ASSERT_TRUE(policy.addExclusion(rule1, reason1));
+    TEST_ASSERT_TRUE(policy.addExclusion(rule2, reason2));
+
+    TEST_ASSERT_TRUE(policy.isOperationAllowed("GPIO1", GpioOperation::Read, reason));
+    TEST_ASSERT_FALSE(policy.isOperationAllowed("GPIO1", GpioOperation::Write, reason));
+
+    TEST_ASSERT_FALSE(policy.isOperationAllowed("GPIO2", GpioOperation::Read, reason));
+    TEST_ASSERT_TRUE(policy.isOperationAllowed("GPIO2", GpioOperation::Write, reason));
+}
+
+void test_policy_alias_case_insensitive_resolution(void)
+{
+    ConfigurableGpioPolicy policy("test", false, "GPIO2,PA5,PB10", "");
+    ETString resolved;
+
+    TEST_ASSERT_TRUE(policy.resolveIdentifier("GPIO2", resolved));
+    TEST_ASSERT_TRUE(resolved == "GPIO2");
+
+    TEST_ASSERT_TRUE(policy.resolveIdentifier("gpio2", resolved));
+    TEST_ASSERT_TRUE(resolved == "GPIO2");
+
+    TEST_ASSERT_TRUE(policy.resolveIdentifier("PA5", resolved));
+    TEST_ASSERT_TRUE(resolved == "PA5");
+
+    TEST_ASSERT_TRUE(policy.resolveIdentifier("pa5", resolved));
+    TEST_ASSERT_TRUE(resolved == "PA5");
+}
+
+void test_policy_numeric_alias_resolution(void)
+{
+    ConfigurableGpioPolicy policy("test", false, "GPIO0,GPIO1,GPIO2,GPIO3", "");
+    ETString resolved;
+
+    for (int i = 0; i < 4; i++)
+    {
+        ETString numStr = std::to_string(i).c_str();
+        TEST_ASSERT_TRUE(policy.resolveIdentifier(numStr, resolved));
+
+        ETString expected = "GPIO";
+        expected += numStr;
+        TEST_ASSERT_TRUE(resolved == expected);
+    }
+}
+
+void test_compile_time_auth_multiple_passwords(void)
+{
+    ETString hash1 = CompileTimeGpioAuth::hashPasswordHex("password1");
+    ETString hash2 = CompileTimeGpioAuth::hashPasswordHex("password2");
+
+    CompileTimeGpioAuth auth1(hash1);
+    CompileTimeGpioAuth auth2(hash2);
+
+    TEST_ASSERT_TRUE(auth1.verifyPassword("password1"));
+    TEST_ASSERT_FALSE(auth1.verifyPassword("password2"));
+
+    TEST_ASSERT_TRUE(auth2.verifyPassword("password2"));
+    TEST_ASSERT_FALSE(auth2.verifyPassword("password1"));
+}
+
+void test_policy_empty_allowlist_allows_nothing(void)
+{
+    ConfigurableGpioPolicy policy("test", false, "", "");
+    ETString reason;
+
+    TEST_ASSERT_FALSE(policy.isOperationAllowed("GPIO1", GpioOperation::Read, reason));
+    TEST_ASSERT_FALSE(policy.isOperationAllowed("PA0", GpioOperation::Write, reason));
+    TEST_ASSERT_FALSE(policy.isOperationAllowed("PB1", GpioOperation::Mode, reason));
+}
+
 void process_tests()
 {
     UNITY_BEGIN();
@@ -97,6 +212,13 @@ void process_tests()
     RUN_TEST(test_policy_forced_exclusion_blocks_operations);
     RUN_TEST(test_compile_time_auth_hash_validation);
     RUN_TEST(test_policy_runtime_include_overrides_allowlist);
+    RUN_TEST(test_policy_allows_all_by_default);
+    RUN_TEST(test_policy_selective_operation_denial);
+    RUN_TEST(test_policy_multiple_exclusions);
+    RUN_TEST(test_policy_alias_case_insensitive_resolution);
+    RUN_TEST(test_policy_numeric_alias_resolution);
+    RUN_TEST(test_compile_time_auth_multiple_passwords);
+    RUN_TEST(test_policy_empty_allowlist_allows_nothing);
     UNITY_END();
 }
 

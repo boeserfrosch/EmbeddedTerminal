@@ -131,13 +131,13 @@ void test_empty()
 void test_to_lower()
 {
     ETString a = "ABC";
-    a.toLowerCase();
+    a = a.toLowerCase();
     TEST_ASSERT_EQUAL_STRING("abc", a.c_str());
     a = "abcd";
-    a.toLowerCase();
+    a = a.toLowerCase();
     TEST_ASSERT_EQUAL_STRING("abcd", a.c_str());
     a = "FOO_BAR& ";
-    a.toLowerCase();
+    a = a.toLowerCase();
     TEST_ASSERT_EQUAL_STRING("foo_bar& ", a.c_str());
 }
 
@@ -161,6 +161,11 @@ void test_find()
     TEST_ASSERT_EQUAL_UINT32(ETString::npos, r5);
     auto r5b = s.find('Z', 4);
     TEST_ASSERT_EQUAL_UINT32(ETString::npos, r5b);
+    ETString line0 = "line4\nline5\nline6\nline7\nline8\nline9\nline10\nline11\nline12\n";
+    auto r6 = line0.find("line11");
+    TEST_ASSERT_NOT_EQUAL(ETString::npos, r6);
+    TEST_ASSERT_EQUAL(0, line0.find("line4"));
+    TEST_ASSERT_EQUAL(43, line0.find("line11"));
 }
 
 void test_find_last_of()

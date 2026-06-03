@@ -15,7 +15,7 @@ namespace EmbeddedTerminal
     class ESPIDFGpioInterface : public IGpioInterface
     {
     public:
-        explicit ESPIDFGpioInterface(const ETVector<int> &pins)
+        ESPIDFGpioInterface(const ETVector<int> &pins)
         {
             for (auto pin : pins)
             {

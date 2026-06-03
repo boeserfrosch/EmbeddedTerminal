@@ -11,7 +11,7 @@ namespace EmbeddedTerminal
     class ArduinoFileSystem : public IFileSystem
     {
     public:
-        explicit ArduinoFileSystem(FS &fs) : mount_(&fs) {}
+        ArduinoFileSystem(FS &fs) : mount_(&fs) {}
         virtual ~ArduinoFileSystem() = default;
 
         ETFile open(const Path &path, const char *mode = FILE_MODE_READ, const bool create = false) override

@@ -17,7 +17,7 @@ namespace EmbeddedTerminal
     class ESPIDFTerminalStream : public ITerminalStream
     {
     public:
-        explicit ESPIDFTerminalStream(uart_port_t uartPort)
+        ESPIDFTerminalStream(uart_port_t uartPort)
             : uartPort_(uartPort)
         {
         }

@@ -9,8 +9,7 @@
 #endif
 #include "commands/mkdir.h"
 #include "../../Mocks/native/MockFileSystem.h"
-#include "../../Mocks/MockStream.h"
-#include "../../Mocks/CommandRuntimeTestUtils.h"
+#include "../utils.h"
 #include "DirectoryNavigator.h"
 #include "StorageSystem.h"
 #include "../../Mocks/native/MockStorageMedia.h"
@@ -43,19 +42,17 @@ void tearDown(void)
 void test_mkdir_valid_directory(void)
 {
     cmd::mkdir mkdir(*dir);
-    ETString keyword = "mkdir";
-    ETString arg = "newdir";
-    ETString result = mkdir.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("created") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("mkdir", {"newdir"});
+    CommandResult result = mkdir.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains("created"));
 }
 
 void test_mkdir_existing_directory(void)
 {
     cmd::mkdir mkdir(*dir);
-    ETString keyword = "mkdir";
-    ETString arg = "existingdir";
-    ETString result = mkdir.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("already exists") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("mkdir", {"existingdir"});
+    CommandResult result = mkdir.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains("already exists"));
 }
 
 void test_mkdir_usage(void)
@@ -70,9 +67,9 @@ void test_mkdir_edge_cases(void)
 {
     cmd::mkdir mkdir(*dir);
     ETString keyword = "mkdir";
-    ETString arg = "   ";
-    ETString result = mkdir.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("Missing required argument: folder") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("mkdir");
+    CommandResult result = mkdir.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains(mkdir.usage(keyword)));
 }
 
 void test_mkdir_auto_completion_directory_suggestions(void)
@@ -87,19 +84,13 @@ void test_mkdir_execute_writes_stdout(void)
 {
     cmd::mkdir mkdir(*dir);
 
-    MockStream stream;
-    ETMap<ETString, ETString> vars;
-    CommandContext context{vars, 0, true};
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
-
-    CommandInvocation invocation{"mkdir", "newdir2", context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = mkdir.execute(invocation);
+    auto iHandle = TestCommandInvocationHandle("mkdir", {"newdir"});
+    CommandResult result = mkdir.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);
-    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("created") != ETString::npos);
-    TEST_ASSERT_TRUE(stream.stderrBuffer.empty());
+    TEST_MESSAGE(("Output: " + iHandle.output).c_str());
+    TEST_ASSERT_TRUE(iHandle.output.contains("created"));
+    TEST_ASSERT_TRUE(iHandle.error.empty());
 }
 
 void process_tests()

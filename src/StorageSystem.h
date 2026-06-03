@@ -2,6 +2,7 @@
 #define ET_STORAGE_SYSTEM_H
 
 #include "interfaces/IStorage.h"
+#include "ETTypes.h"
 #include <cstring>
 
 namespace EmbeddedTerminal
@@ -61,17 +62,17 @@ namespace EmbeddedTerminal
             Path p = path;
             if (!p.isAbsolute())
             {
-                p = "/" + p; // Make it absolute for easier matching
+                p = Path("/") + p; // Make it absolute for easier matching
             }
 
-            Path longestMatch;
+            const Path *longestMatch = nullptr;
             IStorageMedia *found = nullptr;
             for (const auto &kv : mountPoints_)
             {
                 Path prefix = kv.first + "/";
-                if (p.isChildOf(prefix) && (longestMatch.isEmpty() || prefix.isChildOf(longestMatch)))
+                if (p.isChildOf(prefix) && (!longestMatch || prefix.isChildOf(*longestMatch)))
                 {
-                    longestMatch = prefix;
+                    longestMatch = &kv.first;
                     found = kv.second;
                 }
             }
@@ -83,7 +84,7 @@ namespace EmbeddedTerminal
             auto media = getMediaFromPath(path);
             if (!media)
                 return ETFile();
-            ETString fsPath = stripMediaPrefix(path);
+            Path fsPath = stripMediaPrefix(path);
             auto fs = media->fileSystem();
             if (!fs)
                 return ETFile();
@@ -97,7 +98,7 @@ namespace EmbeddedTerminal
             {
                 return false;
             }
-            ETString fsPath = stripMediaPrefix(path);
+            Path fsPath = stripMediaPrefix(path);
             auto fs = media->fileSystem();
             if (!fs)
                 return false;
@@ -108,7 +109,7 @@ namespace EmbeddedTerminal
             auto media = getMediaFromPath(path);
             if (!media)
                 return false;
-            ETString fsPath = stripMediaPrefix(path);
+            Path fsPath = stripMediaPrefix(path);
             auto fs = media->fileSystem();
             if (!fs)
                 return false;
@@ -120,7 +121,7 @@ namespace EmbeddedTerminal
             auto media = getMediaFromPath(path);
             if (!media)
                 return false;
-            ETString fsPath = stripMediaPrefix(path);
+            Path fsPath = stripMediaPrefix(path);
             auto fs = media->fileSystem();
             if (!fs)
                 return false;
@@ -132,7 +133,7 @@ namespace EmbeddedTerminal
             auto media = getMediaFromPath(path);
             if (!media)
                 return false;
-            ETString fsPath = stripMediaPrefix(path);
+            Path fsPath = stripMediaPrefix(path);
             auto fs = media->fileSystem();
             if (!fs)
                 return false;
@@ -143,7 +144,7 @@ namespace EmbeddedTerminal
             auto media = getMediaFromPath(path);
             if (!media)
                 return false;
-            ETString fsPath = stripMediaPrefix(path);
+            Path fsPath = stripMediaPrefix(path);
             auto fs = media->fileSystem();
             if (!fs)
                 return false;
@@ -154,18 +155,18 @@ namespace EmbeddedTerminal
             auto media = getMediaFromPath(path);
             if (!media)
                 return false;
-            ETString fsPath = stripMediaPrefix(path);
+            Path fsPath = stripMediaPrefix(path);
             auto fs = media->fileSystem();
             if (!fs)
                 return false;
             return fs->rmdir(fsPath);
         }
-        ETVector<Path> list(const Path &path, const ETString &prefix = "") const override
+        ETVector<Path> list(const Path &path, const ETString &prefix = ETString("")) const override
         {
             auto media = getMediaFromPath(path);
             if (!media)
                 return ETVector<Path>();
-            ETString fsPath = stripMediaPrefix(path);
+            Path fsPath = stripMediaPrefix(path);
             auto fs = media->fileSystem();
             if (!fs)
                 return ETVector<Path>();
@@ -192,13 +193,13 @@ namespace EmbeddedTerminal
             if (!srcFS || !dstFS)
                 return false;
 
-            ETString srcFSPath = stripMediaPrefix(srcPath);
-            ETString dstFSPath = stripMediaPrefix(dstPath);
+            Path srcFSPath = stripMediaPrefix(srcPath);
+            Path dstFSPath = stripMediaPrefix(dstPath);
 
             ETFile srcFile = srcFS->open(srcFSPath, FILE_MODE_READ);
             if (!srcFile.isOpen())
                 return false;
-            ETString content = srcFile.readAll();
+            auto content = srcFile.readAll();
             srcFile.close();
             ETFile dstFile = dstFS->open(dstFSPath, FILE_MODE_WRITE, true);
             if (!dstFile.isOpen())
@@ -219,7 +220,7 @@ namespace EmbeddedTerminal
             auto m = getMediaFromPath(path);
             if (!m)
                 return false;
-            ETString fsPath = stripMediaPrefix(path);
+            Path fsPath = stripMediaPrefix(path);
             auto fs = m->fileSystem();
             if (!fs)
                 return false;
@@ -235,7 +236,7 @@ namespace EmbeddedTerminal
         {
             for (const auto &kv : mountPoints_)
             {
-                ETString prefix = kv.first + "/";
+                Path prefix = kv.first + "/";
                 if (path.isChildOf(prefix) == 0)
                     return path.relativeTo(prefix);
             }

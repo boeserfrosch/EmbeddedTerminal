@@ -118,7 +118,7 @@ namespace
         static constexpr int BUZZER = 22;
         static constexpr int TICK_MS = 50;
 
-        explicit Script2SchedulerHarness(MockGpioScenario &gpio)
+        Script2SchedulerHarness(MockGpioScenario &gpio)
             : gpio_(gpio)
         {
         }

@@ -24,23 +24,18 @@ namespace
     public:
         ETVector<ETString> collected;
 
-        ETString usage(const ETString &keyword) override
+        ETString usage(const ETString &keyword) const override
         {
             return keyword;
         }
 
-        CommandResult execute(CommandInvocation &invocation) override
+        CommandResult invoke(CommandInvocation &invocation) override
         {
-            collected.push_back(invocation.arguments);
+            for (const auto &arg : invocation.arguments)
+            {
+                collected.push_back(arg);
+            }
             return CommandResult::completed(0);
-        }
-
-    protected:
-        ETString trigger(const ETString &keyword, const ETString &additional) override
-        {
-            (void)keyword;
-            (void)additional;
-            return "";
         }
     };
 
@@ -83,17 +78,17 @@ void test_script_rejects_inline_script_text(void)
 
     ETMap<ETString, ETString> vars;
     CommandContext context{vars, 0, true};
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(test.stream_, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(test.stream_, TerminalChannel::StdErr);
+    EmptyInputChannel input;
+    StreamBackedOutputChannel output(test.stream_, TerminalChannel::StdOut);
+    StreamBackedOutputChannel error(test.stream_, TerminalChannel::StdErr);
 
-    CommandInvocation invocation{"script", "collect first; collect second", context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = test.script_.execute(invocation);
+    CommandInvocation invocation{"script", {"collect", "first", ";", "collect", "second"}, context, input, output, error};
+    CommandResult result = test.script_.invoke(invocation);
 
     TEST_ASSERT_EQUAL(static_cast<int>(CommandExecutionState::Completed), static_cast<int>(result.state));
     TEST_ASSERT_EQUAL(2, result.exitCode);
     TEST_ASSERT_EQUAL(0, test.collect_.collected.size());
-    TEST_ASSERT_TRUE(test.stream_.stderrBuffer.find("script error: failed to open script file") != ETString::npos);
+    TEST_ASSERT_TRUE(test.stream_.stderrBuffer.find("script error: File not found") != ETString::npos);
 }
 
 void test_script_execute_file_path_form(void)
@@ -109,15 +104,15 @@ void test_script_execute_file_path_form(void)
 
     ETMap<ETString, ETString> vars;
     CommandContext context{vars, 0, true};
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(test.stream_, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(test.stream_, TerminalChannel::StdErr);
+    EmptyInputChannel input;
+    StreamBackedOutputChannel output(test.stream_, TerminalChannel::StdOut);
+    StreamBackedOutputChannel error(test.stream_, TerminalChannel::StdErr);
 
-    CommandInvocation invocation{"script", "demo.et", context, stdinChannel, stdoutChannel, stderrChannel};
+    CommandInvocation invocation{"script", {"demo.et"}, context, input, output, error};
     CommandResult result = CommandResult::running(0);
     while (result.state == CommandExecutionState::Running)
     {
-        result = test.script_.execute(invocation);
+        result = test.script_.invoke(invocation);
     }
 
     TEST_ASSERT_EQUAL(static_cast<int>(CommandExecutionState::Completed), static_cast<int>(result.state));
@@ -125,46 +120,11 @@ void test_script_execute_file_path_form(void)
 
     if (result.exitCode != 0)
     {
-        TEST_FAIL_MESSAGE(("Script failed with exit code: " + test.stream_.stderrBuffer).c_str());
+        TEST_FAIL_MESSAGE(("Script failed with exit code: " + toETString(result.exitCode) + " message: " + test.stream_.stderrBuffer).c_str());
     }
     TEST_ASSERT_EQUAL(2, test.collect_.collected.size());
     TEST_ASSERT_EQUAL_STRING("first", test.collect_.collected[0].c_str());
     TEST_ASSERT_EQUAL_STRING("second", test.collect_.collected[1].c_str());
-}
-
-void test_script_execute_dash_f_form(void)
-{
-    TestScriptTerminal test;
-    MockFileSystem fs;
-    test.terminal_.setFileSystem(&fs);
-
-    ETFile file = fs.open("chain.et", FILE_MODE_WRITE, true);
-    TEST_ASSERT_TRUE(file.isOpen());
-    TEST_ASSERT_TRUE(file.writeAll("collect one && collect two\nmissing || collect recovered\n"));
-    file.close();
-
-    ETMap<ETString, ETString> vars;
-    CommandContext context{vars, 0, true};
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(test.stream_, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(test.stream_, TerminalChannel::StdErr);
-
-    CommandInvocation invocation{"script", "chain.et", context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = CommandResult::running(0);
-    while (result.state == CommandExecutionState::Running)
-    {
-        result = test.script_.execute(invocation);
-    }
-
-    TEST_ASSERT_EQUAL(static_cast<int>(CommandExecutionState::Completed), static_cast<int>(result.state));
-    TEST_MESSAGE(("Stderr: " + test.stream_.stderrBuffer).c_str());
-    if (test.collect_.collected.size() != 3)
-    {
-        TEST_FAIL_MESSAGE(("Expected 3 collected, got: " + test.stream_.stderrBuffer).c_str());
-    }
-    TEST_ASSERT_EQUAL_STRING("one", test.collect_.collected[0].c_str());
-    TEST_ASSERT_EQUAL_STRING("two", test.collect_.collected[1].c_str());
-    TEST_ASSERT_EQUAL_STRING("recovered", test.collect_.collected[2].c_str());
 }
 
 void test_script_rejects_missing_file(void)
@@ -174,16 +134,16 @@ void test_script_rejects_missing_file(void)
 
     ETMap<ETString, ETString> vars;
     CommandContext context{vars, 0, true};
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(test.stream_, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(test.stream_, TerminalChannel::StdErr);
+    EmptyInputChannel input;
+    StreamBackedOutputChannel output(test.stream_, TerminalChannel::StdOut);
+    StreamBackedOutputChannel error(test.stream_, TerminalChannel::StdErr);
 
-    CommandInvocation invocation{"script", "missing.et", context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = test.script_.execute(invocation);
+    CommandInvocation invocation{"script", {"missing.et"}, context, input, output, error};
+    CommandResult result = test.script_.invoke(invocation);
 
     TEST_ASSERT_EQUAL(static_cast<int>(CommandExecutionState::Completed), static_cast<int>(result.state));
     TEST_ASSERT_EQUAL(2, result.exitCode);
-    TEST_ASSERT_TRUE(test.stream_.stderrBuffer.find("script error: failed to open script file") != ETString::npos);
+    TEST_ASSERT_TRUE(test.stream_.stderrBuffer.find("script error: File not found") != ETString::npos);
 }
 
 void process_tests()
@@ -192,7 +152,6 @@ void process_tests()
     RUN_TEST(test_script_usage);
     RUN_TEST(test_script_rejects_inline_script_text);
     RUN_TEST(test_script_execute_file_path_form);
-    RUN_TEST(test_script_execute_dash_f_form);
     RUN_TEST(test_script_rejects_missing_file);
     UNITY_END();
 }

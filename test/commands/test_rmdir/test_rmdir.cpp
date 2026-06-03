@@ -9,8 +9,7 @@
 #endif
 #include "commands/rmdir.h"
 #include "../../Mocks/native/MockFileSystem.h"
-#include "../../Mocks/MockStream.h"
-#include "../../Mocks/CommandRuntimeTestUtils.h"
+#include "../utils.h"
 #include "DirectoryNavigator.h"
 
 #include "StorageSystem.h"
@@ -48,8 +47,9 @@ void test_rmdir_valid_directory(void)
     cmd::rmdir rmdir(*dir);
     ETString keyword = "rmdir";
     ETString arg = "dir1";
-    ETString result = rmdir.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("removed") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("rmdir", {arg});
+    CommandResult result = rmdir.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains("removed"));
 }
 
 void test_rmdir_nonexistent_directory(void)
@@ -57,8 +57,9 @@ void test_rmdir_nonexistent_directory(void)
     cmd::rmdir rmdir(*dir);
     ETString keyword = "rmdir";
     ETString arg = "no_dir";
-    ETString result = rmdir.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("did not exist") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("rmdir", {arg});
+    CommandResult result = rmdir.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains("did not exist"));
 }
 
 void test_rmdir_file_instead_of_directory(void)
@@ -66,8 +67,9 @@ void test_rmdir_file_instead_of_directory(void)
     cmd::rmdir rmdir(*dir);
     ETString keyword = "rmdir";
     ETString arg = "file.txt";
-    ETString result = rmdir.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("not a directory") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("rmdir", {arg});
+    CommandResult result = rmdir.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains("not a directory"));
 }
 
 void test_rmdir_usage(void)
@@ -82,9 +84,9 @@ void test_rmdir_edge_cases(void)
 {
     cmd::rmdir rmdir(*dir);
     ETString keyword = "rmdir";
-    ETString arg = "   ";
-    ETString result = rmdir.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("Missing required argument: folder") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("rmdir");
+    CommandResult result = rmdir.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains(rmdir.usage(keyword)));
 }
 
 void test_rmdir_subdirectory(void)
@@ -92,8 +94,9 @@ void test_rmdir_subdirectory(void)
     cmd::rmdir rmdir(*dir);
     ETString keyword = "rmdir";
     ETString arg = "/foo/bar/baz";
-    ETString result = rmdir.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("removed") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("rmdir", {arg});
+    CommandResult result = rmdir.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains("removed"));
     TEST_ASSERT_TRUE(storage->exists("/foo/bar"));
     TEST_ASSERT_FALSE(storage->exists("/foo/bar/baz"));
 }
@@ -103,8 +106,9 @@ void test_rmdir_notemptydirectory(void)
     cmd::rmdir rmdir(*dir);
     ETString keyword = "rmdir";
     ETString arg = "/foo/bar";
-    ETString result = rmdir.trigger(keyword, arg);
-    TEST_ASSERT_TRUE(result.find("is not empty") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle("rmdir", {arg});
+    CommandResult result = rmdir.invoke(iHandle.invocation);
+    TEST_ASSERT_TRUE(iHandle.output.contains("is not empty"));
     TEST_ASSERT_TRUE(storage->exists("/foo/bar/baz"));
     TEST_ASSERT_TRUE(storage->exists("/foo/bar"));
 }
@@ -129,19 +133,12 @@ void test_rmdir_execute_writes_stdout(void)
 {
     cmd::rmdir rmdir(*dir);
 
-    MockStream stream;
-    ETMap<ETString, ETString> vars;
-    CommandContext context{vars, 0, true};
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
-
-    CommandInvocation invocation{"rmdir", "dir1", context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = rmdir.execute(invocation);
+    auto iHandle = TestCommandInvocationHandle("rmdir", {"dir1"});
+    CommandResult result = rmdir.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);
-    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("removed") != ETString::npos);
-    TEST_ASSERT_TRUE(stream.stderrBuffer.empty());
+    TEST_ASSERT_TRUE(iHandle.output.contains("removed"));
+    TEST_ASSERT_TRUE(iHandle.error.empty());
 }
 
 void process_tests()

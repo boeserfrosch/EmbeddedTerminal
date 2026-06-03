@@ -6,57 +6,46 @@
 #include "interfaces/ICommandRuntime.h"
 #include "interfaces/IAutoCompleter.h"
 #include "DefaultAutoCompleters.h"
-#include "Terminal.h"
 
 namespace EmbeddedTerminal
 {
     namespace cmd
     {
-        namespace errorCodes
-        {
-            enum CatCmdErrorCode
-            {
-                CAT_CMD_ERROR_NONE = 0,
-                CAT_CMD_ERROR_INVALID_PATH = 1,
-                CAT_CMD_ERROR_FILE_NOT_FOUND = 2,
-                CAT_CMD_ERROR_IS_DIRECTORY = 3,
-                CAT_CMD_ERROR_FAILED_TO_OPEN_FILE = 4,
-                CAT_CMD_ERROR_FAILED_TO_SEEK = 5,
-                CAT_CMD_ERROR_FAILED_TO_READ = 6
-            };
-        }
-
         class cat : public ICommand
         {
-
         public:
+            enum ErrorCode
+            {
+                NONE = 0,
+                INVALID_PATH = 1,
+                FILE_NOT_FOUND = 2,
+                IS_DIRECTORY = 3,
+                FAILED_TO_OPEN_FILE = 4,
+                FAILED_TO_SEEK = 5,
+                FAILED_TO_READ = 6,
+            };
+
             cat(DirectoryNavigator &dir) : dir_(dir), completer_(dir)
             {
             }
-            ETString usage(const ETString &keyword);
-            CommandResult execute(CommandInvocation &invocation) override;
-            ETString trigger(const ETString &keyword, const ETString &additional) override;
+            ETString usage(const ETString &keyword) const override;
+            CommandResult invoke(CommandInvocation &invocation) override;
+            CommandResult resume(CommandInvocation &invocation) override;
 
             // Auto completion - suggest files and directories
-            ETVector<ETString> getSuggestions(const ETString &partial) override;
+            ETVector<ETString> getSuggestions(const ETString &partial) const override;
 
         private:
-            struct CatState
-            {
-                ETString path;
-                size_t position = 0;
-            };
-
-            CatState handleState_(CommandInvocation &invocation);
-            errorCodes::CatCmdErrorCode checkState_(const CatState &state, CommandInvocation &invocation);
-            bool processChunk_(ETFile &file, size_t filePos, CommandInvocation &invocation);
+            ErrorCode checkFilePath_(CommandInvocation &invocation);
+            CommandResult processExecution_(CommandInvocation &invocation);
+            void reset(CommandInvocation &invocation);
 
             static constexpr size_t CHUNK_SIZE = 512;
             static constexpr const char *SESSION_KEY_PATH = "cat__path";
             static constexpr const char *SESSION_KEY_POS = "cat__pos";
 
-            ETString readFileForTrigger(const ETString &additional);
-            CommandResult executeStream(CommandInvocation &invocation);
+            // ETString readFileForTrigger(const ETString &additional);
+            // CommandResult executeStream(CommandInvocation &invocation);
             EmbeddedTerminal::DirectoryNavigator dir_;
             FilePathCompleter completer_;
         };

@@ -161,3 +161,9 @@ coverage-*.txt
 
 # Examples artifacts
 main.cpp
+
+# Temporary text files
+*.txt
+# But we want to keep some files
+!CMakeLists.txt
+!keywords.txt

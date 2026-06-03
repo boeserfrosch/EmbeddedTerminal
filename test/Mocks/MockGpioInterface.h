@@ -1,7 +1,7 @@
 #ifndef MOCKGPIOINTERFACE_H
 #define MOCKGPIOINTERFACE_H
 
-#include "../../src/interfaces/IGpioInterface.h"
+#include "interfaces/IGpioInterface.h"
 
 class MockGpioInterface : public EmbeddedTerminal::IGpioInterface
 {

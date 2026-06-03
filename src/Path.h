@@ -1,4 +1,3 @@
-#pragma once
 #ifndef ET_PATH_H
 #define ET_PATH_H
 
@@ -31,7 +30,7 @@ namespace EmbeddedTerminal
             }
             else
             {
-                cachedString_ = ::join(pathParts_, "/");
+                cachedString_ = ::join(pathParts_, ETString("/"));
                 if (isAbsolute_)
                 {
                     cachedString_ = "/" + cachedString_;
@@ -42,16 +41,16 @@ namespace EmbeddedTerminal
             return cachedString_;
         }
 
-        ETString cleanUpStringPath_(const ETString &path) const
+        static ETString cleanUpStringPath_(const ETString &path)
         {
-            ETString cleaned = path.trim();
+            ETString cleaned(path.trim());
             // Replace backslashes with slashes
             for (size_t i = 0; i < cleaned.length(); ++i)
             {
                 if (cleaned[i] == '\\')
                     cleaned[i] = '/';
             }
-            return cleaned;
+            return ETString(cleaned);
         }
 
         void normalize_()
@@ -63,13 +62,13 @@ namespace EmbeddedTerminal
                 {
                     continue; // Skip empty parts caused by consecutive slashes
                 }
-                if (part == "." && !normalizedParts.empty())
+                if (part == ETString(".") && !normalizedParts.empty())
                 {
                     // Skip "." , but only if it's not the first part (to allow for absolute paths)
                     continue;
                 }
                 // Handle ".." by popping the last part if possible, but only if the last part is not also ".." (to avoid removing valid parent directory references in relative paths)
-                else if (part == ".." && !normalizedParts.empty() && (normalizedParts.back() != ".." && normalizedParts.back() != "."))
+                else if (part == ETString("..") && !normalizedParts.empty() && (normalizedParts.back() != ETString("..") && normalizedParts.back() != ETString(".")))
                 {
                     normalizedParts.pop_back();
                 }
@@ -87,21 +86,23 @@ namespace EmbeddedTerminal
          * @brief A utility class for handling file paths. It can parse a path string into its components, resolve relative paths, and provide utilities for working with paths.
          * The Path class can be used to manipulate file paths in a platform-independent way, handling both absolute and relative paths, and normalizing them by resolving "." and ".." components.
          */
-        Path(const ETString &path = "")
+        Path(const ETString &path = ETString(""))
         {
-            ETString cleanedPath = cleanUpStringPath_(path);
-            if (cleanedPath.empty() || cleanedPath == "/")
+            ETString cleanedPath(cleanUpStringPath_(path));
+            if (cleanedPath.empty() || cleanedPath == ETString("/"))
             {
                 isAbsolute_ = true;
                 pathParts_.clear(); // Represent root as empty parts
                 return;
             }
             isAbsolute_ = (cleanedPath.length() > 0 && cleanedPath[0] == '/');
-            pathParts_ = ::split(cleanedPath, "/");
+            pathParts_ = ::split(cleanedPath, ETString("/"));
             normalize_();
         }
 
         Path(const char *path) : Path(ETString(path)) {}
+
+        Path(const Path &other) : pathParts_(other.pathParts_), isAbsolute_(other.isAbsolute_), cachedString_(other.cachedString_), cacheDirty_(other.cacheDirty_) {}
 
         /**
          * @brief Converts the Path object back to a string representation. The path components will be joined with "/" as the separator.
@@ -109,12 +110,27 @@ namespace EmbeddedTerminal
          */
         operator ETString() const
         {
-            return asString_();
+            return ETString(asString_());
         }
 
         operator const char *() const
         {
             return c_str();
+        }
+
+        Path operator=(const ETString &other)
+        {
+            *this = Path(other);
+            return *this;
+        }
+
+        Path operator=(const Path &other)
+        {
+            pathParts_ = other.pathParts_;
+            isAbsolute_ = other.isAbsolute_;
+            cachedString_ = other.cachedString_;
+            cacheDirty_ = other.cacheDirty_;
+            return *this;
         }
 
         bool operator==(const Path &other) const
@@ -157,7 +173,7 @@ namespace EmbeddedTerminal
         Path operator+(const char *other) const
         {
             Path p = *this;
-            auto otherParts = ::split(ETString(other), "/");
+            auto otherParts = ::split(ETString(other), ETString("/"));
             p.pathParts_ += otherParts;
             p.normalize_();
             return p;
@@ -200,7 +216,7 @@ namespace EmbeddedTerminal
         Path getBasePath() const
         {
             if (pathParts_.empty())
-                return Path("");
+                return Path(ETString(""));
             Path basePath;
             basePath.pathParts_ = ETVector<ETString>(pathParts_.begin(), pathParts_.end() - 1);
             basePath.isAbsolute_ = isAbsolute_;
@@ -210,8 +226,8 @@ namespace EmbeddedTerminal
         ETString getName() const
         {
             if (pathParts_.empty())
-                return "";
-            return pathParts_.back();
+                return ETString("");
+            return ETString(pathParts_.back());
         }
 
         bool isEmpty() const

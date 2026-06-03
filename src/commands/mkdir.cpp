@@ -3,39 +3,42 @@
 #include <sstream>
 
 using namespace EmbeddedTerminal::cmd;
-ETString mkdir::trigger(const ETString &keyword, const ETString &additional)
+
+EmbeddedTerminal::CommandResult mkdir::invoke(CommandInvocation &invocation)
 {
     OptionParser parser;
     parser.addRequiredRemainingArgument("folder");
-    auto parseResult = parser.parse(additional);
+    auto parseResult = parser.parse(invocation.arguments);
     if (!parseResult.success)
     {
-        return parseResult.errorMessage + "\n" + usage(keyword);
+        invocation.streams.output.print(usage(invocation.keyword));
+        return CommandResult::completed(ErrorCode::Missused);
     }
 
     ETString folderName = parseResult.options["folder"][0];
 
     if (dir_.exists(folderName))
     {
-        return folderName + " already exists\n";
+        invocation.streams.output.print(folderName + " already exists\n");
+        return CommandResult::completed(ErrorCode::FolderAlreadyExists);
     }
 
     auto result = dir_.mkdir(folderName.c_str());
     if (!result)
     {
-        ETString ss;
-        ss += "Could not create " + dir_.pwd(folderName.c_str()) + "\n";
-        return ss;
+        invocation.streams.output.print("Could not create " + folderName + "\n");
+        return CommandResult::completed(ErrorCode::FailedToCreateFolder);
     }
-    return folderName + " created\n";
+    invocation.streams.output.print(folderName + " created\n");
+    return CommandResult::completed(ErrorCode::NONE);
 }
 
-ETString mkdir::usage(const ETString &keyword)
+ETString mkdir::usage(const ETString &keyword) const
 {
     return keyword + " <folder> - Create the specified folder in the current directory\n";
 }
 
-ETVector<ETString> mkdir::getSuggestions(const ETString &partial)
+ETVector<ETString> mkdir::getSuggestions(const ETString &partial) const
 {
     return completer_.getSuggestions(partial);
 }

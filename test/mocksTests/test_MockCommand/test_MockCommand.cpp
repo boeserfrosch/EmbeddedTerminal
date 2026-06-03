@@ -5,24 +5,16 @@
 #endif
 #include "../../Mocks/MockCommand.h"
 #include "../../../src/ETTypes.h"
+#include "../../commands/utils.h"
 
 using namespace EmbeddedTerminal;
-
-class TestableMockCommand : public MockCommand
-{
-public:
-    ETString test_trigger(ETString &keyword, ETString &additional)
-    {
-        return trigger(keyword, additional);
-    }
-};
 
 void setUp(void) {}
 void tearDown(void) {}
 
 void test_mockcommand_usage()
 {
-    TestableMockCommand cmd;
+    MockCommand cmd;
     ETString keyword = "test";
     ETString usage = cmd.usage(keyword);
     TEST_ASSERT_TRUE(usage.find("Usage: test") != ETString::npos);
@@ -30,11 +22,13 @@ void test_mockcommand_usage()
 
 void test_mockcommand_trigger()
 {
-    TestableMockCommand cmd;
+    MockCommand cmd;
     ETString keyword = "foo";
     ETString additional = "bar";
-    ETString result = cmd.test_trigger(keyword, additional);
-    TEST_ASSERT_TRUE(result.find("Triggered: foo bar") != ETString::npos);
+    auto iHandle = TestCommandInvocationHandle(keyword, {additional});
+    CommandResult result = cmd.invoke(iHandle.invocation);
+
+    TEST_ASSERT_TRUE(iHandle.output.contains("foo bar"));
     TEST_ASSERT_EQUAL_STRING("foo", cmd.lastKeyword.c_str());
     TEST_ASSERT_EQUAL_STRING("bar", cmd.lastAdditional.c_str());
 }

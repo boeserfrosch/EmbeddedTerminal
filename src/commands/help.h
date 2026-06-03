@@ -1,7 +1,7 @@
 #ifndef HELP_H
 #define HELP_H
 
-#include "Terminal.h"
+#include "interfaces/IExecutionContext.h"
 #include "interfaces/IAutoCompleter.h"
 #include "DefaultAutoCompleters.h"
 
@@ -14,21 +14,26 @@ namespace EmbeddedTerminal
         {
 
         public:
-            help(Terminal &terminal) : terminal_(terminal)
+            enum ErrorCode
+            {
+                None = 0,
+                InvalidArgument = 1,
+                Missused
+            };
+
+            help(IExecutionContext &terminal) : terminal_(terminal)
             {
             }
-            ETString usage(const ETString &keyword);
+            ETString usage(const ETString &keyword) const override;
 
-            CommandResult execute(CommandInvocation &invocation) override;
-
-            ETString trigger(const ETString &keyword, const ETString &additional) override;
+            CommandResult invoke(CommandInvocation &invocation) override;
 
             // Auto completion - suggest command names
-            ETVector<ETString> getSuggestions(const ETString &partial) override;
+            ETVector<ETString> getSuggestions(const ETString &partial) const override;
 
         private:
-            ETString buildHelpOutput(const ETString &additional);
-            Terminal& terminal_;
+            ETString buildHelpOutput(const ETVector<ETString> &additional);
+            IExecutionContext &terminal_;
         };
     };
 };

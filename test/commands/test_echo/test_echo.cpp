@@ -9,26 +9,27 @@
 #endif
 
 #include "commands/echo.h"
-#include "../../Mocks/MockStream.h"
-#include "../../Mocks/CommandRuntimeTestUtils.h"
+#include "../utils.h"
 
 using namespace EmbeddedTerminal;
 
 void setUp(void) {}
 void tearDown(void) {}
 
-void test_echo_trigger_with_text(void)
+void test_echo_with_text(void)
 {
     cmd::echo echoCmd;
-    ETString result = echoCmd.trigger("echo", "hello world");
-    TEST_ASSERT_EQUAL_STRING("hello world\n", result.c_str());
+    auto iHandle = TestCommandInvocationHandle("echo", {"hello world"});
+    echoCmd.invoke(iHandle.invocation);
+    TEST_ASSERT_EQUAL_STRING("hello world\n", iHandle.output.debugOutput.c_str());
 }
 
-void test_echo_trigger_empty_text(void)
+void test_echo_empty_text(void)
 {
     cmd::echo echoCmd;
-    ETString result = echoCmd.trigger("echo", "");
-    TEST_ASSERT_EQUAL_STRING("\n", result.c_str());
+    auto iHandle = TestCommandInvocationHandle("echo", {""});
+    CommandResult result = echoCmd.invoke(iHandle.invocation);
+    TEST_ASSERT_EQUAL_STRING("\n", iHandle.output.debugOutput.c_str());
 }
 
 void test_echo_usage(void)
@@ -42,26 +43,19 @@ void test_echo_execute_writes_stdout(void)
 {
     cmd::echo echoCmd;
 
-    MockStream stream;
-    ETMap<ETString, ETString> vars;
-    CommandContext context{vars, 0, true};
-    EmptyInputChannel stdinChannel;
-    StreamBackedOutputChannel stdoutChannel(stream, TerminalChannel::StdOut);
-    StreamBackedOutputChannel stderrChannel(stream, TerminalChannel::StdErr);
-
-    CommandInvocation invocation{"echo", "embedded terminal", context, stdinChannel, stdoutChannel, stderrChannel};
-    CommandResult result = echoCmd.execute(invocation);
+    auto iHandle = TestCommandInvocationHandle("echo", {"embedded terminal"});
+    CommandResult result = echoCmd.invoke(iHandle.invocation);
 
     TEST_ASSERT_EQUAL(0, result.exitCode);
-    TEST_ASSERT_TRUE(stream.stdoutBuffer.find("embedded terminal") != ETString::npos);
-    TEST_ASSERT_TRUE(stream.stderrBuffer.empty());
+    TEST_ASSERT_TRUE(iHandle.output.contains("embedded terminal"));
+    TEST_ASSERT_TRUE(iHandle.error.empty());
 }
 
 void process_tests()
 {
     UNITY_BEGIN();
-    RUN_TEST(test_echo_trigger_with_text);
-    RUN_TEST(test_echo_trigger_empty_text);
+    RUN_TEST(test_echo_with_text);
+    RUN_TEST(test_echo_empty_text);
     RUN_TEST(test_echo_usage);
     RUN_TEST(test_echo_execute_writes_stdout);
     UNITY_END();
