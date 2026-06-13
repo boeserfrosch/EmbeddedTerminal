@@ -1,6 +1,6 @@
 {
     "name": "EmbeddedTerminal",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Platform-independent terminal library for embedded systems with command parsing, file system abstraction, and network interfaces.",
     "keywords": [
         "terminal",
