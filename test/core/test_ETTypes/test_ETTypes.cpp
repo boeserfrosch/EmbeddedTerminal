@@ -67,6 +67,17 @@ void test_back_push_pop_back()
     TEST_ASSERT_TRUE(s.back() == 'e');
 }
 
+void test_insert_preserves_suffix()
+{
+    ETString s = "abcd";
+    s.insert(2, 'X');
+    TEST_ASSERT_EQUAL_STRING("abXcd", s.c_str());
+
+    ETString t = "ab";
+    t.insert(2, 'X');
+    TEST_ASSERT_EQUAL_STRING("abX", t.c_str());
+}
+
 void test_substr()
 {
     ETString s = "abcdef";
@@ -256,6 +267,7 @@ void processTests()
     RUN_TEST(test_trim);
     RUN_TEST(test_cleanupLine);
     RUN_TEST(test_back_push_pop_back);
+    RUN_TEST(test_insert_preserves_suffix);
     RUN_TEST(test_substr);
     RUN_TEST(test_assign);
     RUN_TEST(test_find);

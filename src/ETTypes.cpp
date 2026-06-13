@@ -216,9 +216,10 @@ void ETString::erase(size_t pos, size_t len)
 void ETString::insert(size_t pos, char c)
 {
 #if defined(ARDUINO) //|| defined(ESP_PLATFORM)
+    auto suffix = data.substring(pos);
     data = data.substring(0, pos);
     data += c;
-    data += data.substring(pos);
+    data += suffix;
 #else
     data = data.substr(0, pos) + c + data.substr(pos);
 #endif
