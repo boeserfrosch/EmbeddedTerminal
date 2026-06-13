@@ -1,4 +1,4 @@
-#include <Unity.h>
+#include <unity.h>
 #include "lang/LangAPI.h"
 
 using namespace EmbeddedTerminal;
