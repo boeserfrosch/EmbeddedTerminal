@@ -11,7 +11,7 @@ For the most accurate and up-to-date information, please refer to the source cod
 
 - ✅ **Platform Independent**: Works on Arduino, ESP32 (ESP-IDF & Arduino), and native environments
 - ✅ **Command System**: Register and execute custom commands with keyword-based parsing
-- ✅ **Command Runtime v2 (Preview)**: Stream-oriented command execution path with exit-code support
+- ✅ **Command Runtime**: Stream-oriented command execution path with exit-code support
 - ✅ **Storage System Abstraction**: Unified mountable storage model via `IStorageSystem` + `IStorageMedia`
 - ✅ **Command Registration**: create the command objects you need and register them explicitly
 - ✅ **GPIO Control**: Secure, policy-driven GPIO access with compile-time password protection
@@ -29,7 +29,7 @@ Add to your `platformio.ini`:
 ```ini
 [env]
 lib_deps = 
-    boeserfrosch/EmbeddedTerminal@^0.2.1
+    boeserfrosch/EmbeddedTerminal@^1.0.0
 ```
 
 ### Arduino Library Manager
